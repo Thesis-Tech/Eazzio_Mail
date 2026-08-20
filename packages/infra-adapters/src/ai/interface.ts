@@ -8,6 +8,8 @@ export interface MessageSummaryInput {
 export interface EazzioAI {
   summarizeThread(messages: MessageSummaryInput[]): Promise<{ summary: string }>;
   suggestReply(thread: MessageSummaryInput[]): Promise<{ suggestions: string[] }>;
-  classifyPriority(message: MessageSummaryInput): Promise<{ priorityHint: 'low' | 'normal' | 'high' }>;
+  classifyPriority(
+    message: MessageSummaryInput,
+  ): Promise<{ priorityHint: 'low' | 'normal' | 'high' }>;
   isEnabled(scopeId: string): Promise<boolean>;
 }

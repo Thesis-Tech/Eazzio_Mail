@@ -1,21 +1,29 @@
-import { EazzioDatabase } from '../interface.js';
+import { PostgresAdapter, PostgresConfig } from '../postgres-adapter/postgres-adapter.js';
+import { EazzioDatabase, DatabaseContext } from '../interface.js';
 
 export class SupabaseAdapter implements EazzioDatabase {
-  public readonly connectionString: string;
+  private readonly adapter: PostgresAdapter;
 
-  constructor(connectionString: string) {
-    this.connectionString = connectionString;
+  constructor(configOrUrl: string | PostgresConfig) {
+    this.adapter = new PostgresAdapter(configOrUrl);
   }
 
-  public async query<T>(_sql: string, _params?: unknown[]): Promise<T[]> {
-    return [] as T[];
+  public async query<T>(sql: string, params?: unknown[]): Promise<T[]> {
+    return this.adapter.query<T>(sql, params);
   }
 
-  public async transaction<T>(fn: (tx: EazzioDatabase) => Promise<T>): Promise<T> {
-    return fn(this);
+  public async transaction<T>(
+    fn: (tx: EazzioDatabase) => Promise<T>,
+    context?: DatabaseContext,
+  ): Promise<T> {
+    return this.adapter.transaction<T>(fn, context);
   }
 
   public async healthCheck(): Promise<{ ok: boolean; latencyMs: number }> {
-    return { ok: true, latencyMs: 8 };
+    return this.adapter.healthCheck();
+  }
+
+  public async close(): Promise<void> {
+    return this.adapter.close();
   }
 }

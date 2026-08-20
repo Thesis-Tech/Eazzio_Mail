@@ -19,7 +19,7 @@
 
 ## PHASE 1 — Foundation Corrections & Infrastructure Adapters
 
-- [ ] **TASK-002** — Real PostgreSQL Database Adapter & Connection Pool
+- [x] **TASK-002** — Real PostgreSQL Database Adapter & Connection Pool
   - **Action:** Implement production-grade `PostgresAdapter` in `packages/infra-adapters` using `pg`/`postgres` with connection pooling, parameterized queries, and transaction management.
   - **Verification:** Unit and integration tests in `packages/infra-adapters/tests` verifying live query execution, connection lifecycle, and rollback on error.
   - **Definition of Done:** `PostgresAdapter` executes real SQL queries against Postgres, implements `EazzioDatabase` interface, and passes all database contract tests.
