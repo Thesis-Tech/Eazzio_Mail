@@ -18,6 +18,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { AuthStore } from '../../lib/auth-store';
+import { loginWithFacebook } from '../../components/auth/FacebookSdk';
 
 export default function RegisterPage() {
   const [step, setStep] = useState<'details' | 'otp'>('details');
@@ -380,6 +381,60 @@ export default function RegisterPage() {
               <span>Continue to Verification</span>
               <ArrowRight className="w-4 h-4" />
             </button>
+
+            {/* OAuth Divider & Social Logins */}
+            <div className="relative my-4">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-[#2A2E37]"></div>
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-[#16181D] px-2 text-slate-500">Or register with</span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2.5">
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    const fbProfile = await loginWithFacebook();
+                    AuthStore.setSession({
+                      id: fbProfile.id,
+                      email: fbProfile.email,
+                      displayName: fbProfile.name,
+                      isPhoneVerified: true,
+                      role: 'user'
+                    }, 'token_fb_' + Date.now());
+                    window.location.href = '/';
+                  } catch (err: unknown) {
+                    setErrorMessage((err as Error).message || 'Facebook signup failed');
+                  }
+                }}
+                className="py-2.5 px-3 rounded-xl bg-[#1877F2]/10 border border-[#1877F2]/30 hover:bg-[#1877F2]/20 text-xs font-semibold text-[#1877F2] flex items-center justify-center gap-1.5 transition-all"
+              >
+                Facebook
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  AuthStore.setSession({ id: 'user_oauth_google', email: 'user@eazzio.com', displayName: 'Google User', isPhoneVerified: true, role: 'user' }, 'token_google');
+                  window.location.href = '/';
+                }}
+                className="py-2.5 px-3 rounded-xl bg-[#0F1115] border border-[#2A2E37] hover:border-slate-600 text-xs font-medium text-slate-300 hover:text-white flex items-center justify-center gap-1.5 transition-all"
+              >
+                Google
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  AuthStore.setSession({ id: 'user_oauth_github', email: 'dev@eazzio.com', displayName: 'GitHub User', isPhoneVerified: true, role: 'user' }, 'token_github');
+                  window.location.href = '/';
+                }}
+                className="py-2.5 px-3 rounded-xl bg-[#0F1115] border border-[#2A2E37] hover:border-slate-600 text-xs font-medium text-slate-300 hover:text-white flex items-center justify-center gap-1.5 transition-all"
+              >
+                GitHub
+              </button>
+            </div>
           </form>
         ) : (
           /* Step 2: OTP Verification Screen */

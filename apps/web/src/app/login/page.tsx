@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { Mail, Lock, Send, ArrowRight, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { AuthStore } from '../../lib/auth-store';
+import { loginWithFacebook } from '../../components/auth/FacebookSdk';
 
 export default function LoginPage() {
   const [authMode, setAuthMode] = useState<'password' | 'telegram'>('password');
@@ -249,14 +250,35 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-3 gap-2.5">
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                const fbProfile = await loginWithFacebook();
+                AuthStore.setSession({
+                  id: fbProfile.id,
+                  email: fbProfile.email,
+                  displayName: fbProfile.name,
+                  role: 'user'
+                }, 'token_fb_' + Date.now());
+                window.location.href = '/';
+              } catch (err: unknown) {
+                setErrorMessage((err as Error).message || 'Facebook login failed');
+              }
+            }}
+            className="py-2.5 px-3 rounded-xl bg-[#1877F2]/10 border border-[#1877F2]/30 hover:bg-[#1877F2]/20 text-xs font-semibold text-[#1877F2] flex items-center justify-center gap-1.5 transition-all"
+            data-testid="fb-login-button"
+          >
+            Facebook
+          </button>
           <button
             type="button"
             onClick={() => {
               AuthStore.setSession({ id: 'user_oauth_google', email: 'user@eazzio.com', displayName: 'Google User', role: 'user' }, 'token_google');
               window.location.href = '/';
             }}
-            className="py-2.5 px-4 rounded-xl bg-[#0F1115] border border-[#2A2E37] hover:border-slate-600 text-xs font-medium text-slate-300 hover:text-white flex items-center justify-center gap-2 transition-all"
+            className="py-2.5 px-3 rounded-xl bg-[#0F1115] border border-[#2A2E37] hover:border-slate-600 text-xs font-medium text-slate-300 hover:text-white flex items-center justify-center gap-1.5 transition-all"
           >
             Google
           </button>
@@ -266,7 +288,7 @@ export default function LoginPage() {
               AuthStore.setSession({ id: 'user_oauth_github', email: 'dev@eazzio.com', displayName: 'GitHub User', role: 'user' }, 'token_github');
               window.location.href = '/';
             }}
-            className="py-2.5 px-4 rounded-xl bg-[#0F1115] border border-[#2A2E37] hover:border-slate-600 text-xs font-medium text-slate-300 hover:text-white flex items-center justify-center gap-2 transition-all"
+            className="py-2.5 px-3 rounded-xl bg-[#0F1115] border border-[#2A2E37] hover:border-slate-600 text-xs font-medium text-slate-300 hover:text-white flex items-center justify-center gap-1.5 transition-all"
           >
             GitHub
           </button>
