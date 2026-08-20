@@ -13,7 +13,7 @@ describe('Notification Service & Realtime Channels', () => {
     const mockPublisher = {
       publish: async (channel: string, message: any) => {
         published.push({ channel, message });
-      }
+      },
     };
 
     const service = new NotificationService(mockPublisher);
@@ -25,7 +25,7 @@ describe('Notification Service & Realtime Channels', () => {
       folderId: 'fld-inbox',
       fromAddress: 'sender@example.com',
       subject: 'Urgent Update',
-      sizeBytes: 1024
+      sizeBytes: 1024,
     };
 
     await service.handleMailAccepted(event);
@@ -40,7 +40,7 @@ describe('Notification Service & Realtime Channels', () => {
     const mockPublisher = {
       publish: async (channel: string, message: any) => {
         published.push({ channel, message });
-      }
+      },
     };
 
     const service = new NotificationService(mockPublisher);

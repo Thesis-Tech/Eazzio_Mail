@@ -3,4 +3,5 @@ export interface EazzioCache {
   set(key: string, value: string, ttlSeconds?: number): Promise<void>;
   incr(key: string, ttlSeconds?: number): Promise<number>;
   del(key: string): Promise<void>;
+  publish?(channel: string, message: string): Promise<number>;
 }

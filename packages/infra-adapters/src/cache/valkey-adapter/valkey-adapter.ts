@@ -74,6 +74,10 @@ export class ValkeyCacheAdapter implements EazzioCache {
     await this.client.del(key);
   }
 
+  public async publish(channel: string, message: string): Promise<number> {
+    return this.client.publish(channel, message);
+  }
+
   public async healthCheck(): Promise<boolean> {
     try {
       const pong = await this.client.ping();

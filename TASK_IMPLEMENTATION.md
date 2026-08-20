@@ -73,7 +73,7 @@
   - **Verification:** Integration test verifying that emitted `MailAcceptedEvent` results in searchable document in OpenSearch index.
   - **Definition of Done:** Single-writer indexing pipeline operational and synchronized with message creation.
 
-- [ ] **TASK-012** — Realtime WebSocket Gateway Server
+- [x] **TASK-012** — Realtime WebSocket Gateway Server
   - **Action:** Implement live WebSocket server in `services/notification` supporting user authentication, channel subscriptions (`mailbox:{id}`), and broadcasting arrival events.
   - **Verification:** WebSocket client test connecting, authenticating, and receiving realtime event notifications.
   - **Definition of Done:** WebSocket gateway pushes new email events to connected clients with <1s latency.

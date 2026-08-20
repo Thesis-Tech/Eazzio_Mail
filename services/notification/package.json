@@ -12,11 +12,13 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@eazzio/domain": "workspace:*",
     "@eazzio/contracts": "workspace:*",
-    "@eazzio/infra-adapters": "workspace:*"
+    "@eazzio/domain": "workspace:*",
+    "@eazzio/infra-adapters": "workspace:*",
+    "ws": "^8.21.3"
   },
   "devDependencies": {
+    "@types/ws": "^8.18.1",
     "typescript": "^5.7.3",
     "vitest": "^3.0.5"
   }

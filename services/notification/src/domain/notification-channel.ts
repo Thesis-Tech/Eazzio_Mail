@@ -9,20 +9,33 @@ export class NotificationChannelManager {
     return `mailbox:${mailboxId}:events`;
   }
 
-  public static createMailArrivedPayload(messageId: string, from: string, subject: string): RealtimeMessage {
+  public static createMailArrivedPayload(
+    messageId: string,
+    from: string,
+    subject: string,
+  ): RealtimeMessage {
     return {
       type: 'MAIL_ARRIVED',
       payload: { messageId, from, subject },
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
   }
 
-  public static createQuotaWarningPayload(mailboxId: string, usedBytes: bigint, quotaBytes: bigint): RealtimeMessage {
+  public static createQuotaWarningPayload(
+    mailboxId: string,
+    usedBytes: bigint,
+    quotaBytes: bigint,
+  ): RealtimeMessage {
     const percentage = Number((usedBytes * 100n) / quotaBytes);
     return {
       type: 'QUOTA_WARNING',
-      payload: { mailboxId, usedBytes: usedBytes.toString(), quotaBytes: quotaBytes.toString(), percentage },
-      timestamp: new Date().toISOString()
+      payload: {
+        mailboxId,
+        usedBytes: usedBytes.toString(),
+        quotaBytes: quotaBytes.toString(),
+        percentage,
+      },
+      timestamp: new Date().toISOString(),
     };
   }
 }
