@@ -52,4 +52,21 @@ describe('Web App Auth Flow & Session Management (TASK-015)', () => {
     expect(AuthStore.getState().isAuthenticated).toBe(false);
     expect(AuthStore.getState().user).toBeNull();
   });
+
+  it('should enforce username rules: no special characters, max 1 dot', () => {
+    const usernameRegex = /^[a-z0-9]+(\.[a-z0-9]+)?$/;
+
+    expect(usernameRegex.test('rahul')).toBe(true);
+    expect(usernameRegex.test('rahul.kumar')).toBe(true);
+    expect(usernameRegex.test('alex99')).toBe(true);
+    expect(usernameRegex.test('john.doe123')).toBe(true);
+
+    // Invalid usernames
+    expect(usernameRegex.test('rahul.kumar.singh')).toBe(false); // multiple dots
+    expect(usernameRegex.test('.rahul')).toBe(false); // leading dot
+    expect(usernameRegex.test('rahul.')).toBe(false); // trailing dot
+    expect(usernameRegex.test('rahul_kumar')).toBe(false); // underscore
+    expect(usernameRegex.test('rahul-kumar')).toBe(false); // dash
+    expect(usernameRegex.test('rahul@kumar')).toBe(false); // @ symbol
+  });
 });

@@ -2,23 +2,44 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { Mail, Lock, User, ArrowRight, AlertCircle, Sparkles, CheckCircle2 } from 'lucide-react';
+import { Mail, Lock, User, ArrowRight, AlertCircle, Sparkles } from 'lucide-react';
 import { AuthStore } from '../../lib/auth-store';
 
 export default function RegisterPage() {
   const [displayName, setDisplayName] = useState('');
-  const [username, setUsername] = useState('');
+  const [rawUsername, setRawUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Clean username: remove @eazzio.com if pasted, lowercase, remove invalid chars
-  const cleanUsername = username
-    .toLowerCase()
-    .replace(/@eazzio\.com$/i, '')
-    .replace(/[^a-z0-9._-]/g, '');
+  /**
+   * Enforces strict username rules:
+   * 1. Only a-z, 0-9, and at most one '.' (no special characters).
+   * 2. Cannot start with a dot.
+   */
+  const sanitizeUsernameInput = (input: string): string => {
+    let val = input.toLowerCase().replace(/@eazzio\.com$/i, '');
+    // Strip everything except lowercase letters, numbers, and dot
+    val = val.replace(/[^a-z0-9.]/g, '');
+    // Cannot start with dot
+    val = val.replace(/^\./, '');
+    // Allow at most ONE dot in the entire username
+    const dotIndex = val.indexOf('.');
+    if (dotIndex !== -1) {
+      const beforeDot = val.slice(0, dotIndex);
+      const afterDot = val.slice(dotIndex + 1).replace(/\./g, '');
+      val = `${beforeDot}.${afterDot}`;
+    }
+    return val;
+  };
 
+  const handleUsernameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const sanitized = sanitizeUsernameInput(e.target.value);
+    setRawUsername(sanitized);
+  };
+
+  const cleanUsername = rawUsername;
   const fullEmailAddress = cleanUsername ? `${cleanUsername}@eazzio.com` : '';
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -33,6 +54,20 @@ export default function RegisterPage() {
 
       if (cleanUsername.length < 3) {
         throw new Error('Username must be at least 3 characters long');
+      }
+
+      if (cleanUsername.length > 30) {
+        throw new Error('Username cannot exceed 30 characters');
+      }
+
+      if (cleanUsername.endsWith('.')) {
+        throw new Error('Username cannot end with a dot (.)');
+      }
+
+      // Exact strict regex: alphanumeric, optional single dot in between, followed by alphanumeric
+      const usernameRegex = /^[a-z0-9]+(\.[a-z0-9]+)?$/;
+      if (!usernameRegex.test(cleanUsername)) {
+        throw new Error('Username can only contain letters (a-z), numbers (0-9), and at most one dot (.) (e.g. rahul.kumar)');
       }
 
       if (password.length < 8) {
@@ -105,15 +140,18 @@ export default function RegisterPage() {
 
           {/* Eazzio Username Input with fixed @eazzio.com badge */}
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1.5">Choose your Email Address</label>
+            <div className="flex justify-between items-center mb-1.5">
+              <label className="text-xs font-medium text-slate-300">Choose your Username</label>
+              <span className="text-[10px] text-slate-400">a-z, 0-9 & only 1 dot (.)</span>
+            </div>
             <div className="relative flex items-center">
               <Mail className="w-4 h-4 absolute left-3.5 text-slate-400 pointer-events-none" />
               <input
                 type="text"
                 value={cleanUsername}
-                onChange={(e) => setUsername(e.target.value)}
+                onChange={handleUsernameChange}
                 required
-                placeholder="username"
+                placeholder="rahul.kumar"
                 className="w-full bg-[#0F1115] border border-[#2A2E37] focus:border-[#2D5BFF] focus:ring-1 focus:ring-[#2D5BFF] rounded-xl pl-10 pr-32 py-2.5 text-sm font-medium text-white placeholder-slate-500 outline-none transition-all"
                 data-testid="register-username-input"
               />
@@ -121,10 +159,14 @@ export default function RegisterPage() {
                 @eazzio.com
               </div>
             </div>
-            {cleanUsername && (
+            {cleanUsername ? (
               <p className="text-[11px] text-slate-400 mt-1.5 flex items-center gap-1.5 pl-1">
                 <Sparkles className="w-3 h-3 text-[#2D5BFF]" />
                 Your address will be: <span className="text-white font-medium">{fullEmailAddress}</span>
+              </p>
+            ) : (
+              <p className="text-[11px] text-slate-500 mt-1 pl-1">
+                No special characters allowed. Single dot permitted (e.g. <code>rahul.kumar</code>).
               </p>
             )}
           </div>
