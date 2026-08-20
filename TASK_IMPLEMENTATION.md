@@ -83,7 +83,7 @@
   - **Verification:** Integration tests verifying DNS record resolution against simulated DNS server and updating domain verification status in DB.
   - **Definition of Done:** Domain verification accurately queries DNS records and activates domains upon 4-check pass.
 
-- [ ] **TASK-014** — AI Gateway Live Adapter Integration
+- [x] **TASK-014** — AI Gateway Live Adapter Integration
   - **Action:** Implement Gemini/LLM provider adapter in `packages/infra-adapters` and wire to `services/ai-gateway`, enforcing organization opt-in policy and read-only DB permissions.
   - **Verification:** Integration tests verifying thread summarization and smart reply suggestions with org opt-in checks.
   - **Definition of Done:** AI Gateway securely summarizes threads when enabled and denies execution when disabled.
