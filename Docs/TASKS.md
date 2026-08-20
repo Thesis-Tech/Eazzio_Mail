@@ -146,19 +146,19 @@
 
 ### 4.I — Realtime & Notification (`services/notification`)
 
-- [ ] **T093** — WebSocket gateway in `services/api`; client subscription model. *Ref: FR-RT-01.*
-- [ ] **T094** — `services/notification` consumes all message-lifecycle events, dispatches realtime updates. *Ref: MODULES.md Section 3.6.*
-- [ ] **T095** — Multi-device state consistency (read state, folder moves) across simultaneous sessions. *Ref: FR-RT-03.*
-- [ ] **T096** — Polling fallback on WebSocket disconnect (`APP_FLOW.md` Section 9 degraded-state flow). *Ref: NFR-REL-02.*
-- [ ] **T097** — FCM push notification integration + device-token management. *Ref: TechStack.md Section 18; MODULES.md Section 3.6.*
-- [ ] **T098** — Webhook dispatch: signature, timestamp validation, replay protection, idempotency. *Ref: FR-RT-04; Security.md Section 20.*
+- [x] **T093** — WebSocket gateway in `services/api`; client subscription model. *Ref: FR-RT-01.*
+- [x] **T094** — `services/notification` consumes all message-lifecycle events, dispatches realtime updates. *Ref: MODULES.md Section 3.6.*
+- [x] **T095** — Multi-device state consistency (read state, folder moves) across simultaneous sessions. *Ref: FR-RT-03.*
+- [x] **T096** — Polling fallback on WebSocket disconnect (`APP_FLOW.md` Section 9 degraded-state flow). *Ref: NFR-REL-02.*
+- [x] **T097** — FCM push notification integration + device-token management. *Ref: TechStack.md Section 18; MODULES.md Section 3.6.*
+- [x] **T098** — Webhook dispatch: signature, timestamp validation, replay protection, idempotency. *Ref: FR-RT-04; Security.md Section 20.*
 
 ### 4.J — Domain & Admin (`services/admin-service`, `apps/admin`)
 
-- [ ] **T099** — Scaffold `services/admin-service/`. *Ref: MODULES.md Section 3.7.*
-- [ ] **T100** — Domain onboarding: DNS instructions generation. *Ref: FR-DOM-01.*
-- [ ] **T101** — DNS verification polling (MX/SPF/DKIM/DMARC independently) + `DomainVerified` event; server-side enforcement that all four must pass before send/receive is usable. *Ref: FR-DOM-02; LLD.md Section 5.3; Security.md Section 5.3.*
-- [ ] **T102** — Mailbox/alias provisioning under a verified domain, quota management. *Ref: FR-DOM-03.*
+- [x] **T099** — Scaffold `services/admin-service/`. *Ref: MODULES.md Section 3.7.*
+- [x] **T100** — Domain onboarding: DNS instructions generation. *Ref: FR-DOM-01.*
+- [x] **T101** — DNS verification polling (MX/SPF/DKIM/DMARC independently) + `DomainVerified` event; server-side enforcement that all four must pass before send/receive is usable. *Ref: FR-DOM-02; LLD.md Section 5.3; Security.md Section 5.3.*
+- [x] **T102** — Mailbox/alias provisioning under a verified domain, quota management. *Ref: FR-DOM-03.*
 - [ ] **T103** — Disposable/temporary alias support with expiry. *Ref: FR-DOM-04.*
 - [ ] **T104** — Org provisioning + policy (password/MFA/retention settings). *Ref: FR-ADMIN-01/02.*
 - [ ] **T105** — Audit log query endpoint (org/domain-scoped per role, per `Security.md` Section 8.1 table). *Ref: FR-ADMIN-03.*

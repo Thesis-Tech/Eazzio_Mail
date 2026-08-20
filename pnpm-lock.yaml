@@ -84,6 +84,28 @@ importers:
         specifier: ^3.0.5
         version: 3.2.7(@types/node@26.2.0)
 
+  services/admin-service:
+    dependencies:
+      '@eazzio/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@eazzio/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
+      '@eazzio/identity':
+        specifier: workspace:*
+        version: link:../identity
+      '@eazzio/infra-adapters':
+        specifier: workspace:*
+        version: link:../../packages/infra-adapters
+    devDependencies:
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.0.5
+        version: 3.2.7(@types/node@26.2.0)
+
   services/api:
     dependencies:
       '@eazzio/contracts':
@@ -178,6 +200,25 @@ importers:
         version: 3.2.7(@types/node@26.2.0)
 
   services/mail-outbound:
+    dependencies:
+      '@eazzio/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@eazzio/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
+      '@eazzio/infra-adapters':
+        specifier: workspace:*
+        version: link:../../packages/infra-adapters
+    devDependencies:
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.0.5
+        version: 3.2.7(@types/node@26.2.0)
+
+  services/notification:
     dependencies:
       '@eazzio/contracts':
         specifier: workspace:*
