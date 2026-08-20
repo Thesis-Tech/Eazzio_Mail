@@ -109,18 +109,18 @@
 
 ### 4.F — Inbound Mail Pipeline (`services/mail-inbound`)
 
-- [ ] **T065** — Scaffold `services/mail-inbound/`. *Ref: MODULES.md Section 3.2.*
-- [ ] **T066** — Wire Postfix SMTP receive → envelope handoff; enforce STARTTLS/MTA-STS policy. *Ref: FR-IN-01/02; Security.md Section 4.*
-- [ ] **T067** — Envelope validation (sender/recipient existence, size, rate limits). *Ref: FR-IN-03.*
-- [ ] **T068** — Wire `packages/security-pipeline` SPF/DKIM/DMARC/ARC checks into the pipeline. *Ref: FR-IN-04.*
-- [ ] **T069** — MIME parsing with malformed-message handling (logged, never silently dropped). *Ref: FR-IN-05.*
-- [ ] **T070** — Attachment analysis: type ID, hashing, known-threat lookup, ClamAV scan, recursive archive inspection within resource limits. *Ref: FR-IN-06; FR-SPAM-07/08.*
-- [ ] **T071** — Wire Rspamd rule + statistical scoring, plus URL risk scoring (`FR-SPAM-04`), into the composite score. *Ref: FR-SPAM-01…04.*
-- [ ] **T072** — Wire the deterministic policy decision gate (`decide()` from T037) as the actual accept/quarantine/reject enforcement point. *Ref: FR-IN-07; DECISIONS.md D-007.*
-- [ ] **T073** — Accept path: object storage write (raw MIME) + Postgres metadata write + `MailAccepted` event emission. *Ref: FR-IN-08.*
-- [ ] **T074** — Reject/quarantine paths: `MailRejected`/`MailQuarantined` events with reason codes; audit log entry per rejection. *Ref: LLD.md Section 4; Security.md Section 18.2.*
-- [ ] **T075** — End-to-end fixture tests: DMARC-reject mail never reaches inbox; malware attachment always quarantines. *Ref: Security.md Section 25.*
-- [ ] **T076** — `services/mail-inbound/README.md` naming FR-* IDs and forbidden dependencies.
+- [x] **T065** — Scaffold `services/mail-inbound/`. *Ref: MODULES.md Section 3.2.*
+- [x] **T066** — Wire Postfix SMTP receive → envelope handoff; enforce STARTTLS/MTA-STS policy. *Ref: FR-IN-01/02; Security.md Section 4.*
+- [x] **T067** — Envelope validation (sender/recipient existence, size, rate limits). *Ref: FR-IN-03.*
+- [x] **T068** — Wire `packages/security-pipeline` SPF/DKIM/DMARC/ARC checks into the pipeline. *Ref: FR-IN-04.*
+- [x] **T069** — MIME parsing with malformed-message handling (logged, never silently dropped). *Ref: FR-IN-05.*
+- [x] **T070** — Attachment analysis: type ID, hashing, known-threat lookup, ClamAV scan, recursive archive inspection within resource limits. *Ref: FR-IN-06; FR-SPAM-07/08.*
+- [x] **T071** — Wire Rspamd rule + statistical scoring, plus URL risk scoring (`FR-SPAM-04`), into the composite score. *Ref: FR-SPAM-01…04.*
+- [x] **T072** — Wire the deterministic policy decision gate (`decide()` from T037) as the actual accept/quarantine/reject enforcement point. *Ref: FR-IN-07; DECISIONS.md D-007.*
+- [x] **T073** — Accept path: object storage write (raw MIME) + Postgres metadata write + `MailAccepted` event emission. *Ref: FR-IN-08.*
+- [x] **T074** — Reject/quarantine paths: `MailRejected`/`MailQuarantined` events with reason codes; audit log entry per rejection. *Ref: LLD.md Section 4; Security.md Section 18.2.*
+- [x] **T075** — End-to-end fixture tests: DMARC-reject mail never reaches inbox; malware attachment always quarantines. *Ref: Security.md Section 25.*
+- [x] **T076** — `services/mail-inbound/README.md` naming FR-* IDs and forbidden dependencies.
 
 ### 4.G — Outbound Mail Pipeline (`services/mail-outbound`)
 
