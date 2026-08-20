@@ -7,7 +7,9 @@ import { SessionManager, Session } from '../../src/domain/session-state.js';
 
 describe('Identity Service Core Modules', () => {
   it('should enforce 12-char minimum password policy with Argon2id', async () => {
-    await expect(PasswordService.hash('short')).rejects.toThrow('Password must be at least 12 characters long');
+    await expect(PasswordService.hash('short')).rejects.toThrow(
+      'Password must be at least 12 characters long',
+    );
     const hash = await PasswordService.hash('valid_long_secure_password_123');
     expect(hash).toContain('$argon2id$');
     const valid = await PasswordService.verify(hash, 'valid_long_secure_password_123');
@@ -18,7 +20,7 @@ describe('Identity Service Core Modules', () => {
     const token = TokenService.generateAccessToken({
       userId: 'usr-1',
       sessionId: 'ses-1',
-      email: 'user@eazzio.com'
+      email: 'user@eazzio.com',
     });
     const payload = TokenService.verifyAccessToken(token);
     expect(payload.userId).toBe('usr-1');
@@ -42,7 +44,7 @@ describe('Identity Service Core Modules', () => {
       createdAt: new Date(),
       lastSeenAt: new Date(),
       expiresAt: new Date(Date.now() + 60000),
-      revokedAt: null
+      revokedAt: null,
     };
     expect(SessionManager.isActive(session)).toBe(true);
     const revoked = SessionManager.revoke(session);

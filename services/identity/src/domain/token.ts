@@ -11,7 +11,7 @@ export interface TokenPayload {
 export class TokenService {
   public static generateAccessToken(payload: TokenPayload): string {
     return jwt.sign(payload, identityConfig.jwtSecret, {
-      expiresIn: '15m'
+      expiresIn: '15m',
     });
   }
 

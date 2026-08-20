@@ -8,7 +8,7 @@ export class PasswordService {
     return argon2.hash(password, {
       type: argon2.argon2id,
       memoryCost: 65536,
-      timeCost: 3
+      timeCost: 3,
     });
   }
 

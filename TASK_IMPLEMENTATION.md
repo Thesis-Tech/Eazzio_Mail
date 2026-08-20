@@ -48,7 +48,7 @@
 
 ## PHASE 2 — Backend Completion & Service Persistence
 
-- [ ] **TASK-007** — Database-Backed Identity & Authentication Service
+- [x] **TASK-007** — Database-Backed Identity & Authentication Service
   - **Action:** Wire `services/identity` to `PostgresUserRepository` and session storage, implementing persistent registration, login, JWT issuance, TOTP setup, and session revocation.
   - **Verification:** Integration tests verifying that registered users and sessions are stored in PostgreSQL, and invalid/revoked tokens are rejected.
   - **Definition of Done:** Identity service fully persists state to database and passes authentication test suite.

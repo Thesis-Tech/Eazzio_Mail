@@ -9,6 +9,14 @@ export class TotpService {
     return authenticator.keyuri(userEmail, 'Eazzio Mail', secret);
   }
 
+  public static generateOtpAuthUrl(userEmail: string, secret: string): string {
+    return this.generateUri(userEmail, secret);
+  }
+
+  public static generateToken(secret: string): string {
+    return authenticator.generate(secret);
+  }
+
   public static verify(token: string, secret: string): boolean {
     return authenticator.verify({ token, secret });
   }

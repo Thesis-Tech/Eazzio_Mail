@@ -21,7 +21,7 @@ export class SessionManager {
   public static revoke(session: Session): Session {
     return {
       ...session,
-      revokedAt: new Date()
+      revokedAt: new Date(),
     };
   }
 }
