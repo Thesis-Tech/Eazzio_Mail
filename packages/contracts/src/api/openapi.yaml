@@ -1,0 +1,70 @@
+openapi: 3.1.0
+info:
+  title: Eazzio Mail API
+  version: 1.0.0
+  description: Authoritative OpenAPI contract for Eazzio Mail REST API
+paths:
+  /v1/auth/register:
+    post:
+      summary: Register new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, minLength: 12 }
+      responses:
+        '201':
+          description: User registered
+  /v1/auth/login:
+    post:
+      summary: User login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+                mfaCode: { type: string }
+      responses:
+        '200':
+          description: Login successful
+  /v1/mailboxes/{id}/messages:
+    get:
+      summary: List messages in mailbox
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: folderId
+          in: query
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: List of messages
+  /v1/messages/compose:
+    post:
+      summary: Compose outbound email
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [to, subject, body]
+              properties:
+                to: { type: array, items: { type: string, format: email } }
+                subject: { type: string }
+                body: { type: string }
+      responses:
+        '202':
+          description: Email queued for sending

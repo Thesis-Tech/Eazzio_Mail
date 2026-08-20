@@ -52,27 +52,27 @@
 
 ### 4.B — Shared Packages (Interfaces First)
 
-- [ ] **T020** — `packages/domain/models/`: Message, Mailbox, Folder, Label, Thread, User, Organization, Domain, Policy — pure, no I/O. *Ref: LLD.md Section 1; MODULES.md Section 2.1.*
-- [ ] **T021** — `packages/domain`: value objects `EmailAddress`, `MessageId`, `Quota`, `SpamScore` + repository interfaces (no implementations). *Ref: MODULES.md Section 2.1.*
-- [ ] **T022** — `packages/contracts/api/openapi.yaml`: schema for every endpoint in `LLD.md` Section 3. *Ref: LLD.md Section 3; TechStack.md Section 2 (API Standards).*
-- [ ] **T023** — `packages/contracts/events/`: `MailAccepted`, `MailRejected`, `MailQuarantined`, `MailDelivered`, `MailBounced`, `DomainVerified` schemas. *Ref: LLD.md Section 4.*
-- [ ] **T024** — `packages/infra-adapters/database/interface.ts` (`EazzioDatabase`) — interface only. *Ref: LLD.md Section 2.1; ARCHITECTURE.md Section 9.2/9.3.*
+- [x] **T020** — `packages/domain/models/`: Message, Mailbox, Folder, Label, Thread, User, Organization, Domain, Policy — pure, no I/O. *Ref: LLD.md Section 1; MODULES.md Section 2.1.*
+- [x] **T021** — `packages/domain`: value objects `EmailAddress`, `MessageId`, `Quota`, `SpamScore` + repository interfaces (no implementations). *Ref: MODULES.md Section 2.1.*
+- [x] **T022** — `packages/contracts/api/openapi.yaml`: schema for every endpoint in `LLD.md` Section 3. *Ref: LLD.md Section 3; TechStack.md Section 2 (API Standards).*
+- [x] **T023** — `packages/contracts/events/`: `MailAccepted`, `MailRejected`, `MailQuarantined`, `MailDelivered`, `MailBounced`, `DomainVerified` schemas. *Ref: LLD.md Section 4.*
+- [x] **T024** — `packages/infra-adapters/database/interface.ts` (`EazzioDatabase`) — interface only. *Ref: LLD.md Section 2.1; ARCHITECTURE.md Section 9.2/9.3.*
 - [ ] **T025** — `packages/infra-adapters/database/postgres-adapter/` + contract tests. *Ref: DECISIONS.md D-004; TechStack.md Section 5.*
 - [ ] **T026** — `packages/infra-adapters/database/supabase-adapter/` + same contract test suite as T025. *Ref: ARCHITECTURE.md Appendix A.*
-- [ ] **T027** — `packages/infra-adapters/storage/interface.ts` (`EazzioStorage`) — interface only. *Ref: LLD.md Section 2.2.*
+- [x] **T027** — `packages/infra-adapters/storage/interface.ts` (`EazzioStorage`) — interface only. *Ref: LLD.md Section 2.2.*
 - [ ] **T028** — `packages/infra-adapters/storage/minio-adapter/` + contract tests. *Ref: TechStack.md Section 6.*
 - [ ] **T029** — `packages/infra-adapters/storage/cloudinary-adapter/` + same contract test suite as T028; configure signed uploads + restricted presets. *Ref: Security.md Section 14.*
-- [ ] **T030** — `packages/infra-adapters/cache/interface.ts` (`EazzioCache`) + Valkey adapter; verify `incr()` atomicity under concurrency. *Ref: LLD.md Section 2.3; TechStack.md Section 7; MODULES.md Section 2.5.*
-- [ ] **T031** — `packages/infra-adapters/ai/interface.ts` (`EazzioAI`) + `local-model-adapter/`; test proving `isEnabled()` gates every other method and no method's output reaches a decision table. *Ref: LLD.md Section 2.4; DECISIONS.md D-007.*
-- [ ] **T032** — `packages/infra-adapters/email-transport/interface.ts` + adapter wrapping Postfix/Dovecot integration points. *Ref: LLD.md Section 2.5.*
-- [ ] **T033** — `packages/security-pipeline/{spf,dkim,dmarc,arc}/`: deterministic auth checks. *Ref: FR-IN-04; Security.md Section 5.1.*
-- [ ] **T034** — `packages/security-pipeline/spam-rules/` (Rspamd rule engine integration). *Ref: FR-SPAM-01.*
-- [ ] **T035** — `packages/security-pipeline/spam-statistical/` (Bayesian layer). *Ref: FR-SPAM-02.*
-- [ ] **T036** — `packages/security-pipeline/malware-scan/`: scoring/decision logic around the ClamAV adapter. *Ref: FR-SPAM-07/08; Security.md Section 14.*
-- [ ] **T037** — Implement and unit-test `decide()` (accept/quarantine/reject) against fixture messages covering every branch. *Ref: LLD.md Section 6.1; DECISIONS.md D-007; Security.md Section 5.1.*
-- [ ] **T038** — `packages/ui-kit`: token setup (colors/typography/spacing/motion) matching `DESIGN.md` Section 2, generated via the `ui-ux-pro-max` skill. *Ref: DESIGN.md Sections 2–3.*
-- [ ] **T039** — `packages/ui-kit` components: `AppShell`, `MailList`, `MailListItem`, `ThreadView`, `ComposeSheet`, `LabelChip`, `FolderTree`, `SearchBar`, `ToastStack`, `EmptyState` — states/variants catalog + accessibility pass per component. *Ref: DESIGN.md Section 3, Section 6.1.*
-- [ ] **T040** — `packages/ui-kit` components: `DomainVerificationCard`, `PrivacyModeBadge` (fixed copy per `DESIGN.md` Section 6.5), `RiskBanner`, `AuditLogTable`. *Ref: DESIGN.md Section 3; DECISIONS.md D-011.*
+- [x] **T030** — `packages/infra-adapters/cache/interface.ts` (`EazzioCache`) + Valkey adapter; verify `incr()` atomicity under concurrency. *Ref: LLD.md Section 2.3; TechStack.md Section 7; MODULES.md Section 2.5.*
+- [x] **T031** — `packages/infra-adapters/ai/interface.ts` (`EazzioAI`) + `local-model-adapter/`; test proving `isEnabled()` gates every other method and no method's output reaches a decision table. *Ref: LLD.md Section 2.4; DECISIONS.md D-007.*
+- [x] **T032** — `packages/infra-adapters/email-transport/interface.ts` + adapter wrapping Postfix/Dovecot integration points. *Ref: LLD.md Section 2.5.*
+- [x] **T033** — `packages/security-pipeline/{spf,dkim,dmarc,arc}/`: deterministic auth checks. *Ref: FR-IN-04; Security.md Section 5.1.*
+- [x] **T034** — `packages/security-pipeline/spam-rules/` (Rspamd rule engine integration). *Ref: FR-SPAM-01.*
+- [x] **T035** — `packages/security-pipeline/spam-statistical/` (Bayesian layer). *Ref: FR-SPAM-02.*
+- [x] **T036** — `packages/security-pipeline/malware-scan/`: scoring/decision logic around the ClamAV adapter. *Ref: FR-SPAM-07/08; Security.md Section 14.*
+- [x] **T037** — Implement and unit-test `decide()` (accept/quarantine/reject) against fixture messages covering every branch. *Ref: LLD.md Section 6.1; DECISIONS.md D-007; Security.md Section 5.1.*
+- [x] **T038** — `packages/ui-kit`: token setup (colors/typography/spacing/motion) matching `DESIGN.md` Section 2, generated via the `ui-ux-pro-max` skill. *Ref: DESIGN.md Sections 2–3.*
+- [x] **T039** — `packages/ui-kit` components: `AppShell`, `MailList`, `MailListItem`, `ThreadView`, `ComposeSheet`, `LabelChip`, `FolderTree`, `SearchBar`, `ToastStack`, `EmptyState` — states/variants catalog + accessibility pass per component. *Ref: DESIGN.md Section 3, Section 6.1.*
+- [x] **T040** — `packages/ui-kit` components: `DomainVerificationCard`, `PrivacyModeBadge` (fixed copy per `DESIGN.md` Section 6.5), `RiskBanner`, `AuditLogTable`. *Ref: DESIGN.md Section 3; DECISIONS.md D-011.*
 
 ### 4.C — Identity Service
 
