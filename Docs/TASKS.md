@@ -137,12 +137,12 @@
 
 ### 4.H — Search (`services/search-indexer` + `services/api`)
 
-- [ ] **T087** — Scaffold `services/search-indexer/` — consumes `MailAccepted` only, writes to OpenSearch only. *Ref: DECISIONS.md D-010.*
-- [ ] **T088** — Full-text indexing across sender/recipient/subject/body/attachment-text/date/folder/label/thread. *Ref: FR-SRCH-01; LLD.md Section 6.4.*
-- [ ] **T089** — Search query endpoint in `services/api` (read-only; confirm no direct OpenSearch write exists in this service). *Ref: FR-SRCH-01; DECISIONS.md D-010.*
-- [ ] **T090** — Boolean/phrase/prefix/fuzzy query support + relevance ranking. *Ref: FR-SRCH-02/03.*
-- [ ] **T091** — Autocomplete/typeahead endpoint, <400ms budget. *Ref: FR-SRCH-04; DESIGN.md Section 7.*
-- [ ] **T092** — Verify indexing SLA end-to-end (`MailAccepted` → document available). *Ref: FR-SRCH-05; NFR-PERF-02.*
+- [x] **T087** — Scaffold `services/search-indexer/` — consumes `MailAccepted` only, writes to OpenSearch only. *Ref: DECISIONS.md D-010.*
+- [x] **T088** — Full-text indexing across sender/recipient/subject/body/attachment-text/date/folder/label/thread. *Ref: FR-SRCH-01; LLD.md Section 6.4.*
+- [x] **T089** — Search query endpoint in `services/api` (read-only; confirm no direct OpenSearch write exists in this service). *Ref: FR-SRCH-01; DECISIONS.md D-010.*
+- [x] **T090** — Boolean/phrase/prefix/fuzzy query support + relevance ranking. *Ref: FR-SRCH-02/03.*
+- [x] **T091** — Autocomplete/typeahead endpoint, <400ms budget. *Ref: FR-SRCH-04; DESIGN.md Section 7.*
+- [x] **T092** — Verify indexing SLA end-to-end (`MailAccepted` → document available). *Ref: FR-SRCH-05; NFR-PERF-02.*
 
 ### 4.I — Realtime & Notification (`services/notification`)
 
