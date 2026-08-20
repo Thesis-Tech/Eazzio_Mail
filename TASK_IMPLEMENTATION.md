@@ -34,7 +34,7 @@
   - **Verification:** Repository unit and integration tests verifying CRUD operations, tenant scoping, and data mapping to domain entities.
   - **Definition of Done:** All domain repository interfaces in `packages/domain/src/repositories/interfaces.ts` have fully implemented, tested PostgreSQL repository classes.
 
-- [ ] **TASK-005** — OpenSearch Client Adapter & Valkey Cache Adapter
+- [x] **TASK-005** — OpenSearch Client Adapter & Valkey Cache Adapter
   - **Action:** Implement `OpenSearchAdapter` for full-text indexing/querying in `packages/infra-adapters` and `ValkeyCacheAdapter` implementing `EazzioCache`.
   - **Verification:** Unit tests with mock/local servers validating document indexing, search queries, cache get/set/del, and TTL expiration.
   - **Definition of Done:** `OpenSearchAdapter` and `ValkeyCacheAdapter` pass test contracts with zero mock fallback stubs.
@@ -93,7 +93,7 @@
 ## PHASE 3 — Web Application (`apps/web`)
 
 - [ ] **TASK-015** — Web Application Architecture, Layout & Auth Flow
-  - **Action:** Implement Next.js App Router authenticated layout with sidebar, header, user profile, login page, registration page, and session token management.
+  - **Action:** Implement Next.js App Router authenticated layout with sidebar, header, user profile, login page, registration page, and session token management,supabase auth email and password, oauth, phone number verify via telegram otp.
   - **Verification:** End-to-end web test for login flow, session persistence, and authenticated shell rendering.
   - **Definition of Done:** Users can log in, view authenticated dashboard shell, and navigate system folders.
 
