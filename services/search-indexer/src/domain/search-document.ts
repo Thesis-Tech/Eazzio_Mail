@@ -38,7 +38,7 @@ export class SearchDocumentProjector {
       snippet,
       hasAttachments: false,
       receivedAt: params.occurredAt,
-      sizeBytes: params.sizeBytes
+      sizeBytes: params.sizeBytes,
     };
   }
 }

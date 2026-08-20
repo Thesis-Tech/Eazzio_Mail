@@ -68,7 +68,7 @@
   - **Verification:** Unit tests verifying RSA cryptographic signature against public key DNS record and queue processor handling retries/bounces.
   - **Definition of Done:** Outbound messages are correctly signed, queued, delivered via SMTP transport, and retried on transient failures.
 
-- [ ] **TASK-011** — Search Indexer Event Consumer
+- [x] **TASK-011** — Search Indexer Event Consumer
   - **Action:** Wire `services/search-indexer` to consume `MailAcceptedEvent` and index documents into OpenSearch using `OpenSearchAdapter`.
   - **Verification:** Integration test verifying that emitted `MailAcceptedEvent` results in searchable document in OpenSearch index.
   - **Definition of Done:** Single-writer indexing pipeline operational and synchronized with message creation.

@@ -13,7 +13,7 @@ describe('Search Indexer Service (Single Writer)', () => {
       subject: 'Important quarterly results',
       bodyText: 'Please find attached the financial results for Q3.',
       sizeBytes: 2048,
-      occurredAt: new Date().toISOString()
+      occurredAt: new Date().toISOString(),
     });
 
     expect(doc.id).toBe('msg-1');
@@ -27,7 +27,7 @@ describe('Search Indexer Service (Single Writer)', () => {
       indexDocument: async (doc: any) => {
         indexedDocs.push(doc);
         return { indexed: true, documentId: doc.id };
-      }
+      },
     };
 
     const indexer = new IndexerService(mockWriter);
@@ -39,7 +39,7 @@ describe('Search Indexer Service (Single Writer)', () => {
       folderId: 'fld-inbox',
       fromAddress: 'alice@example.com',
       subject: 'Hello Search',
-      sizeBytes: 500
+      sizeBytes: 500,
     };
 
     const res = await indexer.handleMailAccepted(event);
