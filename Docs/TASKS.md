@@ -180,30 +180,30 @@
 - [x] **T115** — ThreadView with RiskBanner (spam-score/auth-failure explanation, plain-language reason codes). *Ref: APP_FLOW.md Section 3; Security.md Section 18.2 (reasonCode mapping).*
 - [x] **T116** — ComposeSheet: autosave, attachment upload, quoting conventions, optimistic send UI. *Ref: APP_FLOW.md Section 4; DESIGN.md Section 6.3.*
 - [x] **T117** — Search UI: SearchBar typeahead, Search Results, filter chips. *Ref: APP_FLOW.md Section 5.*
-- [ ] **T118** — Filters/Rules Builder UI. *Ref: APP_FLOW.md Section 6.*
-- [ ] **T119** — Privacy Mode settings screen with fixed `PrivacyModeBadge` copy (Standard/Enhanced/E2EE-disabled). *Ref: APP_FLOW.md Section 8; DESIGN.md Section 6.5.*
-- [ ] **T120** — Error/degraded-state handling: connectivity banner, AI/search degradation messaging, session-expiry draft preservation. *Ref: APP_FLOW.md Section 9.*
-- [ ] **T121** — Sandboxed HTML message-body renderer with strict, isolated CSP. *Ref: Security.md Section 11.*
-- [ ] **T122** — Accessibility pass (WCAG 2.1 AA, keyboard nav, screen reader) on all core flows. *Ref: DESIGN.md Section 6.1; Rule 79.*
-- [ ] **T123** — Performance budget verification against `DESIGN.md` Section 7 targets.
+- [x] **T118** — Filters/Rules Builder UI. *Ref: APP_FLOW.md Section 6.*
+- [x] **T119** — Privacy Mode settings screen with fixed `PrivacyModeBadge` copy (Standard/Enhanced/E2EE-disabled). *Ref: APP_FLOW.md Section 8; DESIGN.md Section 6.5.*
+- [x] **T120** — Error/degraded-state handling: connectivity banner, AI/search degradation messaging, session-expiry draft preservation. *Ref: APP_FLOW.md Section 9.*
+- [x] **T121** — Sandboxed HTML message-body renderer with strict, isolated CSP. *Ref: Security.md Section 11.*
+- [x] **T122** — Accessibility pass (WCAG 2.1 AA, keyboard nav, screen reader) on all core flows. *Ref: DESIGN.md Section 6.1; Rule 79.*
+- [x] **T123** — Performance budget verification against `DESIGN.md` Section 7 targets.
 
 ### 4.M — Mobile Client (`apps/mobile`)
 
-- [ ] **T124** — Scaffold Flutter app: Riverpod state, GoRouter navigation, ported design tokens. *Ref: TechStack.md Section 12; DESIGN.md Section 8.*
-- [ ] **T125** — Auth, Inbox, ThreadView, ComposeSheet (full-screen route), Search — parity with `apps/web` flows. *Ref: APP_FLOW.md Sections 2–5.*
-- [ ] **T126** — Secure Storage for tokens; no secrets embedded in the app package; secure logging. *Ref: Security.md Section 23.*
-- [ ] **T127** — FCM push notifications, deep linking (`mailto:`). *Ref: TechStack.md Section 12.*
-- [ ] **T128** — Cross-platform verification (Android + iOS minimum supported versions). *Ref: Rule 81.*
+- [x] **T124** — Scaffold Flutter app: Riverpod state, GoRouter navigation, ported design tokens. *Ref: TechStack.md Section 12; DESIGN.md Section 8.*
+- [x] **T125** — Auth, Inbox, ThreadView, ComposeSheet (full-screen route), Search — parity with `apps/web` flows. *Ref: APP_FLOW.md Sections 2–5.*
+- [x] **T126** — Secure Storage for tokens; no secrets embedded in the app package; secure logging. *Ref: Security.md Section 23.*
+- [x] **T127** — FCM push notifications, deep linking (`mailto:`). *Ref: TechStack.md Section 12.*
+- [x] **T128** — Cross-platform verification (Android + iOS minimum supported versions). *Ref: Rule 81.*
 
 ### 4.N — Observability
 
-- [ ] **T129** — Prometheus metrics: mail flow (accepted/rejected/queued/delivered/bounced), API latency, queue depth, worker failures. *Ref: FR-OBS-02; TechStack.md Section 13.*
-- [ ] **T130** — Grafana dashboards, including Supabase (500MB)/Cloudinary (25GB) free-tier alert thresholds. *Ref: FR-OBS-03; ARCHITECTURE.md Appendix A.3.*
-- [ ] **T131** — Structured JSON logging with request/correlation IDs; confirm no secrets/PII in any log line. *Ref: Security.md Section 18.1.*
-- [ ] **T132** — Sentry integration: frontend, backend, mobile. *Ref: TechStack.md Section 13.*
-- [ ] **T133** — OpenTelemetry tracing across `apps/*` → `services/*` → `packages/infra-adapters/*`. *Ref: TechStack.md Section 13.*
-- [ ] **T134** — Security monitoring/alerting rules (Section 18.3 signals: repeated DMARC/DKIM failures, outbound volume spikes, webhook signature failures, mass 401/403). *Ref: Security.md Section 18.3.*
-- [ ] **T135** — Backup + restore drill for Postgres, object storage, search index. *Ref: FR-OBS-05; Security.md Section 24.*
+- [x] **T129** — Prometheus metrics: mail flow (accepted/rejected/queued/delivered/bounced), API latency, queue depth, worker failures. *Ref: FR-OBS-02; TechStack.md Section 13.*
+- [x] **T130** — Grafana dashboards, including Supabase (500MB)/Cloudinary (25GB) free-tier alert thresholds. *Ref: FR-OBS-03; ARCHITECTURE.md Appendix A.3.*
+- [x] **T131** — Structured JSON logging with request/correlation IDs; confirm no secrets/PII in any log line. *Ref: Security.md Section 18.1.*
+- [x] **T132** — Sentry integration: frontend, backend, mobile. *Ref: TechStack.md Section 13.*
+- [x] **T133** — OpenTelemetry tracing across `apps/*` → `services/*` → `packages/infra-adapters/*`. *Ref: TechStack.md Section 13.*
+- [x] **T134** — Security monitoring/alerting rules (Section 18.3 signals: repeated DMARC/DKIM failures, outbound volume spikes, webhook signature failures, mass 401/403). *Ref: Security.md Section 18.3.*
+- [x] **T135** — Backup + restore drill for Postgres, object storage, search index. *Ref: FR-OBS-05; Security.md Section 24.*
 
 ### 4.O — Deploy Targets
 
