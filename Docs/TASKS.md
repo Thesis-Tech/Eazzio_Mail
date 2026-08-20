@@ -57,8 +57,8 @@
 - [x] **T022** — `packages/contracts/api/openapi.yaml`: schema for every endpoint in `LLD.md` Section 3. *Ref: LLD.md Section 3; TechStack.md Section 2 (API Standards).*
 - [x] **T023** — `packages/contracts/events/`: `MailAccepted`, `MailRejected`, `MailQuarantined`, `MailDelivered`, `MailBounced`, `DomainVerified` schemas. *Ref: LLD.md Section 4.*
 - [x] **T024** — `packages/infra-adapters/database/interface.ts` (`EazzioDatabase`) — interface only. *Ref: LLD.md Section 2.1; ARCHITECTURE.md Section 9.2/9.3.*
-- [ ] **T025** — `packages/infra-adapters/database/postgres-adapter/` + contract tests. *Ref: DECISIONS.md D-004; TechStack.md Section 5.*
-- [ ] **T026** — `packages/infra-adapters/database/supabase-adapter/` + same contract test suite as T025. *Ref: ARCHITECTURE.md Appendix A.*
+- [x] **T025** — `packages/infra-adapters/database/postgres-adapter/` + contract tests. *Ref: DECISIONS.md D-004; TechStack.md Section 5.*
+- [x] **T026** — `packages/infra-adapters/database/supabase-adapter/` + same contract test suite as T025. *Ref: ARCHITECTURE.md Appendix A.*
 - [x] **T027** — `packages/infra-adapters/storage/interface.ts` (`EazzioStorage`) — interface only. *Ref: LLD.md Section 2.2.*
 - [ ] **T028** — `packages/infra-adapters/storage/minio-adapter/` + contract tests. *Ref: TechStack.md Section 6.*
 - [ ] **T029** — `packages/infra-adapters/storage/cloudinary-adapter/` + same contract test suite as T028; configure signed uploads + restricted presets. *Ref: Security.md Section 14.*
@@ -90,10 +90,10 @@
 
 ### 4.D — Database & RLS
 
-- [ ] **T052** — Implement full schema (`LLD.md` Section 1) as versioned migrations, each with a tested rollback script. *Ref: LLD.md Section 1; AGENTS.md Rule 86.*
-- [ ] **T053** — Native PostgreSQL RLS policies for tenant/ownership isolation on `mailboxes`, `messages`, `domains`, `organizations`; verify policies run identically on `postgres-adapter` and `supabase-adapter`. *Ref: Security.md Section 16; DECISIONS.md D-004.*
-- [ ] **T054** — DB role grants: confirm `services/ai-gateway`'s role has no write grant to `messages.spam_score`, `delivery_state`, `auth_results`, `outbound_queue.state`; write the negative test proving it. *Ref: Security.md Section 8.4; MODULES.md Section 3.8.*
-- [ ] **T055** — `audit_log` table: append-only enforcement (no `UPDATE`/`DELETE` grant for any application role). *Ref: LLD.md Section 1.4; Security.md Section 18.2.*
+- [x] **T052** — Implement full schema (`LLD.md` Section 1) as versioned migrations, each with a tested rollback script. *Ref: LLD.md Section 1; AGENTS.md Rule 86.*
+- [x] **T053** — Native PostgreSQL RLS policies for tenant/ownership isolation on `mailboxes`, `messages`, `domains`, `organizations`; verify policies run identically on `postgres-adapter` and `supabase-adapter`. *Ref: Security.md Section 16; DECISIONS.md D-004.*
+- [x] **T054** — DB role grants: confirm `services/ai-gateway`'s role has no write grant to `messages.spam_score`, `delivery_state`, `auth_results`, `outbound_queue.state`; write the negative test proving it. *Ref: Security.md Section 8.4; MODULES.md Section 3.8.*
+- [x] **T055** — `audit_log` table: append-only enforcement (no `UPDATE`/`DELETE` grant for any application role). *Ref: LLD.md Section 1.4; Security.md Section 18.2.*
 
 ### 4.E — Mailbox Core (`services/api`)
 
