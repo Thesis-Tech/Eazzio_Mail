@@ -6,11 +6,7 @@ export interface AuthenticatedRequest extends Request {
   user?: TokenPayload;
 }
 
-export function requireAuth(
-  req: AuthenticatedRequest,
-  _res: Response,
-  next: NextFunction
-): void {
+export function requireAuth(req: AuthenticatedRequest, _res: Response, next: NextFunction): void {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     throw new AppError('AUTH_REQUIRED', 'Authentication required', 401);

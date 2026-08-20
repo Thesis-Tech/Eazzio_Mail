@@ -8,25 +8,33 @@ describe('Mailbox Core API & Application Logic', () => {
   const validToken = TokenService.generateAccessToken({
     userId: 'usr-1',
     sessionId: 'ses-1',
-    email: 'user@eazzio.com'
+    email: 'user@eazzio.com',
   });
 
   it('should generate 6 standard system folders', () => {
     const folders = MailboxService.getSystemFolders('mbx-1');
     expect(folders.length).toBe(6);
-    expect(folders.map(f => f.kind)).toEqual(['inbox', 'sent', 'drafts', 'spam', 'trash', 'archive']);
+    expect(folders.map((f) => f.kind)).toEqual([
+      'inbox',
+      'sent',
+      'drafts',
+      'spam',
+      'trash',
+      'archive',
+    ]);
   });
 
   it('should enforce object-level ownership checks', () => {
-    expect(() => MailboxService.verifyOwnership('usr-1', 'usr-2')).toThrowError('Access denied to this mailbox');
+    expect(() => MailboxService.verifyOwnership('usr-1', 'usr-2')).toThrowError(
+      'Access denied to this mailbox',
+    );
     expect(() => MailboxService.verifyOwnership('usr-1', 'usr-1')).not.toThrow();
   });
 
   it('should assign thread heuristically based on subject matching', () => {
-    const threadId = MailboxService.assignThread(
-      { subject: 'Re: Project Update' },
-      [{ id: 'th-1', subjectNormalized: 'project update' }]
-    );
+    const threadId = MailboxService.assignThread({ subject: 'Re: Project Update' }, [
+      { id: 'th-1', subjectNormalized: 'project update' },
+    ]);
     expect(threadId).toBe('th-1');
   });
 

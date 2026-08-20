@@ -1,6 +1,8 @@
 import { MessageRepository, Message } from '@eazzio/domain';
 import { EazzioDatabase } from '../database/interface.js';
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 interface MessageRow {
   id: string;
   mailbox_id: string;
@@ -53,6 +55,7 @@ export class PostgresMessageRepository implements MessageRepository {
   }
 
   public async findById(id: string): Promise<Message | null> {
+    if (!UUID_REGEX.test(id)) return null;
     const rows = await this.db.query<MessageRow>(
       `SELECT id, mailbox_id, folder_id, thread_id, message_id_header, in_reply_to,
               references_header, from_address, subject, snippet, size_bytes, raw_object_key,
@@ -71,6 +74,7 @@ export class PostgresMessageRepository implements MessageRepository {
     limit: number = 50,
     cursor?: string,
   ): Promise<Message[]> {
+    if (!UUID_REGEX.test(mailboxId)) return [];
     let sql = `
       SELECT id, mailbox_id, folder_id, thread_id, message_id_header, in_reply_to,
              references_header, from_address, subject, snippet, size_bytes, raw_object_key,
@@ -81,7 +85,7 @@ export class PostgresMessageRepository implements MessageRepository {
     `;
     const params: unknown[] = [mailboxId];
 
-    if (folderId) {
+    if (folderId && UUID_REGEX.test(folderId)) {
       params.push(folderId);
       sql += ` AND folder_id = $${params.length}`;
     }
@@ -102,6 +106,7 @@ export class PostgresMessageRepository implements MessageRepository {
     mailboxId: string,
     messageIdHeader: string,
   ): Promise<Message | null> {
+    if (!UUID_REGEX.test(mailboxId)) return null;
     const rows = await this.db.query<MessageRow>(
       `SELECT id, mailbox_id, folder_id, thread_id, message_id_header, in_reply_to,
               references_header, from_address, subject, snippet, size_bytes, raw_object_key,
@@ -162,16 +167,19 @@ export class PostgresMessageRepository implements MessageRepository {
   }
 
   public async updateFolder(messageId: string, folderId: string): Promise<void> {
+    if (!UUID_REGEX.test(messageId) || !UUID_REGEX.test(folderId)) return;
     await this.db.query('UPDATE messages SET folder_id = $2 WHERE id = $1', [messageId, folderId]);
   }
 
   public async setLabels(messageId: string, labelIds: string[]): Promise<void> {
+    if (!UUID_REGEX.test(messageId)) return;
     await this.db.query('DELETE FROM message_labels WHERE message_id = $1', [messageId]);
-    if (labelIds.length > 0) {
-      const values = labelIds.map((_, idx) => `($1, $${idx + 2})`).join(', ');
+    const validLabelIds = labelIds.filter((lid) => UUID_REGEX.test(lid));
+    if (validLabelIds.length > 0) {
+      const values = validLabelIds.map((_, idx) => `($1, $${idx + 2})`).join(', ');
       await this.db.query(
         `INSERT INTO message_labels (message_id, label_id) VALUES ${values} ON CONFLICT DO NOTHING`,
-        [messageId, ...labelIds],
+        [messageId, ...validLabelIds],
       );
     }
   }
@@ -180,6 +188,7 @@ export class PostgresMessageRepository implements MessageRepository {
     messageId: string,
     flags: { isRead?: boolean; isStarred?: boolean; isImportant?: boolean },
   ): Promise<void> {
+    if (!UUID_REGEX.test(messageId)) return;
     const updates: string[] = [];
     const params: unknown[] = [messageId];
 
@@ -205,6 +214,7 @@ export class PostgresMessageRepository implements MessageRepository {
     messageId: string,
     state: 'queued' | 'sending' | 'delivered' | 'retrying' | 'bounced',
   ): Promise<void> {
+    if (!UUID_REGEX.test(messageId)) return;
     await this.db.query('UPDATE messages SET delivery_state = $2 WHERE id = $1', [
       messageId,
       state,

@@ -1,6 +1,8 @@
 import { MailboxRepository, Mailbox } from '@eazzio/domain';
 import { EazzioDatabase } from '../database/interface.js';
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 interface MailboxRow {
   id: string;
   owner_user_id: string;
@@ -27,6 +29,9 @@ export class PostgresMailboxRepository implements MailboxRepository {
   }
 
   public async findById(id: string): Promise<Mailbox | null> {
+    if (!UUID_REGEX.test(id)) {
+      return null;
+    }
     const rows = await this.db.query<MailboxRow>(
       'SELECT id, owner_user_id, domain_id, address, quota_bytes, used_bytes, created_at FROM mailboxes WHERE id = $1',
       [id],
@@ -43,27 +48,24 @@ export class PostgresMailboxRepository implements MailboxRepository {
   }
 
   public async findByOwnerId(userId: string): Promise<Mailbox[]> {
+    if (!UUID_REGEX.test(userId)) {
+      return [];
+    }
     const rows = await this.db.query<MailboxRow>(
       'SELECT id, owner_user_id, domain_id, address, quota_bytes, used_bytes, created_at FROM mailboxes WHERE owner_user_id = $1 ORDER BY created_at ASC',
       [userId],
     );
-    return rows.map((row) => this.mapRowToMailbox(row));
+    return rows.map((r) => this.mapRowToMailbox(r));
   }
 
   public async save(mailbox: Mailbox): Promise<void> {
     await this.db.query(
       `INSERT INTO mailboxes (id, owner_user_id, domain_id, address, quota_bytes, used_bytes, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
-       ON CONFLICT (id) DO UPDATE SET
-         owner_user_id = EXCLUDED.owner_user_id,
-         domain_id = EXCLUDED.domain_id,
-         address = EXCLUDED.address,
-         quota_bytes = EXCLUDED.quota_bytes,
-         used_bytes = EXCLUDED.used_bytes`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
       [
         mailbox.id,
         mailbox.ownerUserId,
-        mailbox.domainId ?? null,
+        mailbox.domainId,
         mailbox.address,
         mailbox.quotaBytes.toString(),
         mailbox.usedBytes.toString(),
@@ -72,9 +74,10 @@ export class PostgresMailboxRepository implements MailboxRepository {
     );
   }
 
-  public async updateQuotaUsage(mailboxId: string, usedBytes: bigint): Promise<void> {
+  public async updateQuotaUsage(id: string, usedBytes: bigint): Promise<void> {
+    if (!UUID_REGEX.test(id)) return;
     await this.db.query('UPDATE mailboxes SET used_bytes = $2 WHERE id = $1', [
-      mailboxId,
+      id,
       usedBytes.toString(),
     ]);
   }

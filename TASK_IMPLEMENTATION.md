@@ -53,7 +53,7 @@
   - **Verification:** Integration tests verifying that registered users and sessions are stored in PostgreSQL, and invalid/revoked tokens are rejected.
   - **Definition of Done:** Identity service fully persists state to database and passes authentication test suite.
 
-- [ ] **TASK-008** — REST API Service Database Integration
+- [x] **TASK-008** — REST API Service Database Integration
   - **Action:** Wire `services/api` routes (`/v1/mailboxes`, `/v1/search`) to domain repositories and OpenSearch adapter, replacing mock search adapter and dummy message arrays with real data queries.
   - **Verification:** API integration tests with supertest verifying folder listing, message querying, pagination, label application, and search autocomplete against database/OpenSearch.
   - **Definition of Done:** All `/v1/` routes in `services/api` execute real database and search queries with strict auth middleware.

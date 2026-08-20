@@ -1,6 +1,8 @@
 import { FolderRepository, Folder } from '@eazzio/domain';
 import { EazzioDatabase } from '../database/interface.js';
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 interface FolderRow {
   id: string;
   mailbox_id: string;
@@ -23,6 +25,7 @@ export class PostgresFolderRepository implements FolderRepository {
   }
 
   public async findById(id: string): Promise<Folder | null> {
+    if (!UUID_REGEX.test(id)) return null;
     const rows = await this.db.query<FolderRow>(
       'SELECT id, mailbox_id, parent_folder_id, name, kind FROM folders WHERE id = $1',
       [id],
@@ -31,6 +34,7 @@ export class PostgresFolderRepository implements FolderRepository {
   }
 
   public async findByMailboxId(mailboxId: string): Promise<Folder[]> {
+    if (!UUID_REGEX.test(mailboxId)) return [];
     const rows = await this.db.query<FolderRow>(
       'SELECT id, mailbox_id, parent_folder_id, name, kind FROM folders WHERE mailbox_id = $1 ORDER BY name ASC',
       [mailboxId],
@@ -51,6 +55,7 @@ export class PostgresFolderRepository implements FolderRepository {
   }
 
   public async delete(id: string): Promise<void> {
+    if (!UUID_REGEX.test(id)) return;
     await this.db.query('DELETE FROM folders WHERE id = $1', [id]);
   }
 }

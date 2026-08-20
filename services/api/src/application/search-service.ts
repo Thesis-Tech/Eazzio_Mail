@@ -18,14 +18,18 @@ export interface SearchResultItem {
 }
 
 export interface SearchQueryAdapter {
-  query(params: SearchQueryParams): Promise<{ items: SearchResultItem[]; nextCursor?: string | null }>;
+  query(
+    params: SearchQueryParams,
+  ): Promise<{ items: SearchResultItem[]; nextCursor?: string | null }>;
   autocomplete(prefix: string, mailboxId: string): Promise<string[]>;
 }
 
 export class SearchService {
   constructor(private readonly searchAdapter: SearchQueryAdapter) {}
 
-  public async search(params: SearchQueryParams): Promise<{ items: SearchResultItem[]; nextCursor?: string | null }> {
+  public async search(
+    params: SearchQueryParams,
+  ): Promise<{ items: SearchResultItem[]; nextCursor?: string | null }> {
     if (!params.q || params.q.trim().length === 0) {
       throw new AppError('VALIDATION_ERROR', 'Search query cannot be empty', 400);
     }

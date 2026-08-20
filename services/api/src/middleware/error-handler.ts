@@ -10,7 +10,7 @@ export class AppError extends Error {
     public readonly code: string,
     public readonly message: string,
     public readonly statusCode: number = 400,
-    public readonly details?: ApiErrorDetail[]
+    public readonly details?: ApiErrorDetail[],
   ) {
     super(message);
   }
@@ -20,15 +20,15 @@ export function errorHandler(
   err: Error | AppError,
   _req: Request,
   res: Response,
-  _next: NextFunction
+  _next: NextFunction,
 ): void {
   if (err instanceof AppError) {
     res.status(err.statusCode).json({
       error: {
         code: err.code,
         message: err.message,
-        details: err.details
-      }
+        details: err.details,
+      },
     });
     return;
   }
@@ -37,7 +37,7 @@ export function errorHandler(
   res.status(500).json({
     error: {
       code: 'INTERNAL_ERROR',
-      message: 'An unexpected internal error occurred'
-    }
+      message: 'An unexpected internal error occurred',
+    },
   });
 }
