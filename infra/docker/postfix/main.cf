@@ -1,0 +1,47 @@
+# Postfix main.cf for Eazzio Mail MTA
+myhostname = mail.eazzio.local
+mydomain = eazzio.local
+myorigin = $mydomain
+mydestination = localhost.$mydomain, localhost
+inet_interfaces = all
+inet_protocols = ipv4
+
+# Virtual Mailbox & LMTP Delivery to Dovecot / Inbound Daemon
+virtual_transport = lmtp:inet:dovecot:24
+virtual_mailbox_domains = /etc/postfix/virtual_domains
+virtual_mailbox_maps = /etc/postfix/virtual_mailboxes
+
+# SMTP Security & Restrictions
+smtpd_banner = $myhostname ESMTP Eazzio Mail MTA
+biff = no
+append_dot_mydomain = no
+readme_directory = no
+
+# Size limits (25MB payload)
+message_size_limit = 26214400
+mailbox_size_limit = 0
+
+# TLS Configuration
+smtpd_tls_security_level = may
+smtpd_tls_auth_only = yes
+smtpd_tls_cert_file = /etc/ssl/certs/ssl-cert-snakeoil.pem
+smtpd_tls_key_file = /etc/ssl/private/ssl-cert-snakeoil.key
+smtpd_tls_session_cache_database = btree:${data_directory}/smtpd_scache
+smtp_tls_session_cache_database = btree:${data_directory}/smtp_scache
+
+# Restrictions & Anti-Abuse
+smtpd_helo_required = yes
+smtpd_helo_restrictions = permit_mynetworks, reject_invalid_helo_hostname, permit
+smtpd_recipient_restrictions =
+    permit_mynetworks,
+    permit_sasl_authenticated,
+    reject_non_fqdn_recipient,
+    reject_unknown_recipient_domain,
+    reject_unauth_destination,
+    permit
+
+# Rspamd Milter Integration
+smtpd_milters = inet:rspamd:11332
+non_smtpd_milters = inet:rspamd:11332
+milter_default_action = accept
+milter_protocol = 6

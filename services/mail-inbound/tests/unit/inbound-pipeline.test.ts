@@ -3,18 +3,28 @@ import { InboundEnvelope } from '../../src/domain/envelope.js';
 import { MimeParser } from '../../src/domain/mime-parser.js';
 import { InboundPipeline } from '../../src/application/inbound-pipeline.js';
 
-describe('Inbound Mail Pipeline & Security Gating', () => {
+describe('Inbound Mail Pipeline & Security Gating Unit Tests', () => {
   const rawSampleMime = Buffer.from(
-    'From: sender@example.com\nTo: recipient@eazzio.com\nSubject: Test Email\nMessage-ID: <msg-123@example.com>\n\nHello, world!',
-    'utf-8'
+    'From: sender@example.com\r\nTo: recipient@eazzio.com\r\nSubject: Test Email\r\nMessage-ID: <msg-123@example.com>\r\n\r\nHello, world!',
+    'utf-8',
   );
 
-  it('should parse raw MIME headers and body text', () => {
-    const parsed = MimeParser.parse(rawSampleMime);
+  const pipeline = new InboundPipeline();
+
+  it('should parse raw MIME headers and body text', async () => {
+    const parsed = await MimeParser.parse(rawSampleMime);
     expect(parsed.from).toBe('sender@example.com');
     expect(parsed.subject).toBe('Test Email');
     expect(parsed.bodyText).toBe('Hello, world!');
     expect(parsed.messageIdHeader).toBe('<msg-123@example.com>');
+  });
+
+  it('should sanitize dangerous filenames to prevent path traversal', () => {
+    expect(MimeParser.sanitizeFilename('../../etc/passwd')).toBe('etc_passwd');
+    expect(MimeParser.sanitizeFilename('..\\..\\windows\\system32.dll')).toBe(
+      'windows_system32.dll',
+    );
+    expect(MimeParser.sanitizeFilename('safe-report.pdf')).toBe('safe-report.pdf');
   });
 
   it('should reject email with malware detection', async () => {
@@ -22,10 +32,10 @@ describe('Inbound Mail Pipeline & Security Gating', () => {
       envelopeFrom: 'attacker@bad.com',
       envelopeTo: ['user@eazzio.com'],
       clientIp: '1.2.3.4',
-      sizeBytes: 1024
+      sizeBytes: 1024,
     });
 
-    const result = await InboundPipeline.process({
+    const result = await pipeline.process({
       envelope,
       rawMime: rawSampleMime,
       authResults: { spf: 'pass', dkim: 'pass', dmarc: 'pass', fromDomain: 'bad.com' },
@@ -33,7 +43,7 @@ describe('Inbound Mail Pipeline & Security Gating', () => {
       spamStatisticalScore: 0,
       avResult: { status: 'infected', virusName: 'Trojan.Sample' },
       targetMailboxId: 'mbx-1',
-      defaultFolderId: 'fld-inbox'
+      defaultFolderId: 'fld-inbox',
     });
 
     expect(result.status).toBe('REJECTED');
@@ -47,10 +57,10 @@ describe('Inbound Mail Pipeline & Security Gating', () => {
       envelopeFrom: 'spammer@suspicious.com',
       envelopeTo: ['user@eazzio.com'],
       clientIp: '1.2.3.4',
-      sizeBytes: 1024
+      sizeBytes: 1024,
     });
 
-    const result = await InboundPipeline.process({
+    const result = await pipeline.process({
       envelope,
       rawMime: rawSampleMime,
       authResults: { spf: 'softfail', dkim: 'none', dmarc: 'none', fromDomain: 'suspicious.com' },
@@ -58,7 +68,7 @@ describe('Inbound Mail Pipeline & Security Gating', () => {
       spamStatisticalScore: 0.1,
       avResult: { status: 'clean' },
       targetMailboxId: 'mbx-1',
-      defaultFolderId: 'fld-inbox'
+      defaultFolderId: 'fld-inbox',
     });
 
     expect(result.status).toBe('QUARANTINED');
@@ -72,10 +82,10 @@ describe('Inbound Mail Pipeline & Security Gating', () => {
       envelopeFrom: 'friend@good.com',
       envelopeTo: ['user@eazzio.com'],
       clientIp: '1.2.3.4',
-      sizeBytes: rawSampleMime.length
+      sizeBytes: rawSampleMime.length,
     });
 
-    const result = await InboundPipeline.process({
+    const result = await pipeline.process({
       envelope,
       rawMime: rawSampleMime,
       authResults: { spf: 'pass', dkim: 'pass', dmarc: 'pass', fromDomain: 'good.com' },
@@ -83,7 +93,7 @@ describe('Inbound Mail Pipeline & Security Gating', () => {
       spamStatisticalScore: 0.02,
       avResult: { status: 'clean' },
       targetMailboxId: 'mbx-1',
-      defaultFolderId: 'fld-inbox'
+      defaultFolderId: 'fld-inbox',
     });
 
     expect(result.status).toBe('ACCEPTED');

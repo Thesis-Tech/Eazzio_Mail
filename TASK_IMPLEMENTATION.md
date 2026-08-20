@@ -58,7 +58,7 @@
   - **Verification:** API integration tests with supertest verifying folder listing, message querying, pagination, label application, and search autocomplete against database/OpenSearch.
   - **Definition of Done:** All `/v1/` routes in `services/api` execute real database and search queries with strict auth middleware.
 
-- [ ] **TASK-009** — Inbound Mail Pipeline Daemon & LMTP Integration
+- [x] **TASK-009** — Inbound Mail Pipeline Daemon & LMTP Integration
   - **Action:** Wire `services/mail-inbound` to receive messages via LMTP/SMTP stream, store raw MIME in MinIO/storage adapter, parse MIME, execute security pipeline (`decide()`), and insert message/attachment records into Postgres.
   - **Verification:** Integration test feeding raw MIME stream through inbound pipeline and verifying database records and MinIO storage.
   - **Definition of Done:** Inbound mail pipeline processes raw emails end-to-end and triggers `MailAcceptedEvent`.

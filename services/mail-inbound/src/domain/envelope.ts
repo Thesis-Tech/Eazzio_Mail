@@ -14,9 +14,10 @@ export class InboundEnvelope {
 
   constructor(public readonly props: InboundEnvelopeProps) {
     this.from = new EmailAddress(props.envelopeFrom);
-    this.to = props.envelopeTo.map(addr => new EmailAddress(addr));
+    this.to = props.envelopeTo.map((addr) => new EmailAddress(addr));
 
-    if (props.sizeBytes > 26214400) { // 25MB max size
+    if (props.sizeBytes > 26214400) {
+      // 25MB max size
       throw new Error('Message size exceeds maximum limit of 25MB');
     }
   }
