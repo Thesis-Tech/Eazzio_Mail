@@ -78,7 +78,7 @@
   - **Verification:** WebSocket client test connecting, authenticating, and receiving realtime event notifications.
   - **Definition of Done:** WebSocket gateway pushes new email events to connected clients with <1s latency.
 
-- [ ] **TASK-013** — Admin Service Domain & Organization Management
+- [x] **TASK-013** — Admin Service Domain & Organization Management
   - **Action:** Wire `services/admin-service` to domain repository and real Node.js `dns.promises` resolver for 4-check DNS validation (MX, SPF, DKIM, DMARC).
   - **Verification:** Integration tests verifying DNS record resolution against simulated DNS server and updating domain verification status in DB.
   - **Definition of Done:** Domain verification accurately queries DNS records and activates domains upon 4-check pass.
