@@ -29,8 +29,8 @@
   - **Verification:** Migration applies cleanly and tests verify that queries with `app.current_user_id` access only tenant rows, denying unauthorized access.
   - **Definition of Done:** 100% of tenant tables have explicit, passing RLS policies in PostgreSQL.
 
-- [ ] **TASK-004** — Concrete Domain Repositories Implementation
-  - **Action:** Implement concrete Postgres repositories in `packages/infra-adapters` or domain layer: `PostgresUserRepository`, `PostgresMailboxRepository`, `PostgresMessageRepository`, `PostgresFolderRepository`, `PostgresLabelRepository`, `PostgresThreadRepository`, `PostgresDomainRepository`.
+- [x] **TASK-004** — Concrete Domain Repositories Implementation
+  - **Action:** Implement concrete Postgres repositories in `packages/infra-adapters` or domain layer: `PostgresUserRepository`, `PostgresMailboxRepository`, `PostgresMessageRepository`, `PostgresFolderRepository`, `PostgresLabelRepository`, `PostgresThreadRepository`, `PostgresDomainRepository`, `PostgresOrganizationRepository`.
   - **Verification:** Repository unit and integration tests verifying CRUD operations, tenant scoping, and data mapping to domain entities.
   - **Definition of Done:** All domain repository interfaces in `packages/domain/src/repositories/interfaces.ts` have fully implemented, tested PostgreSQL repository classes.
 
