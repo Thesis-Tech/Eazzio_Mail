@@ -1,20 +1,22 @@
 # Eazzio Mail — TASK_IMPLEMENTATION.md
 
-> **Strict Execution Flow:**
-> 1. **Complete Backend Platform First:** All backend services, contracts, schemas, and engines verified.
-> 2. **Complete Frontend Web Application Next:** Full web client (`apps/web`) and admin portal (`apps/admin`).
-> 3. **Complete Mobile Application Next:** Offline-first mobile client (`apps/mobile`).
-> 4. **Complete Security Gap Audit & Penetration Hardening Last:** Ensure zero security vulnerabilities or leakages.
-> 5. **No Hopping:** Complete each step with `[x]` before advancing.
+> **Execution Rules & Methodology:**
+> 1. **Strict Sequential Progression:** Backend Platform (Phase 1) ➔ Frontend Web Client (Phase 2) ➔ Mobile App (Phase 3) ➔ Security & Penetration Hardening (Phase 4).
+> 2. **No Hopping / No Skipping:** Never start a subsequent phase or task until the current task is completed, tested, and marked `[x]`.
+> 3. **Reference Codebases (`/home/rahul-kumar/Desktop/Git_Pull/`):**
+>    - `Eazzio-Books`: UI layout, multi-tenant contexts, table pagination, and bulk toolbars.
+>    - `Eazzio-Payroll`: Next.js App Router layout, Flutter mobile structure, and RBAC token flow.
+>    - `Docs/DESIGN.md`: Authoritative color standard (Eazzio Blue `#2D5BFF`, Mail Accent `#FFA43D`, Deep Slate `#0F1115`).
+> 4. **Zero Security Gap:** Multi-tenant RLS isolation, anti-enumeration, DKIM key custody, and malware detection enforced across the entire stack.
 
 ---
 
-## Phase 1: Complete Backend Platform (Foundation, Engine & Services)
+## Phase 1: Backend Platform (Foundation, Contracts, Database & Microservices) — `[x] 100% COMPLETE`
 
 - [x] **TASK-B01: Workspace Monorepo & Toolchain Scaffold**
   - Setup root `package.json`, `pnpm-workspace.yaml`, `tsconfig.base.json`, `eslint.config.mjs`, `.prettierrc`.
-  - Wire Dockerfiles (`postgres`, `valkey`, `opensearch`, `minio`, `nginx`, `postfix`, `dovecot`, `rspamd`, `clamav`) and `docker-compose.yml`.
-  - Setup CI workflow `.github/workflows/ci.yml`.
+  - Category A Dockerfiles (`postgres`, `valkey`, `opensearch`, `minio`, `nginx`, `postfix`, `dovecot`, `rspamd`, `clamav`) and `docker-compose.yml`.
+  - CI workflow `.github/workflows/ci.yml` with TruffleHog secret scanning.
 
 - [x] **TASK-B02: Pure Domain Package (`packages/domain`)**
   - Zero I/O immutable domain models (`User`, `Mailbox`, `Message`, `Thread`, `Folder`, `Label`, `Domain`, `Organization`, `Policy`).
@@ -25,11 +27,11 @@
   - Typed event contracts (`MailAcceptedEvent`, `MailRejectedEvent`, `MailQuarantinedEvent`, `MailDeliveredEvent`, `MailBouncedEvent`, `DomainVerifiedEvent`).
 
 - [x] **TASK-B04: Abstract Infrastructure Adapters (`packages/infra-adapters`)**
-  - Interfaces for database (`EazzioDatabase`), object storage (`EazzioStorage`), cache (`EazzioCache`), AI (`EazzioAI`), and mail transport (`EazzioEmailTransport`).
+  - Abstract interfaces for database (`EazzioDatabase`), object storage (`EazzioStorage`), cache (`EazzioCache`), AI (`EazzioAI`), and mail transport (`EazzioEmailTransport`).
 
 - [x] **TASK-B05: Inbound Security Pipeline Engine (`packages/security-pipeline`)**
-  - Deterministic `decide()` algorithm.
-  - SPF/DKIM/DMARC alignment checks, ClamAV malware rejection, and composite spam score threshold evaluation.
+  - Deterministic `decide()` algorithm with composite scoring.
+  - Hard gates for ClamAV malware rejection and DMARC policy enforcement.
 
 - [x] **TASK-B06: Identity & Authentication Backend (`services/identity`)**
   - Argon2id password hashing with mandatory 12-char minimum policy.
@@ -81,27 +83,27 @@
 
 ---
 
-## Phase 2: Frontend Web Client (`apps/web` & `apps/admin`)
+## Phase 2: Frontend Web Client (`apps/web` & `apps/admin`) — `[IN PROGRESS]`
 
-- [ ] **TASK-W01: Web Client Shell & Design System Integration (`apps/web`)**
-  - Complete responsive 3-pane layout (Sidebar navigation, Thread list pane, Reading pane).
-  - Theme toggle (Light / Dark / System) and UI token integration from `@eazzio/ui-kit`.
-  - Privacy Mode Badge (`Standard encryption`, `Enhanced privacy`, `End-to-end encrypted`).
+- [ ] **TASK-W01: Web Client Shell & 3-Pane Responsive Layout (`apps/web`)**
+  - Navigation sidebar (left), virtualized thread list (center), and message reading pane (right).
+  - Theme provider (Light / Dark / System) with Eazzio Blue `#2D5BFF` and surface tokens.
+  - Dynamic Privacy Mode Badge (`Standard encryption`, `Enhanced privacy`, `End-to-end encrypted`).
 
 - [ ] **TASK-W02: Auth & Account Management Web Views (`apps/web`)**
-  - Registration, Login with Argon2id backend integration.
-  - TOTP MFA Challenge Screen and recovery flow.
+  - Registration and Login screens with client validation matching backend Argon2id constraints.
+  - TOTP 2FA QR code enrollment and verification modal.
   - Session & active device manager in settings.
 
 - [ ] **TASK-W03: Mailbox Triage & Virtualized Thread List (`apps/web`)**
-  - Virtual scrolling thread list with infinite cursor pagination.
+  - Infinite cursor pagination with virtualized list rendering.
   - Unread badge counters for system and custom folders.
-  - Multi-select bulk actions (Archive, Trash, Mark read, Apply labels).
-  - Keyboard shortcuts (`j`/`k` navigate, `e` archive, `r` reply, `c` compose, `/` search).
+  - Multi-select bulk action toolbar (Archive, Trash, Mark read, Apply labels).
+  - Keyboard shortcut navigation (`j`/`k` move, `e` archive, `r` reply, `c` compose, `/` search).
 
 - [ ] **TASK-W04: Message Reading Pane & Security Protections (`apps/web`)**
-  - Sanitized HTML email body rendering (Block remote tracking pixels by default).
-  - Attachment preview and download with antivirus status indicator.
+  - Sanitized HTML email rendering with remote image/pixel blocker by default.
+  - Attachment previewer and download cards with antivirus scan indicators.
   - Authentication status badges (SPF/DKIM/DMARC pass/fail display).
 
 - [ ] **TASK-W05: Rich Text Compose & Draft Auto-Save (`apps/web`)**
@@ -122,10 +124,10 @@
 
 ---
 
-## Phase 3: Mobile Application (`apps/mobile` — Flutter / React Native)
+## Phase 3: Mobile Application (`apps/mobile` — Flutter) — `[PENDING]`
 
 - [ ] **TASK-M01: Mobile Monorepo App Setup & Navigation Shell**
-  - Monorepo package scaffold, responsive layout for iOS & Android.
+  - Flutter workspace scaffold matching `ffms_mobile` architecture.
   - Secure local credential storage (Keychain / EncryptedSharedPreferences).
 
 - [ ] **TASK-M02: Offline-First SQLite Sync Engine**
@@ -143,7 +145,7 @@
 
 ---
 
-## Phase 4: Security Gap Check & Penetration Hardening
+## Phase 4: Security Gap Check & Penetration Hardening — `[PENDING]`
 
 - [ ] **TASK-S01: Authentication & Session Security Audit**
   - Anti-brute force rate limiting validation on `/v1/auth/login`.
