@@ -1,3 +1,4 @@
+-- Down Migration: 001_initial_schema.down.sql
 DROP TABLE IF EXISTS audit_log CASCADE;
 DROP TABLE IF EXISTS outbound_queue CASCADE;
 DROP TABLE IF EXISTS filters CASCADE;
