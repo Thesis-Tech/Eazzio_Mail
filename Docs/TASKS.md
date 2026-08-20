@@ -76,17 +76,17 @@
 
 ### 4.C — Identity Service
 
-- [ ] **T041** — Scaffold `services/identity/` (`api/application/domain/infra`). *Ref: ARCHITECTURE.md Section 3.1.*
-- [ ] **T042** — Registration + password policy (Argon2id, 12-char minimum, no forced rotation). *Ref: FR-AUTH-01; Security.md Section 6.1.*
-- [ ] **T043** — Password auth + TOTP MFA (`mfa_totp_secrets` table). *Ref: FR-AUTH-02; LLD.md Section 1.1; Security.md Section 7.*
-- [ ] **T044** — Session/device management: list, revoke individual, revoke all (`sessions` state machine). *Ref: FR-AUTH-03; LLD.md Section 5.4.*
-- [ ] **T045** — Account recovery flow with anti-enumeration response. *Ref: FR-AUTH-04; APP_FLOW.md Section 2; Security.md Section 19.*
-- [ ] **T046** — Suspicious-login detection → forced MFA + existing-session notification. *Ref: FR-AUTH-05; Security.md Section 9.*
-- [ ] **T047** — Authorization hierarchy (Platform→Org→Domain→Mailbox→User) via `roles` table. *Ref: FR-AUTH-06; Security.md Section 8.1.*
-- [ ] **T048** — Scoped API tokens/service accounts. *Ref: FR-AUTH-07.*
-- [ ] **T049** — OAuth 2.0/OIDC login methods (Google + approved providers) routed into `services/identity`'s own session issuance. *Ref: TechStack.md Section 4.*
-- [ ] **T050** — Re-authentication requirement before: password change, email change, MFA disable, token creation, DKIM rotation, org-ownership transfer. *Ref: Security.md Section 7.*
-- [ ] **T051** — `services/identity/README.md` naming FR-* IDs and dependencies; **explicit check confirming no import of Supabase Auth anywhere.** *Ref: DECISIONS.md D-005.*
+- [x] **T041** — Scaffold `services/identity/` (`api/application/domain/infra`). *Ref: ARCHITECTURE.md Section 3.1.*
+- [x] **T042** — Registration + password policy (Argon2id, 12-char minimum, no forced rotation). *Ref: FR-AUTH-01; Security.md Section 6.1.*
+- [x] **T043** — Password auth + TOTP MFA (`mfa_totp_secrets` table). *Ref: FR-AUTH-02; LLD.md Section 1.1; Security.md Section 7.*
+- [x] **T044** — Session/device management: list, revoke individual, revoke all (`sessions` state machine). *Ref: FR-AUTH-03; LLD.md Section 5.4.*
+- [x] **T045** — Account recovery flow with anti-enumeration response. *Ref: FR-AUTH-04; APP_FLOW.md Section 2; Security.md Section 19.*
+- [x] **T046** — Suspicious-login detection → forced MFA + existing-session notification. *Ref: FR-AUTH-05; Security.md Section 9.*
+- [x] **T047** — Authorization hierarchy (Platform→Org→Domain→Mailbox→User) via `roles` table. *Ref: FR-AUTH-06; Security.md Section 8.1.*
+- [x] **T048** — Scoped API tokens/service accounts. *Ref: FR-AUTH-07.*
+- [x] **T049** — OAuth 2.0/OIDC login methods (Google + approved providers) routed into `services/identity`'s own session issuance. *Ref: TechStack.md Section 4.*
+- [x] **T050** — Re-authentication requirement before: password change, email change, MFA disable, token creation, DKIM rotation, org-ownership transfer. *Ref: Security.md Section 7.*
+- [x] **T051** — `services/identity/README.md` naming FR-* IDs and dependencies; **explicit check confirming no import of Supabase Auth anywhere.** *Ref: DECISIONS.md D-005.*
 
 ### 4.D — Database & RLS
 
