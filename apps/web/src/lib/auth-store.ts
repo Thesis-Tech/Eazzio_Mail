@@ -2,6 +2,8 @@ export interface AuthUser {
   id: string;
   email: string;
   displayName?: string;
+  phone?: string;
+  isPhoneVerified?: boolean;
   role?: string;
 }
 
