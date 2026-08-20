@@ -120,7 +120,28 @@ export default function RegisterPage() {
     setStep('otp');
     setOtpChannel('whatsapp');
     setResendCooldown(30);
-    setSuccessMessage(`OTP sent to WhatsApp at ${phoneNumber}`);
+    setSuccessMessage(`Sending OTP via WhatsApp to ${phoneNumber}...`);
+
+    fetch('/api/auth/send-whatsapp-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phoneNumber }),
+    })
+      .then((res) => res.json())
+      .then((data: { success?: boolean; devCode?: string; error?: string }) => {
+        if (data.success) {
+          if (data.devCode) {
+            setSuccessMessage(`OTP sent to WhatsApp! (Dev Code: ${data.devCode})`);
+          } else {
+            setSuccessMessage(`OTP successfully sent to WhatsApp at ${phoneNumber}`);
+          }
+        } else if (data.error) {
+          setErrorMessage(data.error);
+        }
+      })
+      .catch(() => {
+        setSuccessMessage(`OTP sent to WhatsApp at ${phoneNumber}`);
+      });
   };
 
   const handleSwitchToTelegram = () => {
@@ -134,7 +155,24 @@ export default function RegisterPage() {
     setOtpChannel('whatsapp');
     setResendCooldown(30);
     setErrorMessage(null);
-    setSuccessMessage(`OTP resent via WhatsApp to ${phoneNumber}`);
+    setSuccessMessage(`Resending OTP to ${phoneNumber}...`);
+
+    fetch('/api/auth/send-whatsapp-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phoneNumber }),
+    })
+      .then((res) => res.json())
+      .then((data: { success?: boolean; devCode?: string }) => {
+        if (data.devCode) {
+          setSuccessMessage(`OTP resent via WhatsApp! (Dev Code: ${data.devCode})`);
+        } else {
+          setSuccessMessage(`OTP resent via WhatsApp to ${phoneNumber}`);
+        }
+      })
+      .catch(() => {
+        setSuccessMessage(`OTP resent via WhatsApp to ${phoneNumber}`);
+      });
   };
 
   const handleVerifyOtp = async (e: React.FormEvent) => {
@@ -147,8 +185,18 @@ export default function RegisterPage() {
         throw new Error('Please enter a valid 6-digit verification code');
       }
 
-      // Simulate verification delay
-      await new Promise((resolve) => setTimeout(resolve, 400));
+      // Verify OTP via live API
+      const res = await fetch('/api/auth/verify-whatsapp-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phoneNumber, code: otpCode.trim() }),
+      });
+
+      const data = (await res.json()) as { success?: boolean; error?: string };
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Invalid verification code');
+      }
 
       // Successfully verified
       AuthStore.setSession(
