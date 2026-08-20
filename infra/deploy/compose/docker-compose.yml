@@ -1,0 +1,96 @@
+services:
+  postgres:
+    build:
+      context: ../../docker/postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-eazzio_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-eazzio_password}
+      POSTGRES_DB: ${POSTGRES_DB:-eazzio_mail}
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  valkey:
+    build:
+      context: ../../docker/valkey
+    ports:
+      - '6379:6379'
+    healthcheck:
+      test: ['CMD', 'valkey-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  opensearch:
+    build:
+      context: ../../docker/opensearch
+    ports:
+      - '9200:9200'
+    volumes:
+      - opensearch_data:/usr/share/opensearch/data
+    healthcheck:
+      test: ['CMD-SHELL', "curl -s http://localhost:9200/_cat/health | grep -q 'green\\|yellow'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  minio:
+    build:
+      context: ../../docker/minio
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-eazzio_admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-eazzio_secret_key}
+    ports:
+      - '9000:9000'
+      - '9001:9001'
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:9000/minio/health/live']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  postfix:
+    build:
+      context: ../../docker/postfix
+    ports:
+      - '25:25'
+      - '587:587'
+    depends_on:
+      - postgres
+
+  dovecot:
+    build:
+      context: ../../docker/dovecot
+    ports:
+      - '143:143'
+      - '993:993'
+    depends_on:
+      - postgres
+
+  rspamd:
+    build:
+      context: ../../docker/rspamd
+    ports:
+      - '11333:11333'
+      - '11334:11334'
+    depends_on:
+      - valkey
+
+  clamav:
+    build:
+      context: ../../docker/clamav
+    ports:
+      - '3310:3310'
+
+volumes:
+  postgres_data:
+  opensearch_data:
+  minio_data:
