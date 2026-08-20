@@ -63,7 +63,7 @@
   - **Verification:** Integration test feeding raw MIME stream through inbound pipeline and verifying database records and MinIO storage.
   - **Definition of Done:** Inbound mail pipeline processes raw emails end-to-end and triggers `MailAcceptedEvent`.
 
-- [ ] **TASK-010** — Outbound Mail Service, RSA DKIM Signing & Queue Runner
+- [x] **TASK-010** — Outbound Mail Service, RSA DKIM Signing & Queue Runner
   - **Action:** Implement true RSA-SHA256 DKIM cryptographic signing in `services/mail-outbound` and build background queue runner processing `outbound_queue` table with exponential backoff.
   - **Verification:** Unit tests verifying RSA cryptographic signature against public key DNS record and queue processor handling retries/bounces.
   - **Definition of Done:** Outbound messages are correctly signed, queued, delivered via SMTP transport, and retried on transient failures.

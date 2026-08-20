@@ -2,6 +2,13 @@ import { DkimSigner } from '../domain/dkim-signer.js';
 import { HtmlSanitizer } from '../domain/sanitizer.js';
 import { calculateNextAttempt } from '../domain/backoff.js';
 import { MailDeliveredEvent, MailBouncedEvent } from '@eazzio/contracts';
+import {
+  OutboundDeliveryState,
+  OutboundQueueRepository,
+} from '../repositories/outbound-queue-repository.js';
+import { Message, MessageRepository } from '@eazzio/domain';
+import { EazzioStorage } from '@eazzio/infra-adapters';
+import crypto from 'crypto';
 
 export interface ComposeMessageInput {
   fromAddress: string;
@@ -12,12 +19,18 @@ export interface ComposeMessageInput {
   domainName: string;
   dkimSelector: string;
   dkimPrivateKeyPem: string;
-  idempotencyKey: string;
+  idempotencyKey?: string;
+  mailboxId?: string;
+  folderId?: string;
 }
 
-export type OutboundDeliveryState = 'queued' | 'sending' | 'delivered' | 'retrying' | 'bounced';
-
 export class OutboundService {
+  constructor(
+    private readonly queueRepo?: OutboundQueueRepository,
+    private readonly messageRepo?: MessageRepository,
+    private readonly storage?: EazzioStorage,
+  ) {}
+
   public static composeAndSign(input: ComposeMessageInput): { rawMime: Buffer; messageId: string } {
     const messageId = `<${crypto.randomUUID()}@${input.domainName}>`;
     const sanitizedHtml = input.bodyHtml ? HtmlSanitizer.sanitize(input.bodyHtml) : undefined;
@@ -32,7 +45,7 @@ export class OutboundService {
       `MIME-Version: 1.0`,
       `Content-Type: text/html; charset=utf-8`,
       ``,
-      body
+      body,
     ].join('\r\n');
 
     const unsignedMime = Buffer.from(mimeString, 'utf-8');
@@ -40,10 +53,73 @@ export class OutboundService {
       rawMime: unsignedMime,
       domainName: input.domainName,
       selector: input.dkimSelector,
-      privateKeyPem: input.dkimPrivateKeyPem
+      privateKeyPem: input.dkimPrivateKeyPem,
     });
 
     return { rawMime: signedMime, messageId };
+  }
+
+  public async enqueueOutbound(
+    input: ComposeMessageInput,
+  ): Promise<{ messageId: string; queueIds: string[] }> {
+    const { rawMime, messageId } = OutboundService.composeAndSign(input);
+    const dbMessageId = crypto.randomUUID();
+    const queueIds: string[] = [];
+
+    const mailboxId = input.mailboxId || crypto.randomUUID();
+    const folderId = input.folderId || 'fld-sent';
+    const rawObjectKey = `mailboxes/${mailboxId}/messages/${dbMessageId}/raw.eml`;
+
+    // 1. Store signed raw MIME in storage
+    if (this.storage) {
+      await this.storage.put(rawObjectKey, rawMime, 'message/rfc822');
+    }
+
+    // 2. Persist outbound Message record in PostgreSQL
+    if (this.messageRepo) {
+      const message = new Message({
+        id: dbMessageId,
+        mailboxId,
+        folderId,
+        messageIdHeader: messageId,
+        fromAddress: input.fromAddress,
+        subject: input.subject,
+        snippet: (input.bodyText || input.bodyHtml || '').slice(0, 200).replace(/\s+/g, ' ').trim(),
+        sizeBytes: rawMime.length,
+        rawObjectKey,
+        isRead: true,
+        isStarred: false,
+        isImportant: false,
+        direction: 'outbound',
+        deliveryState: 'queued',
+        receivedAt: new Date(),
+      });
+      await this.messageRepo.save(message);
+    }
+
+    // 3. Enqueue delivery record per recipient in outbound_queue
+    if (this.queueRepo) {
+      for (const recipient of input.to) {
+        const queueId = crypto.randomUUID();
+        const idempotencyKey = input.idempotencyKey
+          ? `${input.idempotencyKey}_${recipient}`
+          : `${dbMessageId}_${recipient}`;
+
+        await this.queueRepo.enqueue({
+          id: queueId,
+          messageId: dbMessageId,
+          recipientAddress: recipient,
+          state: 'queued',
+          attemptCount: 0,
+          nextAttemptAt: new Date(),
+          idempotencyKey,
+          createdAt: new Date(),
+        });
+        queueIds.push(queueId);
+      }
+    }
+
+    return { messageId, queueIds };
   }
 
   public static handleDeliveryAttempt(params: {
@@ -67,7 +143,7 @@ export class OutboundService {
         occurredAt: now.toISOString(),
         outboundQueueId: params.outboundQueueId,
         messageId: params.messageId,
-        recipientAddress: params.recipientAddress
+        recipientAddress: params.recipientAddress,
       };
       return { state: 'delivered', event };
     }
@@ -82,7 +158,7 @@ export class OutboundService {
         messageId: params.messageId,
         recipientAddress: params.recipientAddress,
         bounceType: 'transient_exhausted',
-        smtpCode: params.smtpCode
+        smtpCode: params.smtpCode,
       };
       return { state: 'bounced', event };
     }
