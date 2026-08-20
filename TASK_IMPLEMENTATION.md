@@ -24,7 +24,7 @@
   - **Verification:** Unit and integration tests in `packages/infra-adapters/tests` verifying live query execution, connection lifecycle, and rollback on error.
   - **Definition of Done:** `PostgresAdapter` executes real SQL queries against Postgres, implements `EazzioDatabase` interface, and passes all database contract tests.
 
-- [ ] **TASK-003** — Complete Row Level Security (RLS) Policies Migration
+- [x] **TASK-003** — Complete Row Level Security (RLS) Policies Migration
   - **Action:** Author migration `003_complete_rls_policies.sql` creating tenant-scoped RLS policies for `folders`, `labels`, `threads`, `attachments`, `filters`, and `domains`.
   - **Verification:** Migration applies cleanly and tests verify that queries with `app.current_user_id` access only tenant rows, denying unauthorized access.
   - **Definition of Done:** 100% of tenant tables have explicit, passing RLS policies in PostgreSQL.
