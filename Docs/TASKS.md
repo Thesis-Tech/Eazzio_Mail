@@ -124,16 +124,16 @@
 
 ### 4.G — Outbound Mail Pipeline (`services/mail-outbound`)
 
-- [ ] **T077** — Scaffold `services/mail-outbound/`. *Ref: MODULES.md Section 3.3.*
-- [ ] **T078** — Compose validation + HTML sanitization + MIME construction. *Ref: FR-OUT-01.*
-- [ ] **T079** — DKIM signing using `signOutbound()`; private key fetched from secrets store via `dkim_private_key_ref`, never logged. *Ref: FR-OUT-02; LLD.md Section 6.3; Security.md Section 5.2.*
-- [ ] **T080** — DKIM key generation + rotation procedure (dual-sign transition window). *Ref: Security.md Section 5.2, Section 22.*
-- [ ] **T081** — Outbound rate limiting via `EazzioCache.incr()`; stricter limits for new accounts. *Ref: FR-OUT-03; Security.md Section 5.4, Section 12.*
-- [ ] **T082** — Delivery queue: MX resolution, MTA-STS/STARTTLS negotiation, certificate validation, SMTP delivery attempt. *Ref: FR-OUT-04.*
-- [ ] **T083** — Retry/backoff per the exact formula in `LLD.md` Section 5.2; dead-letter after max attempts. *Ref: FR-OUT-05/07.*
-- [ ] **T084** — Delivery-state tracking (`LLD.md` Section 5.1 state machine), queryable per message. *Ref: FR-OUT-06.*
-- [ ] **T085** — Compromised-account mass-send detection → automatic throttle trigger. *Ref: Security.md Section 5.4, Section 21.*
-- [ ] **T086** — Idempotency: `outbound_queue.idempotency_key` UNIQUE constraint enforced on every insert path. *Ref: AGENTS.md Rule 14; LLD.md Section 1.4.*
+- [x] **T077** — Scaffold `services/mail-outbound/`. *Ref: MODULES.md Section 3.3.*
+- [x] **T078** — Compose validation + HTML sanitization + MIME construction. *Ref: FR-OUT-01.*
+- [x] **T079** — DKIM signing using `signOutbound()`; private key fetched from secrets store via `dkim_private_key_ref`, never logged. *Ref: FR-OUT-02; LLD.md Section 6.3; Security.md Section 5.2.*
+- [x] **T080** — DKIM key generation + rotation procedure (dual-sign transition window). *Ref: Security.md Section 5.2, Section 22.*
+- [x] **T081** — Outbound rate limiting via `EazzioCache.incr()`; stricter limits for new accounts. *Ref: FR-OUT-03; Security.md Section 5.4, Section 12.*
+- [x] **T082** — Delivery queue: MX resolution, MTA-STS/STARTTLS negotiation, certificate validation, SMTP delivery attempt. *Ref: FR-OUT-04.*
+- [x] **T083** — Retry/backoff per the exact formula in `LLD.md` Section 5.2; dead-letter after max attempts. *Ref: FR-OUT-05/07.*
+- [x] **T084** — Delivery-state tracking (`LLD.md` Section 5.1 state machine), queryable per message. *Ref: FR-OUT-06.*
+- [x] **T085** — Compromised-account mass-send detection → automatic throttle trigger. *Ref: Security.md Section 5.4, Section 21.*
+- [x] **T086** — Idempotency: `outbound_queue.idempotency_key` UNIQUE constraint enforced on every insert path. *Ref: AGENTS.md Rule 14; LLD.md Section 1.4.*
 
 ### 4.H — Search (`services/search-indexer` + `services/api`)
 
