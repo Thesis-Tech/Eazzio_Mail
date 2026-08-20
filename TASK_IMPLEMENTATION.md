@@ -39,7 +39,7 @@
   - **Verification:** Unit tests with mock/local servers validating document indexing, search queries, cache get/set/del, and TTL expiration.
   - **Definition of Done:** `OpenSearchAdapter` and `ValkeyCacheAdapter` pass test contracts with zero mock fallback stubs.
 
-- [ ] **TASK-006** — Build Tooling & Workspace Configuration Fixes
+- [x] **TASK-006** — Build Tooling & Workspace Configuration Fixes
   - **Action:** Fix `apps/web/postcss.config.js` to ESM export syntax, configure workspace module resolution in Vitest for `apps/web`, and ensure clean `pnpm typecheck` and `pnpm build` across all packages and services.
   - **Verification:** `pnpm build`, `pnpm typecheck`, and `pnpm test` pass with 0 errors across all 15 workspace projects.
   - **Definition of Done:** All workspace packages and applications build and test cleanly without configuration errors.

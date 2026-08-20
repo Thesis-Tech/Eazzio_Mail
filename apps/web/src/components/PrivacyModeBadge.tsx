@@ -4,10 +4,12 @@ import { getPrivacyModeLabel, PrivacyTier } from '@eazzio/ui-kit';
 
 interface PrivacyModeBadgeProps {
   tier?: PrivacyTier;
+  mode?: PrivacyTier;
 }
 
-export function PrivacyModeBadge({ tier = 'standard' }: PrivacyModeBadgeProps) {
-  const label = getPrivacyModeLabel(tier);
+export function PrivacyModeBadge({ tier, mode = 'standard' }: PrivacyModeBadgeProps) {
+  const selectedTier = tier ?? mode;
+  const label = getPrivacyModeLabel(selectedTier);
 
   return (
     <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
