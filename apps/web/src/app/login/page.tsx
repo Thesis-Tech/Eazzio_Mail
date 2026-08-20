@@ -2,12 +2,12 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { Mail, Lock, Send, ShieldCheck, ArrowRight, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Mail, Lock, Send, ArrowRight, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { AuthStore } from '../../lib/auth-store';
 
 export default function LoginPage() {
   const [authMode, setAuthMode] = useState<'password' | 'telegram'>('password');
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [phone, setPhone] = useState('');
   const [telegramOtp, setTelegramOtp] = useState('');
@@ -15,14 +15,19 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // Normalize email: if user enters 'rahul', it becomes 'rahul@eazzio.com'
+  const normalizedEmail = identifier.includes('@')
+    ? identifier.toLowerCase().trim()
+    : `${identifier.toLowerCase().trim()}@eazzio.com`;
+
   const handlePasswordLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setErrorMessage(null);
 
     try {
-      if (!email || !password) {
-        throw new Error('Please enter both email and password');
+      if (!identifier || !password) {
+        throw new Error('Please enter both your email/username and password');
       }
 
       // Simulate authentication request
@@ -31,11 +36,11 @@ export default function LoginPage() {
       AuthStore.setSession(
         {
           id: 'user_123',
-          email,
-          displayName: email.split('@')[0],
+          email: normalizedEmail,
+          displayName: normalizedEmail.split('@')[0],
           role: 'user',
         },
-        'token_' + Date.now(),
+        'token_' + Date.now()
       );
 
       window.location.href = '/';
@@ -71,11 +76,11 @@ export default function LoginPage() {
       AuthStore.setSession(
         {
           id: 'user_telegram_' + Date.now(),
-          email: `${phone.replace(/\D/g, '')}@telegram.eazzio.local`,
+          email: `${phone.replace(/\D/g, '')}@telegram.eazzio.com`,
           displayName: `Telegram User (${phone})`,
           role: 'user',
         },
-        'token_tg_' + Date.now(),
+        'token_tg_' + Date.now()
       );
 
       window.location.href = '/';
@@ -95,36 +100,26 @@ export default function LoginPage() {
             E
           </div>
           <h2 className="text-2xl font-bold tracking-tight text-white">Sign in to Eazzio Mail</h2>
-          <p className="text-sm text-slate-400">Zero-leakage, privacy-first communication</p>
+          <p className="text-sm text-slate-400">Enter your <span className="text-[#2D5BFF] font-semibold">@eazzio.com</span> username or email</p>
         </div>
 
         {/* Tab Switcher: Password vs Telegram OTP */}
         <div className="flex bg-[#0F1115] p-1 rounded-xl border border-[#2A2E37]">
           <button
             type="button"
-            onClick={() => {
-              setAuthMode('password');
-              setErrorMessage(null);
-            }}
+            onClick={() => { setAuthMode('password'); setErrorMessage(null); }}
             className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${
-              authMode === 'password'
-                ? 'bg-[#2D5BFF] text-white shadow-sm'
-                : 'text-slate-400 hover:text-white'
+              authMode === 'password' ? 'bg-[#2D5BFF] text-white shadow-sm' : 'text-slate-400 hover:text-white'
             }`}
             data-testid="tab-password"
           >
-            Email & Password
+            Password
           </button>
           <button
             type="button"
-            onClick={() => {
-              setAuthMode('telegram');
-              setErrorMessage(null);
-            }}
+            onClick={() => { setAuthMode('telegram'); setErrorMessage(null); }}
             className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${
-              authMode === 'telegram'
-                ? 'bg-[#2D5BFF] text-white shadow-sm'
-                : 'text-slate-400 hover:text-white'
+              authMode === 'telegram' ? 'bg-[#2D5BFF] text-white shadow-sm' : 'text-slate-400 hover:text-white'
             }`}
             data-testid="tab-telegram"
           >
@@ -134,10 +129,7 @@ export default function LoginPage() {
 
         {/* Error Alert */}
         {errorMessage && (
-          <div
-            className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-center gap-2.5"
-            data-testid="auth-error-alert"
-          >
+          <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-center gap-2.5" data-testid="auth-error-alert">
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{errorMessage}</span>
           </div>
@@ -147,17 +139,15 @@ export default function LoginPage() {
         {authMode === 'password' ? (
           <form onSubmit={handlePasswordLogin} className="space-y-4" data-testid="login-form">
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                Email Address
-              </label>
+              <label className="block text-xs font-medium text-slate-300 mb-1.5">Username or Email</label>
               <div className="relative">
                 <Mail className="w-4 h-4 absolute left-3.5 top-3 text-slate-400" />
                 <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  type="text"
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
                   required
-                  placeholder="name@company.com"
+                  placeholder="username or username@eazzio.com"
                   className="w-full bg-[#0F1115] border border-[#2A2E37] focus:border-[#2D5BFF] focus:ring-1 focus:ring-[#2D5BFF] rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 outline-none transition-all"
                   data-testid="login-email-input"
                 />
@@ -167,9 +157,7 @@ export default function LoginPage() {
             <div>
               <div className="flex justify-between items-center mb-1.5">
                 <label className="text-xs font-medium text-slate-300">Password</label>
-                <a href="#" className="text-xs text-[#2D5BFF] hover:underline">
-                  Forgot password?
-                </a>
+                <a href="#" className="text-xs text-[#2D5BFF] hover:underline">Forgot password?</a>
               </div>
               <div className="relative">
                 <Lock className="w-4 h-4 absolute left-3.5 top-3 text-slate-400" />
@@ -201,9 +189,7 @@ export default function LoginPage() {
             {!isOtpSent ? (
               <form onSubmit={handleTelegramOtpSend} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                    Phone Number (with country code)
-                  </label>
+                  <label className="block text-xs font-medium text-slate-300 mb-1.5">Phone Number (with country code)</label>
                   <div className="relative">
                     <Send className="w-4 h-4 absolute left-3.5 top-3 text-slate-400" />
                     <input
@@ -211,7 +197,7 @@ export default function LoginPage() {
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
                       required
-                      placeholder="+1 555 123 4567"
+                      placeholder="+91 98765 43210"
                       className="w-full bg-[#0F1115] border border-[#2A2E37] focus:border-[#2D5BFF] focus:ring-1 focus:ring-[#2D5BFF] rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 outline-none transition-all"
                     />
                   </div>
@@ -228,9 +214,7 @@ export default function LoginPage() {
             ) : (
               <form onSubmit={handleTelegramOtpVerify} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                    Enter Telegram Verification Code
-                  </label>
+                  <label className="block text-xs font-medium text-slate-300 mb-1.5">Enter Telegram Verification Code</label>
                   <input
                     type="text"
                     value={telegramOtp}
@@ -239,9 +223,7 @@ export default function LoginPage() {
                     placeholder="123456"
                     className="w-full bg-[#0F1115] border border-[#2A2E37] focus:border-[#2D5BFF] focus:ring-1 focus:ring-[#2D5BFF] rounded-xl px-4 py-2.5 text-center tracking-widest text-lg font-mono text-white placeholder-slate-500 outline-none transition-all"
                   />
-                  <p className="text-xs text-slate-400 mt-2 text-center">
-                    Code sent to Telegram for {phone}
-                  </p>
+                  <p className="text-xs text-slate-400 mt-2 text-center">Code sent to Telegram for {phone}</p>
                 </div>
 
                 <button
@@ -271,15 +253,7 @@ export default function LoginPage() {
           <button
             type="button"
             onClick={() => {
-              AuthStore.setSession(
-                {
-                  id: 'user_oauth_google',
-                  email: 'user@gmail.com',
-                  displayName: 'Google User',
-                  role: 'user',
-                },
-                'token_google',
-              );
+              AuthStore.setSession({ id: 'user_oauth_google', email: 'user@eazzio.com', displayName: 'Google User', role: 'user' }, 'token_google');
               window.location.href = '/';
             }}
             className="py-2.5 px-4 rounded-xl bg-[#0F1115] border border-[#2A2E37] hover:border-slate-600 text-xs font-medium text-slate-300 hover:text-white flex items-center justify-center gap-2 transition-all"
@@ -289,15 +263,7 @@ export default function LoginPage() {
           <button
             type="button"
             onClick={() => {
-              AuthStore.setSession(
-                {
-                  id: 'user_oauth_github',
-                  email: 'dev@github.com',
-                  displayName: 'GitHub User',
-                  role: 'user',
-                },
-                'token_github',
-              );
+              AuthStore.setSession({ id: 'user_oauth_github', email: 'dev@eazzio.com', displayName: 'GitHub User', role: 'user' }, 'token_github');
               window.location.href = '/';
             }}
             className="py-2.5 px-4 rounded-xl bg-[#0F1115] border border-[#2A2E37] hover:border-slate-600 text-xs font-medium text-slate-300 hover:text-white flex items-center justify-center gap-2 transition-all"
