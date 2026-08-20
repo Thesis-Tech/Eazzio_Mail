@@ -159,27 +159,27 @@
 - [x] **T100** — Domain onboarding: DNS instructions generation. *Ref: FR-DOM-01.*
 - [x] **T101** — DNS verification polling (MX/SPF/DKIM/DMARC independently) + `DomainVerified` event; server-side enforcement that all four must pass before send/receive is usable. *Ref: FR-DOM-02; LLD.md Section 5.3; Security.md Section 5.3.*
 - [x] **T102** — Mailbox/alias provisioning under a verified domain, quota management. *Ref: FR-DOM-03.*
-- [ ] **T103** — Disposable/temporary alias support with expiry. *Ref: FR-DOM-04.*
-- [ ] **T104** — Org provisioning + policy (password/MFA/retention settings). *Ref: FR-ADMIN-01/02.*
-- [ ] **T105** — Audit log query endpoint (org/domain-scoped per role, per `Security.md` Section 8.1 table). *Ref: FR-ADMIN-03.*
-- [ ] **T106** — Cross-tenant isolation test: manually crafted request across tenant boundary must fail. *Ref: FR-ADMIN-05; Security.md Section 8.3.*
-- [ ] **T107** — Scaffold `apps/admin/`: Domain Setup Wizard, Mailbox/Alias Management, Org Policy Settings, Audit Log screens. *Ref: DESIGN.md Section 4; APP_FLOW.md Section 7.*
-- [ ] **T108** — Mandatory MFA enforcement for `Domain Admin`/`Organization Admin`/`Platform Admin` roles. *Ref: Security.md Section 7.*
+- [x] **T103** — Disposable/temporary alias support with expiry. *Ref: FR-DOM-04.*
+- [x] **T104** — Org provisioning + policy (password/MFA/retention settings). *Ref: FR-ADMIN-01/02.*
+- [x] **T105** — Audit log query endpoint (org/domain-scoped per role, per `Security.md` Section 8.1 table). *Ref: FR-ADMIN-03.*
+- [x] **T106** — Cross-tenant isolation test: manually crafted request across tenant boundary must fail. *Ref: FR-ADMIN-05; Security.md Section 8.3.*
+- [x] **T107** — Scaffold `apps/admin/`: Domain Setup Wizard, Mailbox/Alias Management, Org Policy Settings, Audit Log screens. *Ref: DESIGN.md Section 4; APP_FLOW.md Section 7.*
+- [x] **T108** — Mandatory MFA enforcement for `Domain Admin`/`Organization Admin`/`Platform Admin` roles. *Ref: Security.md Section 7.*
 
 ### 4.K — AI Gateway (Optional Layer, P2)
 
-- [ ] **T109** — Scaffold `services/ai-gateway/`; wire `isEnabled()` feature-flag check ahead of every other call. *Ref: FR-AI-01/03.*
-- [ ] **T110** — Thread summarization, reply suggestions, priority classification — advisory-only responses. *Ref: FR-AI-02.*
-- [ ] **T111** — Confirm (via T054's negative test) this service cannot write to any decision-relevant column. *Ref: FR-AI-04; DECISIONS.md D-007.*
+- [x] **T109** — Scaffold `services/ai-gateway/`; wire `isEnabled()` feature-flag check ahead of every other call. *Ref: FR-AI-01/03.*
+- [x] **T110** — Thread summarization, reply suggestions, priority classification — advisory-only responses. *Ref: FR-AI-02.*
+- [x] **T111** — Confirm (via T054's negative test) this service cannot write to any decision-relevant column. *Ref: FR-AI-04; DECISIONS.md D-007.*
 
 ### 4.L — Web Client (`apps/web`)
 
-- [ ] **T112** — Scaffold `apps/web/` (Next.js 16 App Router): routes, `features/`, generated `api-client` from `packages/contracts/api`, `realtime/` WebSocket wrapper. *Ref: TechStack.md Section 1; ARCHITECTURE.md Section 3.4.*
-- [ ] **T113** — Auth screens: Register, Login, MFA Challenge, Recovery Request/Confirm. *Ref: APP_FLOW.md Section 2.*
-- [ ] **T114** — Inbox + FolderTree + MailList (multi-select, bulk actions). *Ref: APP_FLOW.md Section 3.*
-- [ ] **T115** — ThreadView with RiskBanner (spam-score/auth-failure explanation, plain-language reason codes). *Ref: APP_FLOW.md Section 3; Security.md Section 18.2 (reasonCode mapping).*
-- [ ] **T116** — ComposeSheet: autosave, attachment upload, quoting conventions, optimistic send UI. *Ref: APP_FLOW.md Section 4; DESIGN.md Section 6.3.*
-- [ ] **T117** — Search UI: SearchBar typeahead, Search Results, filter chips. *Ref: APP_FLOW.md Section 5.*
+- [x] **T112** — Scaffold `apps/web/` (Next.js 16 App Router): routes, `features/`, generated `api-client` from `packages/contracts/api`, `realtime/` WebSocket wrapper. *Ref: TechStack.md Section 1; ARCHITECTURE.md Section 3.4.*
+- [x] **T113** — Auth screens: Register, Login, MFA Challenge, Recovery Request/Confirm. *Ref: APP_FLOW.md Section 2.*
+- [x] **T114** — Inbox + FolderTree + MailList (multi-select, bulk actions). *Ref: APP_FLOW.md Section 3.*
+- [x] **T115** — ThreadView with RiskBanner (spam-score/auth-failure explanation, plain-language reason codes). *Ref: APP_FLOW.md Section 3; Security.md Section 18.2 (reasonCode mapping).*
+- [x] **T116** — ComposeSheet: autosave, attachment upload, quoting conventions, optimistic send UI. *Ref: APP_FLOW.md Section 4; DESIGN.md Section 6.3.*
+- [x] **T117** — Search UI: SearchBar typeahead, Search Results, filter chips. *Ref: APP_FLOW.md Section 5.*
 - [ ] **T118** — Filters/Rules Builder UI. *Ref: APP_FLOW.md Section 6.*
 - [ ] **T119** — Privacy Mode settings screen with fixed `PrivacyModeBadge` copy (Standard/Enhanced/E2EE-disabled). *Ref: APP_FLOW.md Section 8; DESIGN.md Section 6.5.*
 - [ ] **T120** — Error/degraded-state handling: connectivity banner, AI/search degradation messaging, session-expiry draft preservation. *Ref: APP_FLOW.md Section 9.*

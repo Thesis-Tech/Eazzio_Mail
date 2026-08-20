@@ -12,11 +12,14 @@ importers:
         specifier: ^26.2.0
         version: 26.2.0
       prettier:
-        specifier: ^3.5.0
+        specifier: ^3.5.1
         version: 3.9.6
       typescript:
         specifier: ^5.7.3
         version: 5.9.3
+      vitest:
+        specifier: ^3.0.5
+        version: 3.2.7(@types/node@26.2.0)
 
   packages/contracts:
     dependencies:
@@ -95,6 +98,25 @@ importers:
       '@eazzio/identity':
         specifier: workspace:*
         version: link:../identity
+      '@eazzio/infra-adapters':
+        specifier: workspace:*
+        version: link:../../packages/infra-adapters
+    devDependencies:
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.0.5
+        version: 3.2.7(@types/node@26.2.0)
+
+  services/ai-gateway:
+    dependencies:
+      '@eazzio/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@eazzio/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
       '@eazzio/infra-adapters':
         specifier: workspace:*
         version: link:../../packages/infra-adapters
