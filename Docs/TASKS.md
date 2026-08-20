@@ -97,15 +97,15 @@
 
 ### 4.E — Mailbox Core (`services/api`)
 
-- [ ] **T056** — System folders (Inbox/Sent/Drafts/Spam/Trash/Archive). *Ref: FR-MBOX-01.*
-- [ ] **T057** — Custom hierarchical folders. *Ref: FR-MBOX-02.*
-- [ ] **T058** — Labels as many-to-many (`message_labels`), never per-label message copies. *Ref: FR-MBOX-03; DECISIONS.md D-009.*
-- [ ] **T059** — Thread assignment (`assignThread` heuristic: strict In-Reply-To/References match, then subject+participant fallback). *Ref: FR-MBOX-04; LLD.md Section 6.2.*
-- [ ] **T060** — Star/flag/important marking. *Ref: FR-MBOX-05.*
-- [ ] **T061** — Bulk actions (archive/delete/label/move across selection or search results). *Ref: FR-MBOX-07.*
-- [ ] **T062** — Filters/Rules: condition/action builder, priority ordering, enable/disable toggle. *Ref: FR-RULE-01; APP_FLOW.md Section 6.*
-- [ ] **T063** — Object-level authorization on every mailbox/message endpoint (ownership check before data access, not just `isAuthenticated`). *Ref: Security.md Section 8.3.*
-- [ ] **T064** — Standard error envelope + full `LLD.md` Section 3.1 error code taxonomy on every endpoint. *Ref: LLD.md Section 3.1.*
+- [x] **T056** — System folders (Inbox/Sent/Drafts/Spam/Trash/Archive). *Ref: FR-MBOX-01.*
+- [x] **T057** — Custom hierarchical folders. *Ref: FR-MBOX-02.*
+- [x] **T058** — Labels as many-to-many (`message_labels`), never per-label message copies. *Ref: FR-MBOX-03; DECISIONS.md D-009.*
+- [x] **T059** — Thread assignment (`assignThread` heuristic: strict In-Reply-To/References match, then subject+participant fallback). *Ref: FR-MBOX-04; LLD.md Section 6.2.*
+- [x] **T060** — Star/flag/important marking. *Ref: FR-MBOX-05.*
+- [x] **T061** — Bulk actions (archive/delete/label/move across selection or search results). *Ref: FR-MBOX-07.*
+- [x] **T062** — Filters/Rules: condition/action builder, priority ordering, enable/disable toggle. *Ref: FR-RULE-01; APP_FLOW.md Section 6.*
+- [x] **T063** — Object-level authorization on every mailbox/message endpoint (ownership check before data access, not just `isAuthenticated`). *Ref: Security.md Section 8.3.*
+- [x] **T064** — Standard error envelope + full `LLD.md` Section 3.1 error code taxonomy on every endpoint. *Ref: LLD.md Section 3.1.*
 
 ### 4.F — Inbound Mail Pipeline (`services/mail-inbound`)
 
