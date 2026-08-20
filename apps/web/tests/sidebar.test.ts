@@ -18,7 +18,7 @@ describe('NavigationSidebar Unit Tests (ACTION-W01.1)', () => {
 
   it('should validate complete set of 6 system folders', () => {
     expect(mockFolders.length).toBe(6);
-    const slugs = mockFolders.map(f => f.slug);
+    const slugs = mockFolders.map((f) => f.slug);
     expect(slugs).toEqual(['inbox', 'sent', 'drafts', 'spam', 'trash', 'archive']);
   });
 

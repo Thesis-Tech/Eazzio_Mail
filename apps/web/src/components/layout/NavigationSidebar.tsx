@@ -1,19 +1,19 @@
 'use client';
 
 import React from 'react';
-import { 
-  Inbox, 
-  Send, 
-  FileText, 
-  AlertOctagon, 
-  Trash2, 
-  Archive, 
-  Plus, 
-  Tag, 
-  ShieldCheck, 
-  Settings, 
+import {
+  Inbox,
+  Send,
+  FileText,
+  AlertOctagon,
+  Trash2,
+  Archive,
+  Plus,
+  Tag,
+  ShieldCheck,
+  Settings,
   LogOut,
-  ChevronDown
+  ChevronDown,
 } from 'lucide-react';
 import { FolderItem, LabelItem } from '../../types/mail';
 import { PrivacyModeBadge } from '../PrivacyModeBadge';
@@ -38,7 +38,7 @@ export const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
   onSelectFolder,
   onSelectLabel,
   onOpenCompose,
-  isCollapsed = false
+  isCollapsed = false,
 }) => {
   const getFolderIcon = (slug: string) => {
     switch (slug) {
@@ -60,7 +60,7 @@ export const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
   };
 
   return (
-    <aside 
+    <aside
       className={`h-full flex flex-col bg-[#16181D] border-r border-[#2A2E37] text-[#E1E4EA] transition-all duration-200 ${
         isCollapsed ? 'w-16' : 'w-64'
       }`}
@@ -120,11 +120,9 @@ export const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
                 {!isCollapsed && <span className="truncate">{folder.name}</span>}
               </div>
               {!isCollapsed && folder.unreadCount > 0 && (
-                <span 
+                <span
                   className={`text-xs px-2 py-0.5 rounded-full font-bold ${
-                    isActive 
-                      ? 'bg-[#2D5BFF] text-white' 
-                      : 'bg-[#2A2E37] text-slate-300'
+                    isActive ? 'bg-[#2D5BFF] text-white' : 'bg-[#2A2E37] text-slate-300'
                   }`}
                 >
                   {folder.unreadCount}
@@ -156,9 +154,9 @@ export const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
                   title={label.name}
                 >
                   <div className="flex items-center gap-2.5 truncate">
-                    <span 
-                      className="w-2.5 h-2.5 rounded-full shrink-0" 
-                      style={{ backgroundColor: label.color || '#2D5BFF' }} 
+                    <span
+                      className="w-2.5 h-2.5 rounded-full shrink-0"
+                      style={{ backgroundColor: label.color || '#2D5BFF' }}
                     />
                     {!isCollapsed && <span className="truncate">{label.name}</span>}
                   </div>
@@ -177,7 +175,7 @@ export const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
           </div>
         )}
         <div className="flex items-center justify-between pt-1">
-          <button 
+          <button
             className="p-1.5 rounded-lg text-slate-400 hover:bg-[#1C1F26] hover:text-white transition-colors"
             title="Settings"
           >

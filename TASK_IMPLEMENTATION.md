@@ -92,7 +92,7 @@
 
 ## PHASE 3 — Web Application (`apps/web`)
 
-- [ ] **TASK-015** — Web Application Architecture, Layout & Auth Flow
+- [x] **TASK-015** — Web Application Architecture, Layout & Auth Flow
   - **Action:** Implement Next.js App Router authenticated layout with sidebar, header, user profile, login page, registration page, and session token management,supabase auth email and password, oauth, phone number verify via telegram otp.
   - **Verification:** End-to-end web test for login flow, session persistence, and authenticated shell rendering.
   - **Definition of Done:** Users can log in, view authenticated dashboard shell, and navigate system folders.

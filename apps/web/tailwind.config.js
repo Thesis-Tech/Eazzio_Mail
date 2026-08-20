@@ -24,9 +24,9 @@ module.exports = {
         border: {
           light: '#E2E4E9',
           dark: '#2A2E37',
-        }
-      }
+        },
+      },
     },
   },
   plugins: [],
-}
+};
