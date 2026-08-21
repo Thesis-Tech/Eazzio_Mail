@@ -6,7 +6,8 @@ import { ThreadList } from '../components/mail/ThreadList';
 import { ConversationViewer } from '../components/mail/ConversationViewer';
 import { MailComposer, ComposeEmailPayload } from '../components/mail/MailComposer';
 import { ThreadSummary, MessageDetail } from '../types/mail';
-import { Mail, Sparkles } from 'lucide-react';
+import { Mail, Sparkles, X, Search } from 'lucide-react';
+import { parseSearchQuery } from '../components/search/SearchBar';
 
 const initialThreads: ThreadSummary[] = [
   {
@@ -164,7 +165,51 @@ export default function MailDashboardPage() {
   const [activeLabelId, setActiveLabelId] = useState<string | undefined>();
   const [threads, setThreads] = useState<ThreadSummary[]>(initialThreads);
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>('th-101');
+  const [searchQuery, setSearchQuery] = useState('');
   const [isComposeOpen, setIsComposeOpen] = useState(false);
+
+  const parsedFilters = parseSearchQuery(searchQuery);
+  const displayedThreads = threads.filter((t) => {
+    if (
+      parsedFilters.from &&
+      !t.sender.email.toLowerCase().includes(parsedFilters.from) &&
+      !t.sender.name.toLowerCase().includes(parsedFilters.from)
+    ) {
+      return false;
+    }
+    if (
+      parsedFilters.subject &&
+      !t.subject.toLowerCase().includes(parsedFilters.subject)
+    ) {
+      return false;
+    }
+    if (parsedFilters.hasAttachment && !t.hasAttachments) {
+      return false;
+    }
+    if (parsedFilters.isUnread && !t.isUnread) {
+      return false;
+    }
+    if (parsedFilters.isStarred && !t.isStarred) {
+      return false;
+    }
+    if (
+      parsedFilters.label &&
+      !t.labels?.some((l) => l.toLowerCase().includes(parsedFilters.label!))
+    ) {
+      return false;
+    }
+    if (parsedFilters.textTerms.length > 0) {
+      const matchAll = parsedFilters.textTerms.every(
+        (term) =>
+          t.subject.toLowerCase().includes(term) ||
+          t.snippet.toLowerCase().includes(term) ||
+          t.sender.name.toLowerCase().includes(term) ||
+          t.sender.email.toLowerCase().includes(term)
+      );
+      if (!matchAll) return false;
+    }
+    return true;
+  });
 
   const handleSelectThread = (threadId: string) => {
     setSelectedThreadId(threadId);
@@ -315,12 +360,33 @@ export default function MailDashboardPage() {
         setSelectedThreadId(null);
       }}
       onOpenCompose={() => setIsComposeOpen(true)}
+      onSearch={(q) => setSearchQuery(q)}
+      availableThreads={threads}
     >
       <div className="h-full flex flex-col md:flex-row overflow-hidden relative" data-testid="mail-split-pane">
         {/* Left Column: Thread List */}
         <div className="w-full md:w-5/12 lg:w-4/12 h-full flex flex-col min-w-0">
+          {/* Active Search Result Notification Banner */}
+          {searchQuery && (
+            <div className="px-4 py-2 bg-[#16181D] border-b border-[#2A2E37] flex items-center justify-between text-xs text-slate-300 animate-in fade-in" data-testid="search-results-banner">
+              <div className="flex items-center gap-2 truncate">
+                <Search className="w-3.5 h-3.5 text-[#2D5BFF] shrink-0" />
+                <span className="truncate">
+                  Results for <strong className="text-white">"{searchQuery}"</strong> ({displayedThreads.length})
+                </span>
+              </div>
+              <button
+                onClick={() => setSearchQuery('')}
+                className="p-1 rounded hover:bg-[#2A2E37] text-slate-400 hover:text-white shrink-0"
+                title="Clear Search"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
           <ThreadList
-            threads={threads}
+            threads={displayedThreads}
             selectedThreadId={selectedThreadId}
             onSelectThread={handleSelectThread}
             onToggleStar={handleToggleStar}
@@ -328,8 +394,8 @@ export default function MailDashboardPage() {
             onBulkArchive={handleBulkArchive}
             onBulkMarkRead={handleBulkMarkRead}
             onRefresh={() => setThreads([...initialThreads])}
-            folderName={activeFolderId.replace('fld-', '')}
-            totalThreadsCount={threads.length}
+            folderName={searchQuery ? 'Search Results' : activeFolderId.replace('fld-', '')}
+            totalThreadsCount={displayedThreads.length}
           />
         </div>
 

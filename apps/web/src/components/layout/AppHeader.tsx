@@ -1,5 +1,3 @@
-'use client';
-
 import React, { useState } from 'react';
 import {
   Search,
@@ -13,11 +11,14 @@ import {
 } from 'lucide-react';
 import { PrivacyModeBadge } from '../PrivacyModeBadge';
 import { AuthUser } from '../../lib/auth-store';
+import { SearchBar } from '../search/SearchBar';
+import { ThreadSummary } from '../../types/mail';
 
 export interface AppHeaderProps {
   user?: AuthUser | null;
   onLogout?: () => void;
   onSearch?: (query: string) => void;
+  availableThreads?: ThreadSummary[];
   isRealtimeConnected?: boolean;
 }
 
@@ -25,40 +26,21 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   user,
   onLogout,
   onSearch,
+  availableThreads = [],
   isRealtimeConnected = true,
 }) => {
-  const [searchQuery, setSearchQuery] = useState('');
   const [isProfileOpen, setIsProfileOpen] = useState(false);
-
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (onSearch) {
-      onSearch(searchQuery);
-    }
-  };
 
   return (
     <header
       className="h-16 border-b border-[#2A2E37] bg-[#16181D] px-4 flex items-center justify-between gap-4 select-none shrink-0"
       data-testid="app-header"
     >
-      {/* Search Input Bar */}
-      <form onSubmit={handleSearchSubmit} className="flex-1 max-w-2xl">
-        <div className="relative flex items-center">
-          <Search className="w-4 h-4 absolute left-3.5 text-slate-400 pointer-events-none" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search messages, senders, attachments (/ or ⌘K)"
-            className="w-full bg-[#0F1115] border border-[#2A2E37] focus:border-[#2D5BFF] focus:ring-1 focus:ring-[#2D5BFF] rounded-xl pl-10 pr-12 py-2 text-sm text-[#E1E4EA] placeholder-slate-500 outline-none transition-all"
-            data-testid="global-search-input"
-          />
-          <kbd className="absolute right-3 hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-mono text-slate-400 bg-[#1C1F26] border border-[#2A2E37] rounded">
-            ⌘K
-          </kbd>
-        </div>
-      </form>
+      {/* Search Input Bar with Typeahead */}
+      <SearchBar
+        onSearch={onSearch || (() => {})}
+        availableThreads={availableThreads}
+      />
 
       {/* Right Utility Actions */}
       <div className="flex items-center gap-3">

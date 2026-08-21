@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { NavigationSidebar } from './NavigationSidebar';
 import { AppHeader } from './AppHeader';
-import { FolderItem, LabelItem } from '../../types/mail';
+import { FolderItem, LabelItem, ThreadSummary } from '../../types/mail';
 import { AuthStore, AuthUser } from '../../lib/auth-store';
 
 export interface DashboardLayoutProps {
@@ -13,6 +13,8 @@ export interface DashboardLayoutProps {
   onSelectFolder?: (folderId: string) => void;
   onSelectLabel?: (labelId: string) => void;
   onOpenCompose?: () => void;
+  onSearch?: (query: string) => void;
+  availableThreads?: ThreadSummary[];
   customFolders?: FolderItem[];
   customLabels?: LabelItem[];
 }
@@ -39,6 +41,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   onSelectFolder,
   onSelectLabel,
   onOpenCompose,
+  onSearch,
+  availableThreads = [],
   customFolders = defaultFolders,
   customLabels = defaultLabels,
 }) => {
@@ -98,7 +102,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         <AppHeader
           user={currentUser}
           onLogout={handleLogout}
-          onSearch={(q) => console.log('Search query:', q)}
+          onSearch={onSearch}
+          availableThreads={availableThreads}
           isRealtimeConnected={true}
         />
         <main className="flex-1 overflow-auto bg-[#0F1115]">{children}</main>

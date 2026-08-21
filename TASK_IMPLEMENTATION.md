@@ -107,7 +107,7 @@
   - **Verification:** Web component tests verifying draft autosave, email validation, and send action triggering API.
   - **Definition of Done:** Users can compose, attach files, save drafts, and send emails via web UI.
 
-- [ ] **TASK-018** — Full-Text Search Bar & Typeahead UI
+- [x] **TASK-018** — Full-Text Search Bar & Typeahead UI
   - **Action:** Build top search bar with instant autocomplete suggestions, query syntax helpers (from:, subject:, has:attachment), and search result view.
   - **Verification:** Web test verifying typeahead debounce and search result rendering.
   - **Definition of Done:** Users can search mail with typeahead suggestions and filter results.
