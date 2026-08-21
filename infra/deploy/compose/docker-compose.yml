@@ -90,6 +90,17 @@ services:
     ports:
       - '3310:3310'
 
+  mailpit:
+    image: axllent/mailpit:v1.22.3
+    container_name: eazzio_mailpit
+    restart: unless-stopped
+    ports:
+      - '1025:1025'
+      - '8025:8025'
+    environment:
+      MP_MAX_MESSAGES: 500
+      MP_DATA_FILE: ''
+
 volumes:
   postgres_data:
   opensearch_data:
