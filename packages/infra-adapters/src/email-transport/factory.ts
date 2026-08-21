@@ -3,19 +3,23 @@ import { DirectMtaEmailTransport } from './direct-mta-adapter.js';
 import { SmtpSubmissionTransport } from './smtp-submission-adapter.js';
 import { LocalTestTransport } from './local-test-adapter.js';
 
-export type TransportType = 'direct' | 'smtp' | 'local';
+import { SmtpAuthenticatedTransport } from './smtp-authenticated-adapter.js';
+
+export type TransportType = 'direct' | 'smtp' | 'smtp-auth' | 'local';
 
 export function createEmailTransport(type?: TransportType): EazzioEmailTransport {
   const selectedType =
     type ||
     (process.env.MAIL_TRANSPORT as TransportType) ||
-    (process.env.SMTP_HOST ? 'smtp' : process.env.NODE_ENV === 'production' ? 'direct' : 'smtp');
+    (process.env.SMTP_AUTH_USER ? 'smtp-auth' : process.env.SMTP_HOST ? 'smtp' : process.env.NODE_ENV === 'production' ? 'direct' : 'smtp');
 
   switch (selectedType) {
     case 'local':
       return new LocalTestTransport();
     case 'direct':
       return new DirectMtaEmailTransport();
+    case 'smtp-auth':
+      return new SmtpAuthenticatedTransport();
     case 'smtp':
     default:
       return new SmtpSubmissionTransport({

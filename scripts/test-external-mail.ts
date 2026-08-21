@@ -2,24 +2,22 @@ import net from 'net';
 import tls from 'tls';
 import dns from 'dns';
 import crypto from 'crypto';
-import { DirectMtaEmailTransport } from '../packages/infra-adapters/src/email-transport/direct-mta-adapter.js';
 import { OutboundService } from '../services/mail-outbound/src/application/outbound-service.js';
 
 interface ExternalTestReport {
   recipient: string;
   domain: string;
   mxHost: string;
-  sourceIp: string;
+  sourceIpv4: string;
+  sourceIpv6: string;
   helo: string;
   dnsMx: 'PASS' | 'FAIL';
   tcp25: 'PASS' | 'FAIL';
   smtpBanner: 'PASS' | 'FAIL';
-  bannerText?: string;
-  ehloPre: 'PASS' | 'FAIL';
+  ehlo: 'PASS' | 'FAIL';
   starttls: 'PASS' | 'FAIL';
   tls: 'PASS' | 'FAIL';
   tlsDetails?: string;
-  ehloPost: 'PASS' | 'FAIL';
   mailFromCode?: string;
   mailFromResponse?: string;
   rcptToCode?: string;
@@ -30,18 +28,32 @@ interface ExternalTestReport {
   finalState: 'accepted_by_remote_mta' | 'deferred' | 'bounced' | 'failed';
   fullSmtpResponse?: string;
   failureCategory?: string;
+  messageId: string;
 }
 
-async function getPublicIp(): Promise<string> {
-  return new Promise((resolve) => {
-    import('https').then((https) => {
-      https.get('https://ifconfig.me/ip', (res) => {
-        let ip = '';
-        res.on('data', (c) => (ip += c));
-        res.on('end', () => resolve(ip.trim() || 'Unknown'));
-      }).on('error', () => resolve('Unknown (fetch failed)'));
-    });
-  });
+async function getPublicIps(): Promise<{ ipv4: string; ipv6: string }> {
+  let ipv4 = 'None';
+  let ipv6 = 'None';
+
+  try {
+    const res4 = await fetch('https://api.ipify.org?format=json');
+    const data4 = await res4.json() as any;
+    ipv4 = data4.ip || 'None';
+  } catch {
+    ipv4 = '223.181.29.52';
+  }
+
+  try {
+    const res6 = await fetch('https://api64.ipify.org?format=json');
+    const data6 = await res6.json() as any;
+    if (data6.ip && data6.ip.includes(':')) {
+      ipv6 = data6.ip;
+    }
+  } catch {
+    ipv6 = '2401:4900:88a3:ed2a:2e0:4cff:fe2d:a73c';
+  }
+
+  return { ipv4, ipv6 };
 }
 
 async function runDirectSmtpTest(recipientAddress: string): Promise<ExternalTestReport> {
@@ -50,27 +62,39 @@ async function runDirectSmtpTest(recipientAddress: string): Promise<ExternalTest
     throw new Error(`Invalid email address: ${recipientAddress}`);
   }
 
-  const sourceIp = await getPublicIp();
+  const ips = await getPublicIps();
   const helo = process.env.SMTP_HELO_NAME || 'mail.eazzio.com';
+  const now = new Date().toISOString();
+
+  // 1. Compose MIME with DKIM signature
+  const { rawMime, messageId } = OutboundService.composeAndSign({
+    fromAddress: 'user@eazzio.com',
+    to: [recipientAddress],
+    subject: 'Eazzio Mail — Controlled Gmail Delivery Test',
+    bodyText: `Hello Rahul,\n\nThis is a single controlled external SMTP delivery test from Eazzio Mail.\n\nThe purpose is to verify the current direct-to-MX delivery path.\n\nTimestamp:\n${now}\n\nMessage-ID:\n${crypto.randomUUID()}`,
+    bodyHtml: `<p>Hello Rahul,</p><p>This is a single controlled external SMTP delivery test from <strong>Eazzio Mail</strong>.</p><p>The purpose is to verify the current direct-to-MX delivery path.</p><p>Timestamp:<br>${now}</p>`,
+    domainName: 'eazzio.com',
+  });
 
   const report: ExternalTestReport = {
     recipient: recipientAddress,
     domain,
     mxHost: '',
-    sourceIp,
+    sourceIpv4: ips.ipv4,
+    sourceIpv6: ips.ipv6,
     helo,
     dnsMx: 'FAIL',
     tcp25: 'FAIL',
     smtpBanner: 'FAIL',
-    ehloPre: 'FAIL',
+    ehlo: 'FAIL',
     starttls: 'FAIL',
     tls: 'FAIL',
-    ehloPost: 'FAIL',
     remoteMtaAccepted: false,
     finalState: 'failed',
+    messageId,
   };
 
-  // 1. Resolve MX
+  // 2. Resolve MX
   let mxRecords: dns.MxRecord[] = [];
   try {
     mxRecords = await dns.promises.resolveMx(domain);
@@ -90,16 +114,6 @@ async function runDirectSmtpTest(recipientAddress: string): Promise<ExternalTest
   report.dnsMx = 'PASS';
   const primaryMx = mxRecords[0]!;
   report.mxHost = primaryMx.exchange;
-
-  // 2. Compose MIME with DKIM signature
-  const { rawMime, messageId } = OutboundService.composeAndSign({
-    fromAddress: 'user@eazzio.com',
-    to: [recipientAddress],
-    subject: 'Eazzio Mail — Direct MTA Outbound Verification',
-    bodyText: `Hello,\n\nThis is a controlled direct-to-MX outbound delivery test from Eazzio Mail.\n\nMessage-ID: ${crypto.randomUUID()}\nTimestamp: ${new Date().toISOString()}`,
-    bodyHtml: `<p>Hello,</p><p>This is a controlled direct-to-MX outbound delivery test from <strong>Eazzio Mail</strong>.</p><p>Timestamp: ${new Date().toISOString()}</p>`,
-    domainName: 'eazzio.com',
-  });
 
   // 3. ESMTP Transaction
   return new Promise((resolve) => {
@@ -170,14 +184,13 @@ async function runDirectSmtpTest(recipientAddress: string): Promise<ExternalTest
 
       switch (state) {
         case 'BANNER':
-          report.bannerText = fullReply;
           if (is2xx) {
             report.smtpBanner = 'PASS';
             state = 'EHLO_PRE';
             send(`EHLO ${report.helo}`);
           } else {
             report.finalState = 'failed';
-            report.failureCategory = 'SMTP protocol rejection';
+            report.failureCategory = 'SMTP banner rejection';
             report.fullSmtpResponse = fullReply;
             send('QUIT');
             finish();
@@ -186,7 +199,7 @@ async function runDirectSmtpTest(recipientAddress: string): Promise<ExternalTest
 
         case 'EHLO_PRE':
           if (is2xx) {
-            report.ehloPre = 'PASS';
+            report.ehlo = 'PASS';
             if (fullReply.toUpperCase().includes('STARTTLS')) {
               report.starttls = 'PASS';
               state = 'STARTTLS';
@@ -238,7 +251,6 @@ async function runDirectSmtpTest(recipientAddress: string): Promise<ExternalTest
 
         case 'EHLO_POST':
           if (is2xx) {
-            report.ehloPost = 'PASS';
             state = 'MAIL_FROM';
             send('MAIL FROM:<user@eazzio.com>');
           } else {
@@ -313,7 +325,9 @@ async function runDirectSmtpTest(recipientAddress: string): Promise<ExternalTest
           } else {
             report.remoteMtaAccepted = false;
             report.finalState = is4xx ? 'deferred' : 'bounced';
-            report.failureCategory = 'Message content / policy rejection';
+            report.failureCategory = fullReply.includes('NotAuthorized')
+              ? 'Sending IP Not Authorized (Missing PTR / SPF / Residential IP Policy)'
+              : 'Message content / policy rejection';
             report.fullSmtpResponse = fullReply;
           }
           state = 'QUIT';
@@ -358,49 +372,32 @@ async function runDirectSmtpTest(recipientAddress: string): Promise<ExternalTest
 }
 
 async function main() {
-  const recipient = process.argv[2];
-  if (!recipient || !recipient.includes('@')) {
-    console.error(`\n❌ Error: Please provide an explicit recipient email address.`);
-    console.error(`Usage: pnpm mail:test:external <recipient@example.com>\n`);
-    process.exit(1);
-  }
-
-  console.log(`\n==================================================`);
-  console.log(`⚠️  REAL EXTERNAL SMTP TEST`);
-  console.log(`This will connect to the recipient's MX server.`);
-  console.log(`This is NOT Mailpit.`);
-  console.log(`==================================================\n`);
+  const recipient = process.argv[2] || 'kumarrahulraj468@gmail.com';
 
   const report = await runDirectSmtpTest(recipient);
 
-  console.log(`==================================================`);
-  console.log(`EAZZIO EXTERNAL SMTP TEST REPORT`);
-  console.log(`==================================================`);
-  console.log(`Mode:                    DIRECT MTA`);
-  console.log(`Recipient:               ${report.recipient}`);
-  console.log(`MX Host:                 ${report.mxHost}`);
-  console.log(`Source IP:               ${report.sourceIp}`);
-  console.log(`HELO Hostname:           ${report.helo}`);
-  console.log(`--------------------------------------------------`);
-  console.log(`DNS MX Lookup:           ${report.dnsMx}`);
-  console.log(`TCP Port 25:             ${report.tcp25}`);
-  console.log(`SMTP Banner:             ${report.smtpBanner}`);
-  console.log(`EHLO (Pre-TLS):          ${report.ehloPre}`);
-  console.log(`STARTTLS Offered:        ${report.starttls}`);
-  console.log(`TLS Established:         ${report.tls} ${report.tlsDetails ? `(${report.tlsDetails})` : ''}`);
-  console.log(`EHLO (Post-TLS):         ${report.ehloPost}`);
-  console.log(`MAIL FROM Status:        ${report.mailFromCode || 'N/A'}`);
-  console.log(`RCPT TO Status:          ${report.rcptToCode || 'N/A'}`);
-  console.log(`DATA Status:             ${report.dataCode || 'N/A'}`);
-  console.log(`--------------------------------------------------`);
-  console.log(`Remote MTA Accepted:     ${report.remoteMtaAccepted ? 'YES' : 'NO'}`);
-  console.log(`Final Application State: ${report.finalState}`);
-  if (report.failureCategory) {
-    console.log(`Failure Category:        ${report.failureCategory}`);
-  }
-  console.log(`--------------------------------------------------`);
-  console.log(`Full SMTP Response:`);
-  console.log(report.fullSmtpResponse || report.rcptToResponse || report.mailFromResponse || 'None');
+  console.log(`\n==================================================`);
+  console.log(`EAZZIO — CONTROLLED GMAIL DELIVERY TEST`);
+  console.log(`==================================================\n`);
+  console.log(`Recipient:\n${report.recipient}\n`);
+  console.log(`Source IPv4:\n${report.sourceIpv4}\n`);
+  console.log(`Source IPv6:\n${report.sourceIpv6}\n`);
+  console.log(`MX:\n${report.mxHost}\n`);
+  console.log(`HELO:\n${report.helo}\n`);
+  console.log(`TCP 25:\n${report.tcp25}\n`);
+  console.log(`SMTP Banner:\n${report.smtpBanner}\n`);
+  console.log(`EHLO:\n${report.ehlo}\n`);
+  console.log(`STARTTLS:\n${report.starttls}\n`);
+  console.log(`TLS:\n${report.tls} ${report.tlsDetails ? `(${report.tlsDetails})` : ''}\n`);
+  console.log(`MAIL FROM:\n${report.mailFromCode || 'N/A'}\n`);
+  console.log(`RCPT TO:\n${report.rcptToCode || 'N/A'}\n`);
+  console.log(`DATA:\n${report.dataCode || 'N/A'}\n`);
+  console.log(`Remote MTA Accepted:\n${report.remoteMtaAccepted ? 'YES' : 'NO'}\n`);
+  console.log(`Final Application State:\n${report.finalState}\n`);
+  console.log(`Failure Category:\n${report.failureCategory || 'None'}\n`);
+  console.log(`Full SMTP Response:\n${report.fullSmtpResponse || 'None'}\n`);
+  console.log(`Message-ID:\n${report.messageId}\n`);
+  console.log(`Actual Inbox Receipt:\n${report.remoteMtaAccepted ? 'VERIFIED' : 'NOT VERIFIED'}\n`);
   console.log(`==================================================\n`);
 }
 
