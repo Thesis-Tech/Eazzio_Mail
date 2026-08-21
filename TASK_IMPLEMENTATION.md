@@ -126,7 +126,7 @@
 
 ## PHASE 4 — Admin Portal (`apps/admin`)
 
-- [ ] **TASK-021** — Admin Portal Scaffold & Authentication
+- [x] **TASK-021** — Admin Portal Scaffold & Authentication
   - **Action:** Scaffold Next.js Admin Portal with RBAC authentication enforcing Platform Admin and Organization Admin roles.
   - **Verification:** Admin auth tests verifying role enforcement and redirection for unauthorized users.
   - **Definition of Done:** Admin portal renders secure navigation shell for verified admin roles.
