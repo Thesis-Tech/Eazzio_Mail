@@ -26,6 +26,9 @@ importers:
       '@eazzio/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@eazzio/identity':
+        specifier: workspace:*
+        version: link:../../services/identity
       '@eazzio/ui-kit':
         specifier: workspace:*
         version: link:../../packages/ui-kit

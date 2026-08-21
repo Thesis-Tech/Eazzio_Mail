@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@eazzio/contracts": "workspace:*",
+    "@eazzio/identity": "workspace:*",
     "@eazzio/ui-kit": "workspace:*",
     "lucide-react": "^0.475.0",
     "next": "15.1.7",

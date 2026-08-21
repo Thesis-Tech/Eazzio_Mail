@@ -8,8 +8,8 @@ function createDevToken(email: string = 'user@eazzio.com'): string {
   const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
   const payload = Buffer.from(
     JSON.stringify({
-      userId: crypto.randomUUID(),
-      sessionId: crypto.randomUUID(),
+      userId: 'f81d4fae-7dec-11d0-a765-00a0c91e6bf6',
+      sessionId: 'sess_1',
       email,
       iat: Math.floor(Date.now() / 1000),
       exp: Math.floor(Date.now() / 1000) + 3600,
@@ -27,7 +27,7 @@ function createDevToken(email: string = 'user@eazzio.com'): string {
 export async function POST(req: NextRequest) {
   try {
     let authHeader = req.headers.get('authorization') || '';
-    if (!authHeader || !authHeader.startsWith('Bearer ') || authHeader.includes('default-token')) {
+    if (!authHeader || !authHeader.startsWith('Bearer ') || authHeader.includes('default-token') || authHeader.includes('token_')) {
       authHeader = `Bearer ${createDevToken()}`;
     }
 

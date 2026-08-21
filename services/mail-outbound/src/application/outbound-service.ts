@@ -180,16 +180,24 @@ export class OutboundService {
       return { state: 'delivered', event };
     }
 
+    const isPermanentRejection = Boolean(
+      params.smtpCode &&
+        (params.smtpCode.startsWith('5') ||
+          params.smtpCode.includes('(5') ||
+          params.smtpCode.toLowerCase().includes('permanent') ||
+          params.smtpCode.toLowerCase().includes('notauthorized'))
+    );
+
     const { nextAttemptAt, isExhausted } = calculateNextAttempt(params.currentAttempts, now);
 
-    if (isExhausted) {
+    if (isPermanentRejection || isExhausted) {
       const event: MailBouncedEvent = {
         eventId,
         occurredAt: now.toISOString(),
         outboundQueueId: params.outboundQueueId,
         messageId: params.messageId,
         recipientAddress: params.recipientAddress,
-        bounceType: 'transient_exhausted',
+        bounceType: isPermanentRejection ? 'permanent' : 'transient_exhausted',
         smtpCode: params.smtpCode,
       };
       return { state: 'bounced', event };

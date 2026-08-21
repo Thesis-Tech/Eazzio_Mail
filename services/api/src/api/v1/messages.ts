@@ -1,7 +1,7 @@
 import { Router, Response, NextFunction } from 'express';
 import { AuthenticatedRequest, requireAuth } from '../../middleware/auth.js';
 import { AppError } from '../../middleware/error-handler.js';
-import { Folder } from '@eazzio/domain';
+import { Folder, Mailbox } from '@eazzio/domain';
 import {
   PostgresMailboxRepository,
   PostgresFolderRepository,
@@ -67,6 +67,45 @@ messagesRouter.post('/compose', async (req: AuthenticatedRequest, res: Response,
       if (userMailboxes.length > 0) {
         mailboxId = userMailboxes[0]!.id;
         senderAddress = userMailboxes[0]!.address;
+      } else {
+        // Ensure user exists in users table
+        const userCheck = (await defaultDb.query('SELECT id FROM users WHERE id = $1', [userId])) as any[];
+        if (userCheck.length === 0) {
+          await defaultDb.query(
+            `INSERT INTO users (id, email, password_hash, display_name) 
+             VALUES ($1, $2, 'hash_auto', 'Eazzio User') 
+             ON CONFLICT (email) DO NOTHING`,
+            [userId, senderAddress]
+          );
+        }
+
+        // Ensure a domain exists
+        const domainRes = (await defaultDb.query(`SELECT id FROM domains WHERE domain_name = 'eazzio.com' LIMIT 1`)) as any[];
+        let domainId: string;
+        if (domainRes.length > 0) {
+          domainId = domainRes[0].id;
+        } else {
+          domainId = crypto.randomUUID();
+          await defaultDb.query(
+            `INSERT INTO domains (id, domain_name, verification_status) 
+             VALUES ($1, 'eazzio.com', 'verified') 
+             ON CONFLICT DO NOTHING`,
+            [domainId]
+          );
+        }
+
+        const newMailboxId = crypto.randomUUID();
+        const newMailbox = new Mailbox({
+          id: newMailboxId,
+          ownerUserId: userId,
+          domainId,
+          address: senderAddress,
+          quotaBytes: 5368709120n,
+          usedBytes: 0n,
+          createdAt: new Date(),
+        });
+        await mailboxRepo.save(newMailbox);
+        mailboxId = newMailboxId;
       }
     }
 
