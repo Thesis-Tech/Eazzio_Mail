@@ -406,12 +406,18 @@ export default function MailDashboardPage() {
           ...prev,
         ]);
       } else {
+        const errorText =
+          typeof result.error === 'string'
+            ? result.error
+            : result.error?.message ||
+              result.details?.error ||
+              'Transmission deferral recorded.';
         setToasts((prev) => [
           {
             id: `toast-${Date.now()}`,
             title: 'Outbound Delivery Notice',
             senderName: 'Outbound Pipeline',
-            message: result.error || 'Transmission deferral recorded.',
+            message: errorText,
             timestamp: 'Just now',
           },
           ...prev,
@@ -419,12 +425,13 @@ export default function MailDashboardPage() {
       }
     } catch (apiErr: any) {
       console.error('Failed to trigger outbound mail API:', apiErr);
+      const errMsg = apiErr?.message || 'Could not connect to internal outbound service.';
       setToasts((prev) => [
         {
           id: `toast-${Date.now()}`,
           title: 'Outbound Transmission Error',
           senderName: 'Outbound Pipeline',
-          message: apiErr.message || 'Could not connect to internal outbound service.',
+          message: typeof errMsg === 'string' ? errMsg : JSON.stringify(errMsg),
           timestamp: 'Just now',
         },
         ...prev,

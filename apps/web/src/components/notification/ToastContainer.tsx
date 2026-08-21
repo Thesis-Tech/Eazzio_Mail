@@ -57,8 +57,8 @@ export const ToastContainer: React.FC<ToastContainerProps> = ({
               <span className="text-[10px] text-slate-400 shrink-0">{toast.timestamp}</span>
             </div>
 
-            <p className="text-xs font-medium text-slate-200 truncate mt-0.5">{toast.title}</p>
-            <p className="text-xs text-slate-400 truncate mt-0.5">{toast.message}</p>
+            <p className="text-xs font-medium text-slate-200 truncate mt-0.5">{typeof toast.title === 'string' ? toast.title : JSON.stringify(toast.title)}</p>
+            <p className="text-xs text-slate-400 truncate mt-0.5">{typeof toast.message === 'string' ? toast.message : JSON.stringify(toast.message)}</p>
           </div>
 
           {/* Dismiss Button */}
