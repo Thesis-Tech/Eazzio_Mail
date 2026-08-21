@@ -131,7 +131,7 @@
   - **Verification:** Admin auth tests verifying role enforcement and redirection for unauthorized users.
   - **Definition of Done:** Admin portal renders secure navigation shell for verified admin roles.
 
-- [ ] **TASK-022** — Custom Domain Management & 4-Check DNS Verification Dashboard
+- [x] **TASK-022** — Custom Domain Management & 4-Check DNS Verification Dashboard
   - **Action:** Build admin domain dashboard displaying DNS verification status (MX, SPF, DKIM, DMARC), step-by-step DNS record guidance, and manual re-check trigger.
   - **Verification:** UI tests simulating DNS status updates and domain activation.
   - **Definition of Done:** Admins can add domains, view exact DNS records needed, and trigger verification checks.
