@@ -10,6 +10,7 @@ import { Mail, Sparkles, X, Search } from 'lucide-react';
 import { parseSearchQuery } from '../components/search/SearchBar';
 import { realtimeClient, RealtimeMailEvent } from '../lib/websocket-client';
 import { ToastContainer, ToastNotification } from '../components/notification/ToastContainer';
+import { AuthStore } from '../lib/auth-store';
 
 const initialThreads: ThreadSummary[] = [
   {
@@ -365,29 +366,69 @@ export default function MailDashboardPage() {
   const currentMessages = selectedThreadId ? mockConversationMap[selectedThreadId] || [] : [];
 
   const handleSendComposeEmail = async (payload: ComposeEmailPayload) => {
+    let assignedMessageId = `msg-${Date.now()}`;
+    let deliveryState = 'queued';
+
     try {
-      // 1. Dispatch real email via /api/mail/send
-      const response = await fetch('/api/mail/send', {
+      const authState = AuthStore.getState();
+      const token = authState.token || 'default-token';
+      const senderEmail = authState.user?.email || 'user@eazzio.com';
+
+      // 1. Dispatch through internal Eazzio Outbound Mail Pipeline
+      const response = await fetch('/api/messages/compose', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({
-          from: 'support@eazzio.com',
           to: payload.to,
           cc: payload.cc,
           bcc: payload.bcc,
           subject: payload.subject,
-          text: payload.body,
-          html: `<p>${payload.body.replace(/\n/g, '<br>')}</p>`,
-          attachments: payload.attachments?.map((a) => ({ name: a.name })),
+          bodyText: payload.body,
+          bodyHtml: `<p>${payload.body.replace(/\n/g, '<br>')}</p>`,
         }),
       });
 
       const result = await response.json();
-      if (!result.success) {
-        console.warn('Outbound mail server notice:', result.error);
+      if (result.success) {
+        assignedMessageId = result.messageId || assignedMessageId;
+        deliveryState = result.deliveryState || 'queued';
+        setToasts((prev) => [
+          {
+            id: `toast-${Date.now()}`,
+            title: 'Message Queued for Delivery',
+            senderName: 'Outbound Mail Pipeline',
+            message: `Delivering to ${payload.to.join(', ')} via Direct MTA`,
+            timestamp: 'Just now',
+          },
+          ...prev,
+        ]);
+      } else {
+        setToasts((prev) => [
+          {
+            id: `toast-${Date.now()}`,
+            title: 'Outbound Delivery Notice',
+            senderName: 'Outbound Pipeline',
+            message: result.error || 'Transmission deferral recorded.',
+            timestamp: 'Just now',
+          },
+          ...prev,
+        ]);
       }
-    } catch (apiErr) {
+    } catch (apiErr: any) {
       console.error('Failed to trigger outbound mail API:', apiErr);
+      setToasts((prev) => [
+        {
+          id: `toast-${Date.now()}`,
+          title: 'Outbound Transmission Error',
+          senderName: 'Outbound Pipeline',
+          message: apiErr.message || 'Could not connect to internal outbound service.',
+          timestamp: 'Just now',
+        },
+        ...prev,
+      ]);
     }
 
     const newThreadId = `th-${Date.now()}`;
@@ -396,7 +437,7 @@ export default function MailDashboardPage() {
       mailboxId: 'mbx-primary',
       subject: payload.subject,
       snippet: payload.body.slice(0, 80) || '(No Body)',
-      sender: { name: 'You', email: 'user@eazzio.com' },
+      sender: { name: 'You', email: AuthStore.getState().user?.email || 'user@eazzio.com' },
       lastMessageAt: 'Just now',
       messageCount: 1,
       isUnread: false,
@@ -406,11 +447,11 @@ export default function MailDashboardPage() {
     };
 
     const newMsg: MessageDetail = {
-      id: `msg-${Date.now()}`,
+      id: assignedMessageId,
       threadId: newThreadId,
       mailboxId: 'mbx-primary',
       folderId: 'fld-sent',
-      from: { name: 'You', email: 'user@eazzio.com' },
+      from: { name: 'You', email: AuthStore.getState().user?.email || 'user@eazzio.com' },
       to: payload.to.map((addr) => ({ name: addr.split('@')[0] || 'Recipient', email: addr })),
       cc: payload.cc?.map((addr) => ({ name: addr.split('@')[0] || 'Recipient', email: addr })),
       bcc: payload.bcc?.map((addr) => ({ name: addr.split('@')[0] || 'Recipient', email: addr })),

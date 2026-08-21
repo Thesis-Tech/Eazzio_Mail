@@ -166,4 +166,38 @@ describe('REST API Service Live Integration Tests (TASK-008)', () => {
     expect(res.status).toBe(200);
     expect(res.body.data).toBeInstanceOf(Array);
   });
+
+  it('should compose and enqueue outbound email via POST /v1/messages/compose', async () => {
+    const res = await request(app)
+      .post('/v1/messages/compose')
+      .set('Authorization', `Bearer ${tokenUserA}`)
+      .send({
+        mailboxId: mailboxAId,
+        to: ['recipient@external-domain.com'],
+        subject: 'Real Outbound Dispatch Test',
+        bodyText: 'Hello from Eazzio Mail outbound pipeline!',
+      });
+
+    expect(res.status).toBe(202);
+    expect(res.body.success).toBe(true);
+    expect(res.body.messageId).toBeDefined();
+    expect(res.body.queueIds).toBeInstanceOf(Array);
+    expect(res.body.queueIds.length).toBe(1);
+    expect(['queued', 'delivered', 'retrying', 'bounced']).toContain(res.body.deliveryState);
+  });
+
+  it('should reject invalid recipient email format on compose', async () => {
+    const res = await request(app)
+      .post('/v1/messages/compose')
+      .set('Authorization', `Bearer ${tokenUserA}`)
+      .send({
+        mailboxId: mailboxAId,
+        to: ['invalid-format'],
+        subject: 'Invalid Email Test',
+        bodyText: 'Should fail validation',
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('VALIDATION_ERROR');
+  });
 });

@@ -4,4 +4,4 @@ export * from './cache/index.js';
 export * from './search/index.js';
 export * from './storage/index.js';
 export * from './ai/index.js';
-export * from './email-transport/interface.js';
+export * from './email-transport/index.js';
