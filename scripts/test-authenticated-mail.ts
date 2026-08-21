@@ -22,91 +22,101 @@ function loadEnvFile(filePath: string) {
 
 loadEnvFile(path.resolve(process.cwd(), '.env'));
 loadEnvFile(path.resolve(process.cwd(), '.env.local'));
+loadEnvFile(path.resolve(process.cwd(), 'services/api/.env'));
 
 async function main() {
-  const host = process.env.SMTP_AUTH_HOST || 'smtp.gmail.com';
-  const port = process.env.SMTP_AUTH_PORT ? Number(process.env.SMTP_AUTH_PORT) : 587;
-  const user = process.env.SMTP_AUTH_USER;
-  const pass = process.env.SMTP_AUTH_PASS;
-  const recipient = process.argv[2] || 'kumarrahulraj468@gmail.com';
+  const provider = (process.env.MAIL_RELAY_PROVIDER || 'custom').toLowerCase();
+  const host =
+    process.env.SMTP_HOST ||
+    process.env.SMTP_AUTH_HOST ||
+    (provider === 'brevo' ? 'smtp-relay.brevo.com' : provider === 'gmail' ? 'smtp.gmail.com' : 'smtpout.secureserver.net');
+  const port = Number(process.env.SMTP_PORT || process.env.SMTP_AUTH_PORT || 587);
+  const secure = process.env.SMTP_SECURE === 'true' || process.env.SMTP_AUTH_SECURE === 'true' || port === 465;
+  const user = process.env.SMTP_USERNAME || process.env.SMTP_USER || process.env.SMTP_AUTH_USER;
+  const pass = process.env.SMTP_PASSWORD || process.env.SMTP_PASS || process.env.SMTP_AUTH_PASS;
+  const senderEmail = process.env.SMTP_FROM_EMAIL || user || 'rahulkumar@eazzio.com';
+  const recipient = process.argv[2] || process.env.TEST_RECIPIENT || 'kumarrahulraj468@gmail.com';
 
-  console.log(`\n==================================================`);
-  console.log(`🔒 EAZZIO REAL SMTP AUTHENTICATED TEST`);
-  console.log(`==================================================\n`);
+  console.log(`\n════════════════════════════════════════════════════════════════`);
+  console.log(`  EAZZIO MAIL — AUTHENTICATED SMTP RELAY DELIVERY TEST`);
+  console.log(`════════════════════════════════════════════════════════════════\n`);
+
+  console.log(`[Configuration Summary]`);
+  console.log(`  • Relay Provider:   ${provider}`);
+  console.log(`  • SMTP Relay Host:  ${host}:${port} (TLS: ${secure ? 'Direct TLS' : 'STARTTLS'})`);
+  console.log(`  • Sender Address:   ${senderEmail}`);
+  console.log(`  • Target Recipient: ${recipient}`);
+  console.log(`  • Auth Configured:  ${user && pass ? '✅ YES (' + user.slice(0, 3) + '***)' : '❌ NO'}\n`);
 
   if (!user || !pass) {
-    console.error(`❌ Error: Missing SMTP authentication credentials.\n`);
-    console.error(`Please provide your Gmail App Password credentials to run this test.`);
-    console.error(`You can pass them via environment variables or in a local .env.local file:\n`);
-    console.error(`  export SMTP_AUTH_HOST=smtp.gmail.com`);
-    console.error(`  export SMTP_AUTH_PORT=587`);
-    console.error(`  export SMTP_AUTH_USER="your-email@gmail.com"`);
-    console.error(`  export SMTP_AUTH_PASS="your-16-char-app-password"`);
-    console.error(`  pnpm mail:test:authenticated ${recipient}\n`);
-    console.error(`==================================================`);
-    console.error(`Status: WAITING FOR CREDENTIALS`);
-    console.error(`==================================================\n`);
-    process.exit(1);
+    console.warn(`⚠️  NOTICE: No SMTP credentials detected in environment.`);
+    console.warn(`To send a real email directly to ${recipient}, please configure your relay credentials in .env:\n`);
+    console.warn(`  # Option 1: GoDaddy / Secureserver (Your domain's SPF record)`);
+    console.warn(`  SMTP_HOST=smtpout.secureserver.net`);
+    console.warn(`  SMTP_PORT=587`);
+    console.warn(`  SMTP_USERNAME=rahulkumar@eazzio.com`);
+    console.warn(`  SMTP_PASSWORD=your_eazzio_password\n`);
+    console.warn(`  # Option 2: Gmail App Password (Free 16-character token)`);
+    console.warn(`  SMTP_HOST=smtp.gmail.com`);
+    console.warn(`  SMTP_PORT=587`);
+    console.warn(`  SMTP_USERNAME=youraccount@gmail.com`);
+    console.warn(`  SMTP_PASSWORD=your_16_char_app_password\n`);
+    console.warn(`  # Option 3: Brevo / Resend / SendGrid / Amazon SES`);
+    console.warn(`  MAIL_RELAY_PROVIDER=brevo`);
+    console.warn(`  SMTP_HOST=smtp-relay.brevo.com`);
+    console.warn(`  SMTP_PORT=587`);
+    console.warn(`  SMTP_USERNAME=your_brevo_smtp_login`);
+    console.warn(`  SMTP_PASSWORD=your_brevo_smtp_key\n`);
+    console.warn(`Then run: pnpm mail:test:authenticated ${recipient}\n`);
+    return;
   }
 
   const transport = new SmtpAuthenticatedTransport({
     host,
     port,
-    secure: process.env.SMTP_AUTH_SECURE === 'true',
+    secure,
     user,
     pass,
+    fromEmail: senderEmail,
     heloHostname: 'mail.eazzio.com',
   });
 
+  console.log(`[Step 1] Verifying TLS Handshake & SMTP Authentication with Relay...`);
+  const connCheck = await transport.verifyConnection();
+  if (!connCheck.ok) {
+    console.error(`❌ Relay Connection / Authentication Failed: ${connCheck.error}`);
+    console.error(`Please check your SMTP username, password, or security settings.`);
+    process.exit(1);
+  }
+  console.log(`✅ SMTP Connection & Authentication Successful!\n`);
+
+  console.log(`[Step 2] Composing RFC 5322 MIME & Generating DKIM Signature...`);
   const now = new Date().toISOString();
   const { rawMime, messageId } = OutboundService.composeAndSign({
-    fromAddress: user,
+    fromAddress: senderEmail,
     to: [recipient],
-    subject: 'Eazzio Mail — Real SMTP Authenticated Delivery Test',
-    bodyText: `Hello Rahul,\n\nThis is a controlled real-email test from the Eazzio Mail application.\n\nThe application is using authenticated SMTP submission for this test.\n\nTimestamp:\n${now}\n\nMessage-ID:\n${crypto.randomUUID()}`,
-    bodyHtml: `<p>Hello Rahul,</p><p>This is a controlled real-email test from the <strong>Eazzio Mail</strong> application.</p><p>The application is using authenticated SMTP submission for this test.</p><p>Timestamp:<br>${now}</p>`,
-    domainName: user.split('@')[1] || 'eazzio.com',
+    subject: 'Evomail SMTP Test',
+    bodyText: 'Hello from my local server',
+    bodyHtml: `<p>Hello from my local server</p><hr><p style="color: #666; font-size: 12px;">Sent via Eazzio Mail Authenticated Relay at ${now}<br>Message-ID: ${messageId}</p>`,
+    domainName: senderEmail.split('@')[1] || 'eazzio.com',
   });
+  console.log(`✅ Message constructed (ID: ${messageId})\n`);
 
-  let tlsResult = 'PASS';
-  let authResult = 'PASS';
-  let mailFromResult = '250';
-  let rcptToResult = '250';
-  let dataResult = '250';
-  let remoteAccepted = 'YES';
-  let appState = 'accepted_by_submission_mta';
-
+  console.log(`[Step 3] Submitting Outbound Envelope to Relay...`);
   try {
-    const result = await transport.submitOutbound(rawMime, user, [recipient]);
-    const status = await transport.getDeliveryStatus(result.queueId);
-    appState = status.state;
-  } catch (err: any) {
-    const errMsg = err.message || '';
-    if (errMsg.includes('TLS')) tlsResult = 'FAIL';
-    if (errMsg.includes('535') || errMsg.includes('Authentication')) authResult = 'FAIL';
-    remoteAccepted = 'NO';
-    appState = 'bounced';
-    console.error(`\n❌ Submission Error:`, err.message);
-  }
+    const result = await transport.submitOutbound(rawMime, senderEmail, [recipient]);
+    console.log(`✅ Message ACCEPTED by Upstream Relay! (Relay Submission ID: ${result.queueId})\n`);
 
-  console.log(`\n==================================================`);
-  console.log(`EAZZIO REAL SMTP AUTHENTICATED TEST`);
-  console.log(`==================================================\n`);
-  console.log(`Transport:\nsmtp-auth\n`);
-  console.log(`SMTP Host:\n${host}\n`);
-  console.log(`Recipient:\n${recipient}\n`);
-  console.log(`TLS:\n${tlsResult}\n`);
-  console.log(`Authentication:\n${authResult}\n`);
-  console.log(`MAIL FROM:\n${mailFromResult}\n`);
-  console.log(`RCPT TO:\n${rcptToResult}\n`);
-  console.log(`DATA:\n${dataResult}\n`);
-  console.log(`Remote SMTP Acceptance:\n${remoteAccepted}\n`);
-  console.log(`Application State:\n${appState}\n`);
-  console.log(`Message-ID:\n${messageId}\n`);
-  console.log(`Mailbox Receipt:\n${remoteAccepted === 'YES' ? 'VERIFIED' : 'NOT VERIFIED'}\n`);
-  console.log(`Mailpit Regression:\nPASS\n`);
-  console.log(`Full Test Suite:\nPASS\n`);
-  console.log(`==================================================\n`);
+    console.log(`════════════════════════════════════════════════════════════════`);
+    console.log(`  🎉 REAL EMAIL SUBMISSION SUCCESSFUL!`);
+    console.log(`  Target Recipient: ${recipient}`);
+    console.log(`  Relay Host:       ${host}:${port}`);
+    console.log(`  Status:           ACCEPTED_BY_RELAY`);
+    console.log(`════════════════════════════════════════════════════════════════\n`);
+  } catch (err: any) {
+    console.error(`❌ Relay Submission Failed: ${err.message}`);
+    process.exit(1);
+  }
 }
 
 if (process.argv[1]?.endsWith('test-authenticated-mail.ts')) {
