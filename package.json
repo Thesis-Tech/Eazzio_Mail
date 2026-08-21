@@ -8,7 +8,8 @@
     "test": "pnpm --recursive run test",
     "typecheck": "pnpm --recursive run typecheck",
     "mail:diagnose": "npx tsx scripts/diagnose-mail-provider.ts",
-    "mail:test:local": "npx tsx scripts/test-local-mail.ts"
+    "mail:test:local": "npx tsx scripts/test-local-mail.ts",
+    "mail:test:external": "npx tsx scripts/test-external-mail.ts"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",
