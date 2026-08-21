@@ -365,6 +365,31 @@ export default function MailDashboardPage() {
   const currentMessages = selectedThreadId ? mockConversationMap[selectedThreadId] || [] : [];
 
   const handleSendComposeEmail = async (payload: ComposeEmailPayload) => {
+    try {
+      // 1. Dispatch real email via /api/mail/send
+      const response = await fetch('/api/mail/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          from: 'support@eazzio.com',
+          to: payload.to,
+          cc: payload.cc,
+          bcc: payload.bcc,
+          subject: payload.subject,
+          text: payload.body,
+          html: `<p>${payload.body.replace(/\n/g, '<br>')}</p>`,
+          attachments: payload.attachments?.map((a) => ({ name: a.name })),
+        }),
+      });
+
+      const result = await response.json();
+      if (!result.success) {
+        console.warn('Outbound mail server notice:', result.error);
+      }
+    } catch (apiErr) {
+      console.error('Failed to trigger outbound mail API:', apiErr);
+    }
+
     const newThreadId = `th-${Date.now()}`;
     const newThread: ThreadSummary = {
       id: newThreadId,
