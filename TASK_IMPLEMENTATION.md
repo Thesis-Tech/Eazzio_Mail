@@ -136,7 +136,7 @@
   - **Verification:** UI tests simulating DNS status updates and domain activation.
   - **Definition of Done:** Admins can add domains, view exact DNS records needed, and trigger verification checks.
 
-- [ ] **TASK-023** — Mailbox Provisioning & Quota Management UI
+- [x] **TASK-023** — Mailbox Provisioning & Quota Management UI
   - **Action:** Build admin interfaces to provision user mailboxes, assign custom domain email addresses, and configure storage quota limits.
   - **Verification:** UI tests for mailbox creation, edit quota, and account status toggles.
   - **Definition of Done:** Admins can provision mailboxes and adjust storage allocations.

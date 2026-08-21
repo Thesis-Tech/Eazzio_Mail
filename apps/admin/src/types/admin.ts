@@ -62,3 +62,18 @@ export interface AuditLogEntry {
   status: 'success' | 'failure';
   details?: Record<string, any>;
 }
+
+export interface AdminMailbox {
+  id: string;
+  userId: string;
+  displayName: string;
+  address: string;
+  domain: string;
+  department?: string;
+  quotaBytes: number;
+  usedBytes: number;
+  status: 'active' | 'suspended' | 'disabled';
+  isMfaEnabled?: boolean;
+  createdAt: string;
+  lastLoginAt?: string;
+}
