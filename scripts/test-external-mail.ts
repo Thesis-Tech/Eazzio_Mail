@@ -67,13 +67,14 @@ async function runDirectSmtpTest(recipientAddress: string): Promise<ExternalTest
   const now = new Date().toISOString();
 
   // 1. Compose MIME with DKIM signature
+  const senderEmail = process.env.SMTP_FROM_EMAIL || 'rahulkumar@eazzio.com';
   const { rawMime, messageId } = OutboundService.composeAndSign({
-    fromAddress: 'user@eazzio.com',
+    fromAddress: senderEmail,
     to: [recipientAddress],
-    subject: 'Eazzio Mail — Controlled Gmail Delivery Test',
-    bodyText: `Hello Rahul,\n\nThis is a single controlled external SMTP delivery test from Eazzio Mail.\n\nThe purpose is to verify the current direct-to-MX delivery path.\n\nTimestamp:\n${now}\n\nMessage-ID:\n${crypto.randomUUID()}`,
-    bodyHtml: `<p>Hello Rahul,</p><p>This is a single controlled external SMTP delivery test from <strong>Eazzio Mail</strong>.</p><p>The purpose is to verify the current direct-to-MX delivery path.</p><p>Timestamp:<br>${now}</p>`,
-    domainName: 'eazzio.com',
+    subject: 'Eazzio Mail — Controlled Direct SMTP Delivery Test',
+    bodyText: `Hello Rahul,\n\nThis is a single controlled direct SMTP delivery test from Eazzio Mail.\n\nThe purpose is to verify the native self-hosted direct-to-MX delivery path.\n\nTimestamp:\n${now}\n\nMessage-ID:\n${crypto.randomUUID()}`,
+    bodyHtml: `<p>Hello Rahul,</p><p>This is a single controlled direct SMTP delivery test from <strong>Eazzio Mail</strong>.</p><p>The purpose is to verify the native self-hosted direct-to-MX delivery path.</p><p>Timestamp:<br>${now}</p>`,
+    domainName: senderEmail.split('@')[1] || 'eazzio.com',
   });
 
   const report: ExternalTestReport = {
