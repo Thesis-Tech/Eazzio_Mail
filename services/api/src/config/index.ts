@@ -1,3 +1,4 @@
+import '../env.js';
 import { PostgresAdapter, OpenSearchAdapter } from '@eazzio/infra-adapters';
 
 export const config = {

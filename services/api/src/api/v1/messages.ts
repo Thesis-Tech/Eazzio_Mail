@@ -24,10 +24,13 @@ const folderRepo = new PostgresFolderRepository(defaultDb);
 const messageRepo = new PostgresMessageRepository(defaultDb);
 const queueRepo = new PostgresOutboundQueueRepository(defaultDb);
 const storage = new MemoryStorageAdapter();
-const transport = createEmailTransport();
 
 const outboundService = new OutboundService(queueRepo, messageRepo, storage);
-const queueRunner = new QueueRunner(queueRepo, messageRepo, storage, transport);
+
+function getQueueRunner(): QueueRunner {
+  const currentTransport = createEmailTransport();
+  return new QueueRunner(queueRepo, messageRepo, storage, currentTransport);
+}
 
 // Helper to resolve user's primary mailbox and ensure folders exist
 async function getOrCreateUserMailbox(userId: string, userEmail: string): Promise<{ mailboxId: string; address: string }> {
@@ -742,9 +745,11 @@ messagesRouter.post('/compose', async (req: AuthenticatedRequest, res: Response,
 
     // 5. Trigger Queue Runner in the background for outbound SMTP delivery
     setImmediate(() => {
-      queueRunner.processNextBatch(10).catch((runnerErr) => {
-        console.error('Background outbound queue runner error:', runnerErr);
-      });
+      getQueueRunner()
+        .processNextBatch(10)
+        .catch((runnerErr) => {
+          console.error('Background outbound queue runner error:', runnerErr);
+        });
     });
 
     res.status(202).json({

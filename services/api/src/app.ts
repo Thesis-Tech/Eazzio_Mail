@@ -18,5 +18,10 @@ app.use('/v1/mailboxes', mailboxRouter);
 app.use('/v1/messages', messagesRouter);
 app.use('/v1/search', searchRouter);
 
+// Support /api/v1 prefixes
+app.use('/api/v1/mailboxes', mailboxRouter);
+app.use('/api/v1/messages', messagesRouter);
+app.use('/api/v1/search', searchRouter);
+
 // Standard error handling envelope
 app.use(errorHandler);
