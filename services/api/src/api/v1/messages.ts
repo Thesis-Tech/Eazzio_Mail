@@ -54,7 +54,16 @@ messagesRouter.post('/compose', async (req: AuthenticatedRequest, res: Response,
 
     // 2. Validate / Resolve Mailbox ownership
     let mailboxId = requestedMailboxId;
-    let senderAddress = req.user!.email || 'user@eazzio.com';
+    let senderAddress = req.user!.email;
+
+    if (req.body.from && typeof req.body.from === 'string') {
+      const allowedMailboxes = await mailboxRepo.findByOwnerId(userId);
+      const isOwner = allowedMailboxes.some((m) => m.address.toLowerCase() === req.body.from.toLowerCase());
+      if (!isOwner && req.body.from.toLowerCase() !== req.user!.email.toLowerCase()) {
+        throw new AppError('FORBIDDEN', `User is not authorized to send as '${req.body.from}'`, 403);
+      }
+      senderAddress = req.body.from;
+    }
 
     if (mailboxId) {
       const mailbox = await mailboxRepo.findById(mailboxId);

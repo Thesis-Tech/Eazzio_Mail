@@ -380,6 +380,7 @@ export default function MailDashboardPage() {
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
+          'x-user-email': senderEmail,
         },
         body: JSON.stringify({
           to: payload.to,

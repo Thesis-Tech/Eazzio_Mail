@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
   try {
     let authHeader = req.headers.get('authorization') || '';
     if (!authHeader || !authHeader.startsWith('Bearer ') || authHeader.includes('default-token') || authHeader.includes('token_')) {
-      authHeader = `Bearer ${createDevToken()}`;
+      authHeader = `Bearer ${createDevToken('rahulkumar@eazzio.com')}`;
     }
 
     const body = await req.json();
@@ -42,7 +42,13 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify(body),
     });
 
-    const data = await response.json();
+    const responseText = await response.text();
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch {
+      data = { success: false, error: responseText || `Backend responded with status ${response.status}` };
+    }
     return NextResponse.json(data, { status: response.status });
   } catch (error: any) {
     console.error('API Gateway message compose proxy error:', error);
