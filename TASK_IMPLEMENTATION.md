@@ -102,7 +102,7 @@
   - **Verification:** Web component tests verifying thread rendering, selection state, and pagination.
   - **Definition of Done:** Users can browse threads, expand messages in a conversation, and trigger message actions.
 
-- [ ] **TASK-017** — Rich Text Mail Composer & Attachment Upload
+- [x] **TASK-017** — Rich Text Mail Composer & Attachment Upload
   - **Action:** Build modal/docked mail composer with rich text editing, recipient chips with autocomplete, draft autosave, and attachment upload.
   - **Verification:** Web component tests verifying draft autosave, email validation, and send action triggering API.
   - **Definition of Done:** Users can compose, attach files, save drafts, and send emails via web UI.

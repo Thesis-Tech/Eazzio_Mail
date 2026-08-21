@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { DashboardLayout } from '../components/layout/DashboardLayout';
 import { ThreadList } from '../components/mail/ThreadList';
 import { ConversationViewer } from '../components/mail/ConversationViewer';
+import { MailComposer, ComposeEmailPayload } from '../components/mail/MailComposer';
 import { ThreadSummary, MessageDetail } from '../types/mail';
 import { Mail, Sparkles } from 'lucide-react';
 
@@ -247,6 +248,60 @@ export default function MailDashboardPage() {
   const selectedThread = threads.find((t) => t.id === selectedThreadId);
   const currentMessages = selectedThreadId ? mockConversationMap[selectedThreadId] || [] : [];
 
+  const handleSendComposeEmail = async (payload: ComposeEmailPayload) => {
+    const newThreadId = `th-${Date.now()}`;
+    const newThread: ThreadSummary = {
+      id: newThreadId,
+      mailboxId: 'mbx-primary',
+      subject: payload.subject,
+      snippet: payload.body.slice(0, 80) || '(No Body)',
+      sender: { name: 'You', email: 'user@eazzio.com' },
+      lastMessageAt: 'Just now',
+      messageCount: 1,
+      isUnread: false,
+      isStarred: false,
+      hasAttachments: (payload.attachments && payload.attachments.length > 0) || false,
+      labels: ['Sent'],
+    };
+
+    const newMsg: MessageDetail = {
+      id: `msg-${Date.now()}`,
+      threadId: newThreadId,
+      mailboxId: 'mbx-primary',
+      folderId: 'fld-sent',
+      from: { name: 'You', email: 'user@eazzio.com' },
+      to: payload.to.map((addr) => ({ name: addr.split('@')[0] || 'Recipient', email: addr })),
+      cc: payload.cc?.map((addr) => ({ name: addr.split('@')[0] || 'Recipient', email: addr })),
+      bcc: payload.bcc?.map((addr) => ({ name: addr.split('@')[0] || 'Recipient', email: addr })),
+      subject: payload.subject,
+      snippet: payload.body.slice(0, 80),
+      bodyText: payload.body,
+      bodyHtml: `<p>${payload.body}</p>`,
+      receivedAt: 'Just now',
+      isRead: true,
+      isStarred: false,
+      security: {
+        spf: 'pass',
+        dkim: 'pass',
+        dmarc: 'pass',
+        clamavStatus: 'clean',
+        spamScore: 0.0,
+      },
+      attachments:
+        payload.attachments?.map((att) => ({
+          id: att.id,
+          filename: att.name,
+          contentType: 'application/octet-stream',
+          sizeBytes: att.sizeBytes,
+          antivirusStatus: 'clean',
+        })) || [],
+    };
+
+    mockConversationMap[newThreadId] = [newMsg];
+    setThreads((prev) => [newThread, ...prev]);
+    setSelectedThreadId(newThreadId);
+  };
+
   return (
     <DashboardLayout
       activeFolderId={activeFolderId}
@@ -261,7 +316,7 @@ export default function MailDashboardPage() {
       }}
       onOpenCompose={() => setIsComposeOpen(true)}
     >
-      <div className="h-full flex flex-col md:flex-row overflow-hidden" data-testid="mail-split-pane">
+      <div className="h-full flex flex-col md:flex-row overflow-hidden relative" data-testid="mail-split-pane">
         {/* Left Column: Thread List */}
         <div className="w-full md:w-5/12 lg:w-4/12 h-full flex flex-col min-w-0">
           <ThreadList
@@ -303,6 +358,13 @@ export default function MailDashboardPage() {
             </div>
           )}
         </div>
+
+        {/* Docked Mail Composer */}
+        <MailComposer
+          isOpen={isComposeOpen}
+          onClose={() => setIsComposeOpen(false)}
+          onSend={handleSendComposeEmail}
+        />
       </div>
     </DashboardLayout>
   );
