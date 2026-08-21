@@ -150,7 +150,7 @@
 
 ## PHASE 5 — Mobile Application (`apps/mobile`)
 
-- [ ] **TASK-025** — Flutter Architecture, Theming & Secure Auth Flow
+- [x] **TASK-025** — Flutter Architecture, Theming & Secure Auth Flow
   - **Action:** Scaffold Flutter mobile application with GoRouter, Provider/Riverpod state management, dark/light Eazzio design tokens, and secure storage auth token persistence.
   - **Verification:** Flutter widget tests for splash screen, login screen, and token storage.
   - **Definition of Done:** Mobile app launches, handles login/logout, and stores session tokens securely.

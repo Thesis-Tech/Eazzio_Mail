@@ -1,26 +1,40 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'providers/auth_provider.dart';
+import 'theme/app_theme.dart';
+import 'screens/splash_screen.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(const EazzioMailApp());
 }
 
 class EazzioMailApp extends StatelessWidget {
-  const EazzioMailApp({super.key});
+  final AuthProvider? authProvider;
+
+  const EazzioMailApp({super.key, this.authProvider});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    final app = MaterialApp(
       title: 'Eazzio Mail',
-      theme: ThemeData(
-        brightness: Brightness.dark,
-        primaryColor: const Color(0xFF2D5BFF),
-        scaffoldBackgroundColor: const Color(0xFF0F1115),
-      ),
-      home: const Scaffold(
-        body: Center(
-          child: Text('Eazzio Mail Mobile'),
-        ),
-      ),
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: ThemeMode.dark,
+      home: const SplashScreen(),
+    );
+
+    if (authProvider != null) {
+      return ChangeNotifierProvider<AuthProvider>.value(
+        value: authProvider!,
+        child: app,
+      );
+    }
+
+    return ChangeNotifierProvider<AuthProvider>(
+      create: (_) => AuthProvider(),
+      child: app,
     );
   }
 }
