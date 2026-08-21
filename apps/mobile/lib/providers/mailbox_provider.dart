@@ -2,18 +2,62 @@ import 'package:flutter/material.dart';
 import '../models/thread_model.dart';
 import '../models/message_model.dart';
 import '../services/mailbox_service.dart';
+import '../services/websocket_service.dart';
 
 class MailboxProvider extends ChangeNotifier {
   MailboxService _mailboxService;
+  MobileWebSocketService? _wsService;
   List<ThreadModel> _threads = [];
   Map<String, List<MessageModel>> _threadMessages = {};
   bool _isLoading = false;
   String _currentFolder = 'inbox';
   String _searchQuery = '';
   String? _error;
+  String? _latestArrivalAlert;
 
-  MailboxProvider({MailboxService? mailboxService})
-      : _mailboxService = mailboxService ?? MailboxService();
+  MailboxProvider({
+    MailboxService? mailboxService,
+    MobileWebSocketService? wsService,
+  })  : _mailboxService = mailboxService ?? MailboxService(),
+        _wsService = wsService {
+    _setupWebSocketListeners();
+  }
+
+  String? get latestArrivalAlert => _latestArrivalAlert;
+  MobileWebSocketService? get wsService => _wsService;
+
+  void _setupWebSocketListeners() {
+    if (_wsService != null) {
+      _wsService!.onNewEmail = (thread) {
+        final exists = _threads.any((t) => t.id == thread.id);
+        if (!exists) {
+          _threads.insert(0, thread);
+          _latestArrivalAlert = 'New email from ${thread.sender}: ${thread.subject}';
+          notifyListeners();
+        }
+      };
+
+      _wsService!.onThreadUpdate = (threadId, action) {
+        if (action == 'delete' || action == 'archive') {
+          _threads.removeWhere((t) => t.id == threadId);
+          notifyListeners();
+        }
+      };
+    }
+  }
+
+  void connectWebSocket({required String mailboxId, String? token}) {
+    if (_wsService == null) {
+      _wsService = MobileWebSocketService(token: token);
+      _setupWebSocketListeners();
+    }
+    _wsService!.connect(mailboxId: mailboxId);
+  }
+
+  void clearArrivalAlert() {
+    _latestArrivalAlert = null;
+    notifyListeners();
+  }
 
   List<ThreadModel> get threads {
     if (_searchQuery.isEmpty) {

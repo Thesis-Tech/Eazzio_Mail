@@ -170,7 +170,7 @@
   - **Verification:** Flutter widget tests for message composition and sending.
   - **Definition of Done:** Users can compose and send emails directly from mobile devices.
 
-- [ ] **TASK-029** — Mobile Realtime Socket & Push Notifications
+- [x] **TASK-029** — Mobile Realtime Socket & Push Notifications
   - **Action:** Wire WebSocket service and background push notification handlers for instant mobile alerts on new incoming mail.
   - **Verification:** Mobile test verifying socket connection and notification dispatch.
   - **Definition of Done:** Mobile app receives real-time updates and displays notification banners.
