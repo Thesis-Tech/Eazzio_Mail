@@ -179,12 +179,12 @@
 
 ## PHASE 6 — Full Stack Integration & Mail Infrastructure
 
-- [ ] **TASK-030** — Production Mail Daemons Configuration (Postfix, Dovecot, Rspamd, ClamAV)
+- [x] **TASK-030** — Production Mail Daemons Configuration (Postfix, Dovecot, Rspamd, ClamAV)
   - **Action:** Author production configuration files (`main.cf`, `master.cf`, `dovecot.conf`, `rspamd.conf`) and docker configurations with LMTP sockets and milter pipelines.
   - **Verification:** Docker Compose integration test verifying SMTP port 25/587 reception and LMTP delivery to inbound service.
   - **Definition of Done:** Mail daemons run in Docker and route emails through the full security pipeline.
 
-- [ ] **TASK-031** — End-to-End System Integration Test
+- [x] **TASK-031** — End-to-End System Integration Test
   - **Action:** Execute comprehensive integration test verifying the complete lifecycle: domain registration -> DNS verification -> mailbox creation -> inbound SMTP reception -> security pipeline -> DB persistence -> OpenSearch indexing -> WebSocket push -> web & mobile display -> reply composition -> DKIM signing -> outbound delivery.
   - **Verification:** Automated end-to-end integration test passing across all subsystems.
   - **Definition of Done:** Full mail lifecycle verified with zero mocks against live infrastructure.

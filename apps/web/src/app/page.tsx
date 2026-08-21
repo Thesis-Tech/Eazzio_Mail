@@ -83,26 +83,32 @@ export default function MailDashboardPage() {
       const token = authState.token || 'default-token';
       const senderEmail = authState.user?.email || 'rahulkumar@eazzio.com';
 
-      let res = await fetch(`/api/messages?folder=${slug}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'x-user-email': senderEmail,
-        },
-      });
-
-      if (!res.ok && res.status === 502) {
-        // Automatic retry if backend service was restarting
-        await new Promise((r) => setTimeout(r, 1500));
+      let res: Response | null = null;
+      try {
         res = await fetch(`/api/messages?folder=${slug}`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'x-user-email': senderEmail,
           },
         });
+
+        if (res && !res.ok && res.status === 502) {
+          // Automatic retry if backend service was restarting
+          await new Promise((r) => setTimeout(r, 1500));
+          res = await fetch(`/api/messages?folder=${slug}`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'x-user-email': senderEmail,
+            },
+          });
+        }
+      } catch (fetchErr) {
+        console.warn('Network error reaching /api/messages, using cached/local state:', fetchErr);
+        return;
       }
 
-      if (!res.ok) {
-        console.warn(`Messages endpoint responded with status ${res.status}`);
+      if (!res || !res.ok) {
+        console.warn(`Messages endpoint responded with status ${res?.status}`);
         return;
       }
 
