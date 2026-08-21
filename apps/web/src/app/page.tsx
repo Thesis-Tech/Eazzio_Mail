@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { DashboardLayout } from '../components/layout/DashboardLayout';
 import { ThreadList } from '../components/mail/ThreadList';
 import { ConversationViewer } from '../components/mail/ConversationViewer';
@@ -8,6 +8,8 @@ import { MailComposer, ComposeEmailPayload } from '../components/mail/MailCompos
 import { ThreadSummary, MessageDetail } from '../types/mail';
 import { Mail, Sparkles, X, Search } from 'lucide-react';
 import { parseSearchQuery } from '../components/search/SearchBar';
+import { realtimeClient, RealtimeMailEvent } from '../lib/websocket-client';
+import { ToastContainer, ToastNotification } from '../components/notification/ToastContainer';
 
 const initialThreads: ThreadSummary[] = [
   {
@@ -167,6 +169,75 @@ export default function MailDashboardPage() {
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>('th-101');
   const [searchQuery, setSearchQuery] = useState('');
   const [isComposeOpen, setIsComposeOpen] = useState(false);
+  const [toasts, setToasts] = useState<ToastNotification[]>([]);
+
+  useEffect(() => {
+    realtimeClient.connect();
+
+    const unsubscribe = realtimeClient.subscribe('*', (event: RealtimeMailEvent) => {
+      if (event.type === 'mail.received') {
+        const data = event.data;
+        const newThreadId = data.threadId || `th-live-${Date.now()}`;
+        const newThread: ThreadSummary = {
+          id: newThreadId,
+          mailboxId: event.mailboxId,
+          subject: data.subject || 'Incoming Transmission',
+          snippet: data.snippet || 'You have received a new message.',
+          sender: data.from || { name: 'External Relay', email: 'relay@eazzio.com' },
+          lastMessageAt: data.receivedAt || 'Just now',
+          messageCount: 1,
+          isUnread: true,
+          isStarred: false,
+          hasAttachments: data.hasAttachments || false,
+          labels: data.labels || ['Inbox'],
+        };
+
+        const newMsg: MessageDetail = {
+          id: data.messageId || `msg-live-${Date.now()}`,
+          threadId: newThreadId,
+          mailboxId: event.mailboxId,
+          folderId: 'fld-inbox',
+          from: data.from || { name: 'External Relay', email: 'relay@eazzio.com' },
+          to: [{ name: 'You', email: 'user@eazzio.com' }],
+          subject: data.subject || 'Incoming Transmission',
+          snippet: data.snippet || 'You have received a new message.',
+          bodyText: data.snippet || 'Message received via live WebSocket pipeline.',
+          bodyHtml: `<p>${data.snippet || 'Message received via live WebSocket pipeline.'}</p>`,
+          receivedAt: data.receivedAt || 'Just now',
+          isRead: false,
+          isStarred: false,
+          security: {
+            spf: 'pass',
+            dkim: 'pass',
+            dmarc: 'pass',
+            clamavStatus: 'clean',
+            spamScore: 0.0,
+          },
+          attachments: [],
+        };
+
+        mockConversationMap[newThreadId] = [newMsg];
+        setThreads((prev) => [newThread, ...prev]);
+
+        // Add toast notification
+        setToasts((prev) => [
+          {
+            id: `toast-${Date.now()}`,
+            title: data.subject || 'New Incoming Email',
+            senderName: data.from?.name || 'Incoming Sender',
+            message: data.snippet || 'Click to view conversation.',
+            threadId: newThreadId,
+            timestamp: 'Just now',
+          },
+          ...prev.slice(0, 4),
+        ]);
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, []);
 
   const parsedFilters = parseSearchQuery(searchQuery);
   const displayedThreads = threads.filter((t) => {
@@ -430,6 +501,13 @@ export default function MailDashboardPage() {
           isOpen={isComposeOpen}
           onClose={() => setIsComposeOpen(false)}
           onSend={handleSendComposeEmail}
+        />
+
+        {/* Realtime Toast Notifications */}
+        <ToastContainer
+          toasts={toasts}
+          onDismiss={(id) => setToasts((prev) => prev.filter((t) => t.id !== id))}
+          onClickToast={(threadId) => handleSelectThread(threadId)}
         />
       </div>
     </DashboardLayout>

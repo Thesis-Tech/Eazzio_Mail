@@ -5,6 +5,7 @@ import { NavigationSidebar } from './NavigationSidebar';
 import { AppHeader } from './AppHeader';
 import { FolderItem, LabelItem, ThreadSummary } from '../../types/mail';
 import { AuthStore, AuthUser } from '../../lib/auth-store';
+import { realtimeClient, ConnectionStatus } from '../../lib/websocket-client';
 
 export interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -50,15 +51,24 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   const [currentFolder, setCurrentFolder] = useState<string>(activeFolderId);
   const [currentLabel, setCurrentLabel] = useState<string | undefined>(activeLabelId);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('connected');
 
   useEffect(() => {
     AuthStore.initFromStorage();
     setCurrentUser(AuthStore.getState().user);
 
-    const unsubscribe = AuthStore.subscribe((state) => {
+    const unsubscribeAuth = AuthStore.subscribe((state) => {
       setCurrentUser(state.user);
     });
-    return unsubscribe;
+
+    const unsubscribeWs = realtimeClient.onStatusChange((status) => {
+      setConnectionStatus(status);
+    });
+
+    return () => {
+      unsubscribeAuth();
+      unsubscribeWs();
+    };
   }, []);
 
   const handleFolderSelect = (folderId: string) => {
@@ -104,7 +114,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           onLogout={handleLogout}
           onSearch={onSearch}
           availableThreads={availableThreads}
-          isRealtimeConnected={true}
+          isRealtimeConnected={connectionStatus === 'connected'}
         />
         <main className="flex-1 overflow-auto bg-[#0F1115]">{children}</main>
       </div>

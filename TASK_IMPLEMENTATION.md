@@ -112,7 +112,7 @@
   - **Verification:** Web test verifying typeahead debounce and search result rendering.
   - **Definition of Done:** Users can search mail with typeahead suggestions and filter results.
 
-- [ ] **TASK-019** — Realtime WebSocket Client Integration
+- [x] **TASK-019** — Realtime WebSocket Client Integration
   - **Action:** Integrate WebSocket client in web app updating inbox list and toast notifications on incoming email events without page refresh.
   - **Verification:** Test verifying live inbox update upon receiving simulated WebSocket arrival message.
   - **Definition of Done:** New incoming messages appear in real-time in the web client.
