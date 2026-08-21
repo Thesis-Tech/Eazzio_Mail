@@ -358,27 +358,113 @@ export default function MailDashboardPage() {
     }
   };
 
-  const handleBulkDelete = (threadIds: string[]) => {
+  const handleBulkDelete = async (threadIds: string[]) => {
     const idSet = new Set(threadIds);
     setThreads((prev) => prev.filter((t) => !idSet.has(t.id)));
     if (selectedThreadId && idSet.has(selectedThreadId)) {
       setSelectedThreadId(null);
     }
+
+    try {
+      const authState = AuthStore.getState();
+      const token = authState.token || 'default-token';
+      const senderEmail = authState.user?.email || 'rahulkumar@eazzio.com';
+
+      const isTrash = activeFolderId === 'fld-trash';
+      await fetch('/api/messages/batch', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+          'x-user-email': senderEmail,
+        },
+        body: JSON.stringify({
+          action: isTrash ? 'delete' : 'trash',
+          threadIds,
+        }),
+      });
+
+      setToasts((prev) => [
+        {
+          id: `toast-${Date.now()}`,
+          title: isTrash ? 'Deleted Permanently' : 'Moved to Trash',
+          senderName: 'Eazzio Mailbox',
+          message: `${threadIds.length} conversation(s) ${isTrash ? 'deleted permanently' : 'moved to Trash'}.`,
+          timestamp: 'Just now',
+        },
+        ...prev,
+      ]);
+    } catch (err) {
+      console.error('Failed to execute bulk delete:', err);
+    }
   };
 
-  const handleBulkArchive = (threadIds: string[]) => {
+  const handleBulkArchive = async (threadIds: string[]) => {
     const idSet = new Set(threadIds);
     setThreads((prev) => prev.filter((t) => !idSet.has(t.id)));
     if (selectedThreadId && idSet.has(selectedThreadId)) {
       setSelectedThreadId(null);
     }
+
+    try {
+      const authState = AuthStore.getState();
+      const token = authState.token || 'default-token';
+      const senderEmail = authState.user?.email || 'rahulkumar@eazzio.com';
+
+      await fetch('/api/messages/batch', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+          'x-user-email': senderEmail,
+        },
+        body: JSON.stringify({
+          action: 'archive',
+          threadIds,
+        }),
+      });
+
+      setToasts((prev) => [
+        {
+          id: `toast-${Date.now()}`,
+          title: 'Moved to Archive',
+          senderName: 'Eazzio Mailbox',
+          message: `${threadIds.length} conversation(s) moved to Archive.`,
+          timestamp: 'Just now',
+        },
+        ...prev,
+      ]);
+    } catch (err) {
+      console.error('Failed to execute bulk archive:', err);
+    }
   };
 
-  const handleBulkMarkRead = (threadIds: string[], isRead: boolean) => {
+  const handleBulkMarkRead = async (threadIds: string[], isRead: boolean) => {
     const idSet = new Set(threadIds);
     setThreads((prev) =>
       prev.map((t) => (idSet.has(t.id) ? { ...t, isUnread: !isRead } : t))
     );
+
+    try {
+      const authState = AuthStore.getState();
+      const token = authState.token || 'default-token';
+      const senderEmail = authState.user?.email || 'rahulkumar@eazzio.com';
+
+      await fetch('/api/messages/batch', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+          'x-user-email': senderEmail,
+        },
+        body: JSON.stringify({
+          action: isRead ? 'read' : 'unread',
+          threadIds,
+        }),
+      });
+    } catch (err) {
+      console.error('Failed to mark read/unread:', err);
+    }
   };
 
   const handleSendReply = (threadId: string, replyText: string) => {

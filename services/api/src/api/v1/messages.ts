@@ -452,7 +452,56 @@ messagesRouter.post('/:id/star', async (req: AuthenticatedRequest, res: Response
   }
 });
 
-// POST /v1/messages/:id/trash - Move message to trash
+// POST /v1/messages/batch-action - Execute bulk operation on multiple messages / threads
+messagesRouter.post('/batch-action', async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const { action, threadIds = [] } = req.body;
+    const userId = req.user!.userId;
+    const userEmail = req.user!.email;
+
+    if (!Array.isArray(threadIds) || threadIds.length === 0) {
+      res.json({ success: true, count: 0 });
+      return;
+    }
+
+    const { mailboxId } = await getOrCreateUserMailbox(userId, userEmail);
+
+    if (action === 'trash') {
+      const trashFolderId = await getFolderId(mailboxId, 'trash');
+      await defaultDb.query(
+        `UPDATE messages SET folder_id = $2 WHERE (id = ANY($1) OR thread_id = ANY($1)) AND mailbox_id = $3`,
+        [threadIds, trashFolderId, mailboxId]
+      );
+    } else if (action === 'archive') {
+      const archiveFolderId = await getFolderId(mailboxId, 'archive');
+      await defaultDb.query(
+        `UPDATE messages SET folder_id = $2 WHERE (id = ANY($1) OR thread_id = ANY($1)) AND mailbox_id = $3`,
+        [threadIds, archiveFolderId, mailboxId]
+      );
+    } else if (action === 'read') {
+      await defaultDb.query(
+        `UPDATE messages SET is_read = true WHERE (id = ANY($1) OR thread_id = ANY($1)) AND mailbox_id = $2`,
+        [threadIds, mailboxId]
+      );
+    } else if (action === 'unread') {
+      await defaultDb.query(
+        `UPDATE messages SET is_read = false WHERE (id = ANY($1) OR thread_id = ANY($1)) AND mailbox_id = $2`,
+        [threadIds, mailboxId]
+      );
+    } else if (action === 'delete') {
+      await defaultDb.query(
+        `DELETE FROM messages WHERE (id = ANY($1) OR thread_id = ANY($1)) AND mailbox_id = $2`,
+        [threadIds, mailboxId]
+      );
+    }
+
+    res.json({ success: true, count: threadIds.length, action });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /v1/messages/:id/trash - Move message or thread to trash
 messagesRouter.post('/:id/trash', async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
@@ -462,11 +511,10 @@ messagesRouter.post('/:id/trash', async (req: AuthenticatedRequest, res: Respons
     const { mailboxId } = await getOrCreateUserMailbox(userId, userEmail);
     const trashFolderId = await getFolderId(mailboxId, 'trash');
 
-    await defaultDb.query(`UPDATE messages SET folder_id = $2 WHERE id = $1 AND mailbox_id = $3`, [
-      id,
-      trashFolderId,
-      mailboxId,
-    ]);
+    await defaultDb.query(
+      `UPDATE messages SET folder_id = $2 WHERE (id = $1 OR thread_id = $1) AND mailbox_id = $3`,
+      [id, trashFolderId, mailboxId]
+    );
 
     res.json({ success: true, message: 'Message moved to Trash' });
   } catch (err) {
@@ -474,7 +522,7 @@ messagesRouter.post('/:id/trash', async (req: AuthenticatedRequest, res: Respons
   }
 });
 
-// POST /v1/messages/:id/archive - Move message to archive
+// POST /v1/messages/:id/archive - Move message or thread to archive
 messagesRouter.post('/:id/archive', async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
@@ -484,13 +532,31 @@ messagesRouter.post('/:id/archive', async (req: AuthenticatedRequest, res: Respo
     const { mailboxId } = await getOrCreateUserMailbox(userId, userEmail);
     const archiveFolderId = await getFolderId(mailboxId, 'archive');
 
-    await defaultDb.query(`UPDATE messages SET folder_id = $2 WHERE id = $1 AND mailbox_id = $3`, [
-      id,
-      archiveFolderId,
-      mailboxId,
-    ]);
+    await defaultDb.query(
+      `UPDATE messages SET folder_id = $2 WHERE (id = $1 OR thread_id = $1) AND mailbox_id = $3`,
+      [id, archiveFolderId, mailboxId]
+    );
 
     res.json({ success: true, message: 'Message moved to Archive' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// DELETE /v1/messages/:id - Permanently delete message or thread
+messagesRouter.delete('/:id', async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user!.userId;
+    const userEmail = req.user!.email;
+
+    const { mailboxId } = await getOrCreateUserMailbox(userId, userEmail);
+    await defaultDb.query(
+      `DELETE FROM messages WHERE (id = $1 OR thread_id = $1) AND mailbox_id = $2`,
+      [id, mailboxId]
+    );
+
+    res.json({ success: true, message: 'Message deleted permanently' });
   } catch (err) {
     next(err);
   }
