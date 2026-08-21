@@ -141,7 +141,7 @@
   - **Verification:** UI tests for mailbox creation, edit quota, and account status toggles.
   - **Definition of Done:** Admins can provision mailboxes and adjust storage allocations.
 
-- [ ] **TASK-024** — Security Policies & Immutable Audit Log Viewer
+- [x] **TASK-024** — Security Policies & Immutable Audit Log Viewer
   - **Action:** Build organization security policy toggles (MFA enforcement, AI opt-in) and searchable audit log viewer with timestamp filtering.
   - **Verification:** UI tests verifying policy updates and audit log table filtering.
   - **Definition of Done:** Admins can inspect audit logs and toggle tenant-wide security policies.
