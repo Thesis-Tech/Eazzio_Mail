@@ -34,6 +34,7 @@ export function createEmailTransport(type?: TransportType): EazzioEmailTransport
   }
 
   switch (selectedType) {
+    case 'local':
     case 'memory':
       return new LocalTestTransport();
     case 'direct':
@@ -41,7 +42,6 @@ export function createEmailTransport(type?: TransportType): EazzioEmailTransport
     case 'relay':
     case 'smtp-auth':
       return new SmtpAuthenticatedTransport();
-    case 'local':
     case 'smtp':
     default:
       return new SmtpSubmissionTransport({
