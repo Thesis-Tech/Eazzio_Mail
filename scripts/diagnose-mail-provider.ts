@@ -2,23 +2,26 @@ import net from 'net';
 import tls from 'tls';
 import dns from 'dns';
 
+export interface CommandStatus {
+  code: number;
+  status: 'accepted' | 'rejected' | 'deferred' | 'unsupported';
+  response: string;
+}
+
 export interface DiagnosticResult {
   domain: string;
   mxHost: string;
   mxPriority: number;
   ipAddresses: { ipv4?: string[]; ipv6?: string[] };
-  port25Open: boolean;
+  tcp25: 'open' | 'blocked' | 'unreachable';
   banner?: string;
-  ehloAccepted: boolean;
-  startTlsSupported: boolean;
-  tlsEstablished: boolean;
-  tlsProtocol?: string;
-  tlsCipher?: string;
-  mailFromCode?: string;
-  mailFromResponse?: string;
-  rcptToCode?: string;
-  rcptToResponse?: string;
-  overallStatus: 'ACCEPTED' | 'REJECTED' | 'UNREACHABLE' | 'BLOCKED_PORT25';
+  ehlo: 'accepted' | 'rejected' | 'not_tested';
+  starttls: 'supported' | 'unsupported' | 'not_tested';
+  tls: 'established' | 'failed' | 'not_tested';
+  tlsDetails?: { protocol?: string; cipher?: string };
+  mailFrom?: CommandStatus;
+  rcptTo?: CommandStatus;
+  finalStatus: 'ACCEPTED' | 'REJECTED' | 'DEFERRED' | 'UNREACHABLE' | 'BLOCKED_PORT25';
   rejectionReason?: string;
 }
 
@@ -28,11 +31,11 @@ export async function diagnoseDomain(domain: string, testRecipient?: string): Pr
     mxHost: '',
     mxPriority: 999,
     ipAddresses: {},
-    port25Open: false,
-    ehloAccepted: false,
-    startTlsSupported: false,
-    tlsEstablished: false,
-    overallStatus: 'UNREACHABLE',
+    tcp25: 'unreachable',
+    ehlo: 'not_tested',
+    starttls: 'not_tested',
+    tls: 'not_tested',
+    finalStatus: 'UNREACHABLE',
   };
 
   // 1. Resolve MX
@@ -54,7 +57,7 @@ export async function diagnoseDomain(domain: string, testRecipient?: string): Pr
   result.mxHost = primaryMx.exchange;
   result.mxPriority = primaryMx.priority;
 
-  // 2. Resolve A and AAAA for MX
+  // 2. Resolve A and AAAA
   try {
     result.ipAddresses.ipv4 = await dns.promises.resolve4(primaryMx.exchange);
   } catch {}
@@ -63,194 +66,271 @@ export async function diagnoseDomain(domain: string, testRecipient?: string): Pr
   } catch {}
 
   const targetHost = primaryMx.exchange;
-  const targetIp = (result.ipAddresses.ipv4 && result.ipAddresses.ipv4[0]) || targetHost;
 
-  // 3. Perform SMTP handshake
+  // 3. ESMTP Transaction State Machine
   return new Promise((resolve) => {
     const socket = net.createConnection(25, targetHost);
-    let buffer = '';
-    let step: 'BANNER' | 'EHLO_PRE' | 'STARTTLS' | 'EHLO_POST' | 'MAIL_FROM' | 'RCPT_TO' | 'DONE' = 'BANNER';
-    let tlsSocket: tls.TLSSocket | null = null;
+    let activeSocket: net.Socket | tls.TLSSocket = socket;
+    let accumulatedResponseLines: string[] = [];
+    let state:
+      | 'AWAIT_BANNER'
+      | 'AWAIT_EHLO_PRE'
+      | 'AWAIT_STARTTLS'
+      | 'AWAIT_EHLO_POST'
+      | 'AWAIT_MAIL_FROM'
+      | 'AWAIT_RCPT_TO'
+      | 'AWAIT_QUIT'
+      | 'TERMINATED' = 'AWAIT_BANNER';
     let isResolved = false;
 
     const timeout = setTimeout(() => {
       if (!isResolved) {
         isResolved = true;
         socket.destroy();
-        if (!result.port25Open) {
-          result.overallStatus = 'BLOCKED_PORT25';
+        if (result.tcp25 !== 'open') {
+          result.tcp25 = 'blocked';
+          result.finalStatus = 'BLOCKED_PORT25';
           result.rejectionReason = `Connection timed out to ${targetHost}:25`;
         } else {
-          result.rejectionReason = `SMTP transaction timed out`;
+          result.finalStatus = 'UNREACHABLE';
+          result.rejectionReason = `SMTP transaction timed out during state: ${state}`;
         }
         resolve(result);
       }
-    }, 12000);
+    }, 15000);
+
+    const finish = () => {
+      if (!isResolved) {
+        isResolved = true;
+        clearTimeout(timeout);
+        state = 'TERMINATED';
+        setTimeout(() => {
+          activeSocket.destroy();
+          resolve(result);
+        }, 200);
+      }
+    };
 
     socket.on('connect', () => {
-      result.port25Open = true;
+      result.tcp25 = 'open';
     });
 
     socket.on('error', (err) => {
       if (!isResolved) {
         isResolved = true;
         clearTimeout(timeout);
-        result.rejectionReason = `Socket error: ${err.message}`;
+        result.rejectionReason = `Socket error connecting to ${targetHost}: ${err.message}`;
         resolve(result);
       }
     });
 
-    const send = (cmd: string, sock: net.Socket | tls.TLSSocket = socket) => {
-      sock.write(cmd + '\r\n');
+    const sendCommand = (cmd: string) => {
+      if (state === 'TERMINATED') return;
+      activeSocket.write(cmd + '\r\n');
     };
 
-    const handleSmtpLine = (line: string, isPostTls: boolean = false) => {
-      const code = line.slice(0, 3);
-      const isLast = line.charAt(3) === ' ';
-      if (!isLast) return;
+    const processCompleteReply = (codeStr: string, fullText: string) => {
+      const code = parseInt(codeStr, 10);
+      const is2xx = code >= 200 && code < 300;
+      const is3xx = code >= 300 && code < 400;
+      const is4xx = code >= 400 && code < 500;
+      const is5xx = code >= 500 && code < 600;
 
-      if (step === 'BANNER') {
-        result.banner = line;
-        step = 'EHLO_PRE';
-        send('EHLO mail.eazzio.com');
-      } else if (step === 'EHLO_PRE') {
-        if (code.startsWith('2')) {
-          result.ehloAccepted = true;
-          if (buffer.toUpperCase().includes('STARTTLS')) {
-            result.startTlsSupported = true;
-            step = 'STARTTLS';
-            send('STARTTLS');
+      switch (state) {
+        case 'AWAIT_BANNER':
+          result.banner = fullText;
+          if (is2xx) {
+            state = 'AWAIT_EHLO_PRE';
+            sendCommand('EHLO mail.eazzio.com');
           } else {
-            step = 'MAIL_FROM';
-            send('MAIL FROM:<user@eazzio.com>');
-          }
-        } else {
-          result.overallStatus = 'REJECTED';
-          result.rejectionReason = `EHLO rejected: ${line}`;
-          send('QUIT');
-          finish();
-        }
-      } else if (step === 'STARTTLS') {
-        if (code === '220') {
-          socket.removeAllListeners('data');
-          tlsSocket = tls.connect(
-            {
-              socket,
-              host: targetHost,
-              rejectUnauthorized: true,
-            },
-            () => {
-              result.tlsEstablished = true;
-              result.tlsProtocol = tlsSocket?.getProtocol() || undefined;
-              const cipher = tlsSocket?.getCipher();
-              result.tlsCipher = cipher ? `${cipher.name} (${cipher.version})` : undefined;
-              step = 'EHLO_POST';
-              buffer = '';
-              send('EHLO mail.eazzio.com', tlsSocket!);
-            }
-          );
-
-          tlsSocket.on('data', (d) => {
-            buffer += d.toString('utf-8');
-            const lines = buffer.split(/\r?\n/);
-            for (let i = 0; i < lines.length - 1; i++) {
-              if (/^\d{3}/.test(lines[i]!)) {
-                handleSmtpLine(lines[i]!, true);
-              }
-            }
-          });
-
-          tlsSocket.on('error', (tlsErr) => {
-            result.rejectionReason = `TLS handshake error: ${tlsErr.message}`;
+            result.finalStatus = 'REJECTED';
+            result.rejectionReason = `Banner rejected: ${fullText}`;
+            sendCommand('QUIT');
             finish();
-          });
-        } else {
-          result.rejectionReason = `STARTTLS rejected: ${line}`;
-          send('QUIT');
+          }
+          break;
+
+        case 'AWAIT_EHLO_PRE':
+          if (is2xx) {
+            result.ehlo = 'accepted';
+            if (fullText.toUpperCase().includes('STARTTLS')) {
+              result.starttls = 'supported';
+              state = 'AWAIT_STARTTLS';
+              sendCommand('STARTTLS');
+            } else {
+              result.starttls = 'unsupported';
+              state = 'AWAIT_MAIL_FROM';
+              sendCommand('MAIL FROM:<user@eazzio.com>');
+            }
+          } else {
+            result.ehlo = 'rejected';
+            result.finalStatus = 'REJECTED';
+            result.rejectionReason = `EHLO rejected: ${fullText}`;
+            sendCommand('QUIT');
+            finish();
+          }
+          break;
+
+        case 'AWAIT_STARTTLS':
+          if (is2xx) {
+            socket.removeAllListeners('data');
+            const tlsSocket = tls.connect(
+              {
+                socket,
+                host: targetHost,
+                rejectUnauthorized: true,
+              },
+              () => {
+                result.tls = 'established';
+                result.tlsDetails = {
+                  protocol: tlsSocket.getProtocol() || undefined,
+                  cipher: tlsSocket.getCipher() ? `${tlsSocket.getCipher()?.name} (${tlsSocket.getCipher()?.version})` : undefined,
+                };
+                activeSocket = tlsSocket;
+                attachDataListener(tlsSocket);
+                state = 'AWAIT_EHLO_POST';
+                sendCommand('EHLO mail.eazzio.com');
+              }
+            );
+
+            tlsSocket.on('error', (tlsErr) => {
+              result.tls = 'failed';
+              result.finalStatus = 'REJECTED';
+              result.rejectionReason = `TLS handshake failed: ${tlsErr.message}`;
+              finish();
+            });
+          } else {
+            result.starttls = 'unsupported';
+            state = 'AWAIT_MAIL_FROM';
+            sendCommand('MAIL FROM:<user@eazzio.com>');
+          }
+          break;
+
+        case 'AWAIT_EHLO_POST':
+          if (is2xx) {
+            state = 'AWAIT_MAIL_FROM';
+            sendCommand('MAIL FROM:<user@eazzio.com>');
+          } else {
+            result.finalStatus = 'REJECTED';
+            result.rejectionReason = `Post-TLS EHLO rejected: ${fullText}`;
+            sendCommand('QUIT');
+            finish();
+          }
+          break;
+
+        case 'AWAIT_MAIL_FROM':
+          result.mailFrom = {
+            code,
+            status: is2xx ? 'accepted' : is4xx ? 'deferred' : 'rejected',
+            response: fullText,
+          };
+          if (is2xx) {
+            state = 'AWAIT_RCPT_TO';
+            const rcpt = testRecipient || `diagnostic_test@${domain}`;
+            sendCommand(`RCPT TO:<${rcpt}>`);
+          } else {
+            result.finalStatus = is4xx ? 'DEFERRED' : 'REJECTED';
+            result.rejectionReason = `MAIL FROM rejected: ${fullText}`;
+            state = 'AWAIT_QUIT';
+            sendCommand('QUIT');
+            finish();
+          }
+          break;
+
+        case 'AWAIT_RCPT_TO':
+          result.rcptTo = {
+            code,
+            status: is2xx ? 'accepted' : is4xx ? 'deferred' : 'rejected',
+            response: fullText,
+          };
+          if (is2xx) {
+            result.finalStatus = 'ACCEPTED';
+          } else if (is4xx) {
+            result.finalStatus = 'DEFERRED';
+            result.rejectionReason = `RCPT TO deferred: ${fullText}`;
+          } else {
+            result.finalStatus = 'REJECTED';
+            result.rejectionReason = `RCPT TO rejected: ${fullText}`;
+          }
+          state = 'AWAIT_QUIT';
+          sendCommand('QUIT');
           finish();
-        }
-      } else if (step === 'EHLO_POST') {
-        if (code.startsWith('2')) {
-          step = 'MAIL_FROM';
-          send('MAIL FROM:<user@eazzio.com>', tlsSocket || socket);
-        } else {
-          result.rejectionReason = `Post-TLS EHLO rejected: ${line}`;
+          break;
+
+        case 'AWAIT_QUIT':
           finish();
-        }
-      } else if (step === 'MAIL_FROM') {
-        result.mailFromCode = code;
-        result.mailFromResponse = line;
-        if (code.startsWith('2')) {
-          step = 'RCPT_TO';
-          const rcpt = testRecipient || `diagnostic_test@${domain}`;
-          send(`RCPT TO:<${rcpt}>`, tlsSocket || socket);
-        } else {
-          result.overallStatus = 'REJECTED';
-          result.rejectionReason = `MAIL FROM rejected: ${line}`;
-          send('QUIT', tlsSocket || socket);
-          finish();
-        }
-      } else if (step === 'RCPT_TO') {
-        result.rcptToCode = code;
-        result.rcptToResponse = line;
-        if (code.startsWith('2')) {
-          result.overallStatus = 'ACCEPTED';
-        } else {
-          result.overallStatus = 'REJECTED';
-          result.rejectionReason = `RCPT TO rejected: ${line}`;
-        }
-        send('QUIT', tlsSocket || socket);
-        finish();
+          break;
+
+        case 'TERMINATED':
+          break;
       }
-      buffer = '';
     };
 
-    const finish = () => {
-      if (!isResolved) {
-        isResolved = true;
-        clearTimeout(timeout);
-        setTimeout(() => {
-          socket.destroy();
-          resolve(result);
-        }, 300);
-      }
+    let rawBuffer = '';
+    const attachDataListener = (s: net.Socket | tls.TLSSocket) => {
+      s.on('data', (chunk) => {
+        rawBuffer += chunk.toString('utf-8');
+        const lines = rawBuffer.split(/\r?\n/);
+        rawBuffer = lines.pop() || ''; // Keep incomplete trailing fragment
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (trimmed.length >= 3 && /^\d{3}/.test(trimmed)) {
+            accumulatedResponseLines.push(trimmed);
+            const isLastLine = trimmed.length === 3 || trimmed.charAt(3) === ' ';
+            if (isLastLine) {
+              const codeStr = trimmed.slice(0, 3);
+              const fullText = accumulatedResponseLines.join('\n');
+              accumulatedResponseLines = [];
+              processCompleteReply(codeStr, fullText);
+            }
+          }
+        }
+      });
     };
 
-    socket.on('data', (d) => {
-      buffer += d.toString('utf-8');
-      const lines = buffer.split(/\r?\n/);
-      for (let i = 0; i < lines.length - 1; i++) {
-        if (/^\d{3}/.test(lines[i]!)) {
-          handleSmtpLine(lines[i]!, false);
-        }
-      }
-    });
+    attachDataListener(socket);
   });
 }
 
 async function main() {
-  const domain = process.argv[2] || 'gmail.com';
-  console.log(`\n======================================================`);
-  console.log(`🔍 Eazzio Mail Diagnostic: Testing Direct SMTP to [${domain}]`);
-  console.log(`======================================================\n`);
+  const args = process.argv.slice(2);
+  const isJson = args.includes('--json');
+  const domain = args.find((a) => !a.startsWith('--')) || 'gmail.com';
 
   const result = await diagnoseDomain(domain);
-  console.log(`Domain:                ${result.domain}`);
-  console.log(`Primary MX:            ${result.mxHost} (Priority: ${result.mxPriority})`);
-  console.log(`IPv4 Addresses:        ${result.ipAddresses.ipv4?.join(', ') || 'None'}`);
-  console.log(`IPv6 Addresses:        ${result.ipAddresses.ipv6?.join(', ') || 'None'}`);
-  console.log(`TCP Port 25:           ${result.port25Open ? '🟢 OPEN' : '🔴 CLOSED / BLOCKED'}`);
-  console.log(`Banner:                ${result.banner || 'None'}`);
-  console.log(`EHLO Accepted:         ${result.ehloAccepted ? '🟢 YES' : '🔴 NO'}`);
-  console.log(`STARTTLS Supported:    ${result.startTlsSupported ? '🟢 YES' : '🔴 NO'}`);
-  console.log(`TLS Established:       ${result.tlsEstablished ? `🟢 YES (${result.tlsProtocol}, ${result.tlsCipher})` : '🔴 NO'}`);
-  console.log(`MAIL FROM Status:      ${result.mailFromCode || 'N/A'} - ${result.mailFromResponse || 'N/A'}`);
-  console.log(`RCPT TO Status:        ${result.rcptToCode || 'N/A'} - ${result.rcptToResponse || 'N/A'}`);
-  console.log(`Overall Result:        ${result.overallStatus === 'ACCEPTED' ? '🟢 ACCEPTED' : '🔴 ' + result.overallStatus}`);
-  if (result.rejectionReason) {
-    console.log(`Diagnostic Reason:     ${result.rejectionReason}`);
+
+  if (isJson) {
+    console.log(JSON.stringify(result, null, 2));
+    return;
   }
-  console.log(`\n`);
+
+  console.log(`\n==================================================================`);
+  console.log(`🔍 Eazzio Mail Diagnostic: Testing Direct SMTP to [${domain}]`);
+  console.log(`==================================================================\n`);
+  console.log(`Domain:                 ${result.domain}`);
+  console.log(`Primary MX Host:        ${result.mxHost} (Priority: ${result.mxPriority})`);
+  console.log(`IPv4 Addresses:         ${result.ipAddresses.ipv4?.join(', ') || 'None'}`);
+  console.log(`IPv6 Addresses:         ${result.ipAddresses.ipv6?.join(', ') || 'None'}`);
+  console.log(`TCP Port 25:            ${result.tcp25 === 'open' ? '🟢 OPEN' : '🔴 ' + result.tcp25.toUpperCase()}`);
+  console.log(`Banner:                 ${result.banner?.replace(/\n/g, ' ') || 'None'}`);
+  console.log(`EHLO Status:            ${result.ehlo === 'accepted' ? '🟢 ACCEPTED' : '🔴 ' + result.ehlo.toUpperCase()}`);
+  console.log(`STARTTLS Support:       ${result.starttls === 'supported' ? '🟢 SUPPORTED' : '🔴 ' + result.starttls.toUpperCase()}`);
+  console.log(`TLS Connection:         ${result.tls === 'established' ? `🟢 ESTABLISHED (${result.tlsDetails?.protocol}, ${result.tlsDetails?.cipher})` : '🔴 ' + result.tls.toUpperCase()}`);
+  console.log(`MAIL FROM Status:       ${result.mailFrom ? `${result.mailFrom.code} (${result.mailFrom.status.toUpperCase()})` : 'N/A'}`);
+  if (result.mailFrom?.response) {
+    console.log(`  MAIL FROM Response:   ${result.mailFrom.response.replace(/\n/g, ' ')}`);
+  }
+  console.log(`RCPT TO Status:         ${result.rcptTo ? `${result.rcptTo.code} (${result.rcptTo.status.toUpperCase()})` : 'N/A'}`);
+  if (result.rcptTo?.response) {
+    console.log(`  RCPT TO Response:     ${result.rcptTo.response.replace(/\n/g, ' ')}`);
+  }
+  console.log(`------------------------------------------------------------------`);
+  console.log(`Final Diagnostic Result: ${result.finalStatus === 'ACCEPTED' ? '🟢 ACCEPTED' : '🔴 ' + result.finalStatus}`);
+  if (result.rejectionReason) {
+    console.log(`Rejection Diagnostic:   ${result.rejectionReason.replace(/\n/g, ' ')}`);
+  }
+  console.log(`==================================================================\n`);
 }
 
 if (process.argv[1]?.endsWith('diagnose-mail-provider.ts')) {

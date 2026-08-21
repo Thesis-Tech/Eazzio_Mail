@@ -97,7 +97,7 @@ export class DirectMtaEmailTransport implements EazzioEmailTransport {
   }
 
   public async getDeliveryStatus(queueId: string): Promise<{ state: string; detail?: string }> {
-    return { state: 'delivered', detail: `Message dispatched with queueId ${queueId}` };
+    return { state: 'accepted_by_remote_mta', detail: `Message dispatched and accepted by remote MX with queueId ${queueId}` };
   }
 
   private async resolveTargetMx(domain: string): Promise<Array<{ host: string; port: number }>> {

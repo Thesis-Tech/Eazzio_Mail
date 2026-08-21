@@ -18,6 +18,7 @@ export class TotpService {
   }
 
   public static verify(token: string, secret: string): boolean {
+    authenticator.options = { window: 1 };
     return authenticator.verify({ token, secret });
   }
 }

@@ -235,6 +235,6 @@ export class SmtpSubmissionTransport implements EazzioEmailTransport {
   }
 
   public async getDeliveryStatus(queueId: string): Promise<{ state: string; detail?: string }> {
-    return { state: 'delivered', detail: `Submitted to MTA with queueId ${queueId}` };
+    return { state: 'accepted_by_submission_mta', detail: `Submitted to MTA with queueId ${queueId}` };
   }
 }

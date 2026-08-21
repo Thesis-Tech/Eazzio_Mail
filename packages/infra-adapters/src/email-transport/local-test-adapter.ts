@@ -29,7 +29,7 @@ export class LocalTestTransport implements EazzioEmailTransport {
   }
 
   public async getDeliveryStatus(queueId: string): Promise<{ state: string; detail?: string }> {
-    return { state: 'delivered', detail: `Captured in LocalTestTransport memory [${queueId}]` };
+    return { state: 'test_captured', detail: `Captured in LocalTestTransport memory [${queueId}]` };
   }
 
   public static clear(): void {
