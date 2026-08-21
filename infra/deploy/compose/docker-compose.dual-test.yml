@@ -1,0 +1,113 @@
+services:
+  postgres-a:
+    image: postgres:16-alpine
+    container_name: eazzio_postgres_a
+    environment:
+      POSTGRES_USER: eazzio_user
+      POSTGRES_PASSWORD: eazzio_password
+      POSTGRES_DB: eazzio_mail_a
+    ports:
+      - '5433:5432'
+    networks:
+      - eazzio-dual-mail
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U eazzio_user -d eazzio_mail_a']
+      interval: 3s
+      timeout: 3s
+      retries: 5
+
+  postgres-b:
+    image: postgres:16-alpine
+    container_name: eazzio_postgres_b
+    environment:
+      POSTGRES_USER: eazzio_user
+      POSTGRES_PASSWORD: eazzio_password
+      POSTGRES_DB: eazzio_mail_b
+    ports:
+      - '5434:5432'
+    networks:
+      - eazzio-dual-mail
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U eazzio_user -d eazzio_mail_b']
+      interval: 3s
+      timeout: 3s
+      retries: 5
+
+  valkey-a:
+    image: valkey/valkey:7.2-alpine
+    container_name: eazzio_valkey_a
+    ports:
+      - '6380:6379'
+    networks:
+      - eazzio-dual-mail
+    healthcheck:
+      test: ['CMD', 'valkey-cli', 'ping']
+      interval: 3s
+      timeout: 3s
+      retries: 5
+
+  valkey-b:
+    image: valkey/valkey:7.2-alpine
+    container_name: eazzio_valkey_b
+    ports:
+      - '6381:6379'
+    networks:
+      - eazzio-dual-mail
+    healthcheck:
+      test: ['CMD', 'valkey-cli', 'ping']
+      interval: 3s
+      timeout: 3s
+      retries: 5
+
+  postfix-a:
+    build:
+      context: ../../docker/postfix
+    container_name: eazzio_postfix_a
+    ports:
+      - '2525:25'
+    networks:
+      eazzio-dual-mail:
+        aliases:
+          - mail-a.test
+    depends_on:
+      - postgres-a
+
+  postfix-b:
+    build:
+      context: ../../docker/postfix
+    container_name: eazzio_postfix_b
+    ports:
+      - '3525:25'
+    networks:
+      eazzio-dual-mail:
+        aliases:
+          - mail-b.test
+    depends_on:
+      - postgres-b
+
+  dovecot-a:
+    build:
+      context: ../../docker/dovecot
+    container_name: eazzio_dovecot_a
+    networks:
+      eazzio-dual-mail:
+        aliases:
+          - dovecot-a
+    depends_on:
+      - postgres-a
+
+  dovecot-b:
+    build:
+      context: ../../docker/dovecot
+    container_name: eazzio_dovecot_b
+    networks:
+      eazzio-dual-mail:
+        aliases:
+          - dovecot-b
+    depends_on:
+      - postgres-b
+
+networks:
+  eazzio-dual-mail:
+    name: eazzio-dual-mail
+    driver: bridge

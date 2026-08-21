@@ -49,12 +49,14 @@ export interface MailComposerProps {
   initialBody?: string;
 }
 
+const DEFAULT_TO: string[] = [];
+
 export const MailComposer: React.FC<MailComposerProps> = ({
   isOpen,
   onClose,
   onSend,
   onSaveDraft,
-  initialTo = [],
+  initialTo = DEFAULT_TO,
   initialSubject = '',
   initialBody = '',
 }) => {
@@ -63,7 +65,7 @@ export const MailComposer: React.FC<MailComposerProps> = ({
 
   // Form Fields
   const [toInput, setToInput] = useState('');
-  const [toChips, setToChips] = useState<string[]>(initialTo);
+  const [toChips, setToChips] = useState<string[]>([]);
   const [showCc, setShowCc] = useState(false);
   const [ccInput, setCcInput] = useState('');
   const [ccChips, setCcChips] = useState<string[]>([]);
@@ -71,8 +73,8 @@ export const MailComposer: React.FC<MailComposerProps> = ({
   const [bccInput, setBccInput] = useState('');
   const [bccChips, setBccChips] = useState<string[]>([]);
 
-  const [subject, setSubject] = useState(initialSubject);
-  const [body, setBody] = useState(initialBody);
+  const [subject, setSubject] = useState('');
+  const [body, setBody] = useState('');
   const [attachments, setAttachments] = useState<ComposerAttachment[]>([]);
 
   const [isSending, setIsSending] = useState(false);
@@ -81,13 +83,18 @@ export const MailComposer: React.FC<MailComposerProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const prevOpenRef = useRef(false);
 
   useEffect(() => {
-    if (isOpen) {
-      setToChips(initialTo);
-      setSubject(initialSubject);
-      setBody(initialBody);
+    if (isOpen && !prevOpenRef.current) {
+      setToChips(Array.isArray(initialTo) ? [...initialTo] : []);
+      setSubject(initialSubject || '');
+      setBody(initialBody || '');
+      setAttachments([]);
+      setErrorMessage(null);
+      setDraftStatus('Draft ready');
     }
+    prevOpenRef.current = isOpen;
   }, [isOpen, initialTo, initialSubject, initialBody]);
 
   // Autosave simulation every 3 seconds

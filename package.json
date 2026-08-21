@@ -12,7 +12,8 @@
     "mail:test:external": "npx tsx scripts/test-external-mail.ts",
     "mail:test:authenticated": "npx tsx scripts/test-authenticated-mail.ts",
     "mail:test:authenticated-eazzio": "npx tsx scripts/test-authenticated-eazzio.ts",
-    "mail:test:multi-user": "npx tsx scripts/test-multi-user-mail.ts"
+    "mail:test:multi-user": "npx tsx scripts/test-multi-user-mail.ts",
+    "mail:test:dual": "npx tsx scripts/test-dual-instance.ts"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",
