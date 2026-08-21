@@ -6,7 +6,8 @@
     "build": "pnpm --recursive run build",
     "lint": "npx prettier --check .",
     "test": "pnpm --recursive run test",
-    "typecheck": "pnpm --recursive run typecheck"
+    "typecheck": "pnpm --recursive run typecheck",
+    "mail:diagnose": "npx tsx scripts/diagnose-mail-provider.ts"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",

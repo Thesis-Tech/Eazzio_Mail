@@ -7,7 +7,7 @@ import {
   PostgresFolderRepository,
   PostgresMessageRepository,
   MemoryStorageAdapter,
-  DirectMtaEmailTransport,
+  createEmailTransport,
 } from '@eazzio/infra-adapters';
 import {
   PostgresOutboundQueueRepository,
@@ -23,7 +23,7 @@ const folderRepo = new PostgresFolderRepository(defaultDb);
 const messageRepo = new PostgresMessageRepository(defaultDb);
 const queueRepo = new PostgresOutboundQueueRepository(defaultDb);
 const storage = new MemoryStorageAdapter();
-const transport = new DirectMtaEmailTransport();
+const transport = createEmailTransport();
 
 const outboundService = new OutboundService(queueRepo, messageRepo, storage);
 const queueRunner = new QueueRunner(queueRepo, messageRepo, storage, transport);
