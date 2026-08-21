@@ -48,7 +48,7 @@ export function FacebookSdk() {
       <div id="fb-root"></div>
       <Script
         id="facebook-jssdk"
-        strategy="afterInteractive"
+        strategy="lazyOnload"
         src="https://connect.facebook.net/en_US/sdk.js"
         onLoad={() => {
           if (typeof window !== 'undefined') {
