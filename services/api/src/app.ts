@@ -8,6 +8,11 @@ export const app: Express = express();
 
 app.use(express.json());
 
+// Health check
+app.get('/health', (_req, res) => {
+  res.json({ status: 'healthy', timestamp: new Date().toISOString() });
+});
+
 // API v1 routes
 app.use('/v1/mailboxes', mailboxRouter);
 app.use('/v1/messages', messagesRouter);

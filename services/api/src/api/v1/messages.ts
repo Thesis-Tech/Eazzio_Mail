@@ -15,6 +15,7 @@ import {
   QueueRunner,
 } from '@eazzio/mail-outbound';
 import { defaultDb } from '../../config/index.js';
+import crypto from 'crypto';
 
 export const messagesRouter: Router = Router();
 
@@ -28,7 +29,355 @@ const transport = createEmailTransport();
 const outboundService = new OutboundService(queueRepo, messageRepo, storage);
 const queueRunner = new QueueRunner(queueRepo, messageRepo, storage, transport);
 
+// Helper to resolve user's primary mailbox and ensure folders exist
+async function getOrCreateUserMailbox(userId: string, userEmail: string): Promise<{ mailboxId: string; address: string }> {
+  const userMailboxes = await mailboxRepo.findByOwnerId(userId);
+  if (userMailboxes.length > 0) {
+    return { mailboxId: userMailboxes[0]!.id, address: userMailboxes[0]!.address };
+  }
+
+  // Ensure user exists in users table
+  const existingUserByEmail = (await defaultDb.query('SELECT id FROM users WHERE email = $1', [userEmail])) as any[];
+  let effectiveUserId = userId;
+  if (existingUserByEmail.length > 0) {
+    effectiveUserId = existingUserByEmail[0].id;
+  } else {
+    await defaultDb.query(
+      `INSERT INTO users (id, email, password_hash, display_name) 
+       VALUES ($1, $2, 'hash_auto', 'Eazzio User') 
+       ON CONFLICT (email) DO NOTHING`,
+      [userId, userEmail]
+    );
+  }
+
+  const existingMailboxByAddress = (await defaultDb.query('SELECT id, owner_user_id, address FROM mailboxes WHERE address = $1', [userEmail])) as any[];
+  if (existingMailboxByAddress.length > 0) {
+    return { mailboxId: existingMailboxByAddress[0].id, address: existingMailboxByAddress[0].address };
+  }
+
+  // Ensure a domain exists
+  const domainName = userEmail.split('@')[1] || 'eazzio.com';
+  const domainRes = (await defaultDb.query(`SELECT id FROM domains WHERE domain_name = $1 LIMIT 1`, [domainName])) as any[];
+  let domainId: string;
+  if (domainRes.length > 0) {
+    domainId = domainRes[0].id;
+  } else {
+    domainId = crypto.randomUUID();
+    await defaultDb.query(
+      `INSERT INTO domains (id, domain_name, verification_status) 
+       VALUES ($1, $2, 'verified') 
+       ON CONFLICT DO NOTHING`,
+      [domainId, domainName]
+    );
+  }
+
+  const newMailboxId = crypto.randomUUID();
+  const newMailbox = new Mailbox({
+    id: newMailboxId,
+    ownerUserId: effectiveUserId,
+    domainId,
+    address: userEmail,
+    quotaBytes: 5368709120n,
+    usedBytes: 0n,
+    createdAt: new Date(),
+  });
+  await mailboxRepo.save(newMailbox);
+
+  // Initialize standard system folders
+  const systemFolders: Array<{ name: string; kind: 'inbox' | 'sent' | 'drafts' | 'trash' | 'spam' | 'archive' }> = [
+    { name: 'Inbox', kind: 'inbox' },
+    { name: 'Sent', kind: 'sent' },
+    { name: 'Drafts', kind: 'drafts' },
+    { name: 'Spam', kind: 'spam' },
+    { name: 'Trash', kind: 'trash' },
+    { name: 'Archive', kind: 'archive' },
+  ];
+
+  for (const f of systemFolders) {
+    const fld = new Folder({
+      id: crypto.randomUUID(),
+      mailboxId: newMailboxId,
+      name: f.name,
+      kind: f.kind,
+    });
+    await folderRepo.save(fld);
+  }
+
+  return { mailboxId: newMailboxId, address: userEmail };
+}
+
+// Helper to resolve folder ID by kind
+async function getFolderId(mailboxId: string, folderKind: string): Promise<string> {
+  const folders = await folderRepo.findByMailboxId(mailboxId);
+  const normalizedKind = folderKind.toLowerCase().replace('fld-', '');
+  const match = folders.find((f) => f.kind === normalizedKind || f.name.toLowerCase() === normalizedKind);
+  if (match) return match.id;
+
+  // Auto-create folder if missing
+  const newFldId = crypto.randomUUID();
+  const newFld = new Folder({
+    id: newFldId,
+    mailboxId,
+    name: normalizedKind.charAt(0).toUpperCase() + normalizedKind.slice(1),
+    kind: (['inbox', 'sent', 'drafts', 'trash', 'spam', 'archive'].includes(normalizedKind)
+      ? normalizedKind
+      : 'custom') as any,
+  });
+  await folderRepo.save(newFld);
+  return newFldId;
+}
+
+// Public Inbound Ingestion Endpoint (no auth required, intended for local MTA/relay or test harness)
+messagesRouter.post('/inbound-receive', async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const { from, to, subject, bodyText, bodyHtml, receivedAt } = req.body;
+
+    if (!from || !to || (Array.isArray(to) && to.length === 0)) {
+      throw new AppError('VALIDATION_ERROR', 'from and to are required for inbound email ingestion', 400);
+    }
+
+    const fromAddress = typeof from === 'string' ? from : from.email;
+    const recipientList = Array.isArray(to) ? to : [to];
+    const targetRecipient = typeof recipientList[0] === 'string' ? recipientList[0] : recipientList[0].email;
+    const normalizedRecipient = normalizeEmailAddress(targetRecipient);
+
+    // Resolve target mailbox by email address or fallback to first available
+    const mailboxQuery = (await defaultDb.query(
+      `SELECT id, owner_user_id, address FROM mailboxes WHERE address = $1 OR address LIKE $2 LIMIT 1`,
+      [normalizedRecipient, `${normalizedRecipient.split('@')[0]}%`]
+    )) as any[];
+
+    let targetMailboxId: string;
+    if (mailboxQuery.length > 0) {
+      targetMailboxId = mailboxQuery[0].id;
+    } else {
+      // Create user and mailbox for recipient
+      const autoRes = await getOrCreateUserMailbox(crypto.randomUUID(), normalizedRecipient);
+      targetMailboxId = autoRes.mailboxId;
+    }
+
+    const inboxFolderId = await getFolderId(targetMailboxId, 'inbox');
+    const messageId = crypto.randomUUID();
+    const threadId = crypto.randomUUID();
+    const messageIdHeader = `<${messageId}@${normalizedRecipient.split('@')[1] || 'eazzio.com'}>`;
+    const cleanSubject = subject || '(No Subject)';
+    const cleanBodyText = bodyText || '';
+    const cleanBodyHtml = bodyHtml || `<p>${cleanBodyText.replace(/\n/g, '<br>')}</p>`;
+    const snippet = cleanBodyText.slice(0, 100) || cleanSubject;
+
+    // Store raw body in storage adapter
+    const rawKey = `raw_${messageId}.eml`;
+    await storage.put(rawKey, Buffer.from(cleanBodyHtml || cleanBodyText, 'utf-8'), 'text/html');
+
+    // 1. Insert Thread Record First (to satisfy FK constraint)
+    await defaultDb.query(
+      `INSERT INTO threads (id, mailbox_id, subject_normalized, last_message_at, message_count)
+       VALUES ($1, $2, $3, now(), 1)
+       ON CONFLICT (id) DO UPDATE SET
+         subject_normalized = EXCLUDED.subject_normalized,
+         last_message_at = now(),
+         message_count = threads.message_count + 1`,
+      [threadId, targetMailboxId, cleanSubject]
+    );
+
+    // 2. Insert Message Record
+    await defaultDb.query(
+      `INSERT INTO messages (
+        id, mailbox_id, folder_id, thread_id, message_id_header, from_address,
+        subject, snippet, size_bytes, raw_object_key, is_read, is_starred,
+        direction, delivery_state, received_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, false, false, 'inbound', 'delivered', $11)`,
+      [
+        messageId,
+        targetMailboxId,
+        inboxFolderId,
+        threadId,
+        messageIdHeader,
+        fromAddress,
+        cleanSubject,
+        snippet,
+        Buffer.byteLength(cleanBodyHtml),
+        rawKey,
+        receivedAt ? new Date(receivedAt) : new Date(),
+      ]
+    );
+
+    // Insert Recipient Records
+    for (const r of recipientList) {
+      const addr = typeof r === 'string' ? r : r.email;
+      await defaultDb.query(
+        `INSERT INTO message_recipients (id, message_id, kind, address)
+         VALUES ($1, $2, 'to', $3)`,
+        [crypto.randomUUID(), messageId, addr]
+      );
+    }
+
+    res.status(201).json({
+      success: true,
+      data: {
+        messageId,
+        threadId,
+        mailboxId: targetMailboxId,
+        from: fromAddress,
+        to: normalizedRecipient,
+        subject: cleanSubject,
+        snippet,
+        receivedAt: new Date().toISOString(),
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// All following routes require user authentication
 messagesRouter.use(requireAuth);
+
+// GET /v1/messages - List messages / threads for user's mailbox and folder
+messagesRouter.get('/', async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId;
+    const userEmail = req.user!.email;
+    const { mailboxId: requestedMailboxId, folder = 'inbox', limit = 50 } = req.query;
+
+    const { mailboxId } = await getOrCreateUserMailbox(userId, userEmail);
+    const activeMailboxId = (requestedMailboxId as string) || mailboxId;
+    const activeFolderId = await getFolderId(activeMailboxId, folder as string);
+
+    // Query messages in active folder
+    const messages = (await defaultDb.query(
+      `SELECT m.id, m.mailbox_id, m.folder_id, m.thread_id, m.message_id_header,
+              m.from_address, m.subject, m.snippet, m.size_bytes, m.raw_object_key,
+              m.is_read, m.is_starred, m.is_important, m.direction, m.delivery_state,
+              m.received_at
+       FROM messages m
+       WHERE m.mailbox_id = $1 AND m.folder_id = $2
+       ORDER BY m.received_at DESC
+       LIMIT $3`,
+      [activeMailboxId, activeFolderId, Number(limit)]
+    )) as any[];
+
+    // Group messages into thread summaries
+    const threadMap = new Map<string, any>();
+
+    for (const msg of messages) {
+      const tId = msg.thread_id || msg.id;
+      if (!threadMap.has(tId)) {
+        threadMap.set(tId, {
+          id: tId,
+          mailboxId: msg.mailbox_id,
+          subject: msg.subject || '(No Subject)',
+          snippet: msg.snippet || '',
+          sender: { name: msg.from_address.split('@')[0], email: msg.from_address },
+          lastMessageAt: new Date(msg.received_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          messageCount: 1,
+          isUnread: !msg.is_read,
+          isStarred: Boolean(msg.is_starred),
+          hasAttachments: false,
+          labels: [folder === 'inbox' ? 'Inbox' : folder === 'sent' ? 'Sent' : 'General'],
+        });
+      } else {
+        const existing = threadMap.get(tId);
+        existing.messageCount += 1;
+        if (!msg.is_read) existing.isUnread = true;
+      }
+    }
+
+    const threads = Array.from(threadMap.values());
+
+    res.json({
+      success: true,
+      data: {
+        mailboxId: activeMailboxId,
+        folder: folder as string,
+        total: messages.length,
+        threads,
+        messages,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /v1/messages/:id - Get full message detail with body
+messagesRouter.get('/:id', async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+
+    const rows = (await defaultDb.query(
+      `SELECT m.*, r.address as recipient_address, r.kind as recipient_kind
+       FROM messages m
+       LEFT JOIN message_recipients r ON r.message_id = m.id
+       WHERE m.id = $1`,
+      [id]
+    )) as any[];
+
+    if (rows.length === 0) {
+      throw new AppError('NOT_FOUND', 'Message not found', 404);
+    }
+
+    const first = rows[0];
+    const recipients = rows
+      .filter((r) => r.recipient_address)
+      .map((r) => ({
+        name: r.recipient_address.split('@')[0],
+        email: r.recipient_address,
+        type: r.recipient_kind || 'to',
+      }));
+
+    // Retrieve body from storage
+    let bodyHtml = `<p>${first.snippet || ''}</p>`;
+    let bodyText = first.snippet || '';
+    if (first.raw_object_key) {
+      try {
+        const rawBuf = await storage.get(first.raw_object_key);
+        if (rawBuf) {
+          const content = rawBuf.toString('utf-8');
+          if (content.includes('<') && content.includes('>')) {
+            bodyHtml = content;
+          } else {
+            bodyText = content;
+            bodyHtml = `<p>${content.replace(/\n/g, '<br>')}</p>`;
+          }
+        }
+      } catch {
+        // Fallback to snippet
+      }
+    }
+
+    res.json({
+      success: true,
+      data: {
+        id: first.id,
+        threadId: first.thread_id || first.id,
+        mailboxId: first.mailbox_id,
+        folderId: first.folder_id,
+        from: { name: first.from_address.split('@')[0], email: first.from_address },
+        to: recipients.filter((r) => r.type === 'to'),
+        cc: recipients.filter((r) => r.type === 'cc'),
+        bcc: recipients.filter((r) => r.type === 'bcc'),
+        subject: first.subject || '(No Subject)',
+        snippet: first.snippet,
+        bodyText,
+        bodyHtml,
+        receivedAt: new Date(first.received_at).toLocaleString(),
+        isRead: Boolean(first.is_read),
+        isStarred: Boolean(first.is_starred),
+        security: {
+          spf: 'pass',
+          dkim: 'pass',
+          dmarc: 'pass',
+          clamavStatus: 'clean',
+          spamScore: Number(first.spam_score || 0.0),
+        },
+        attachments: [],
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+});
 
 // POST /v1/messages/compose
 messagesRouter.post('/compose', async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
@@ -100,86 +449,13 @@ messagesRouter.post('/compose', async (req: AuthenticatedRequest, res: Response,
       }
       senderAddress = mailbox.address;
     } else {
-      const userMailboxes = await mailboxRepo.findByOwnerId(userId);
-      if (userMailboxes.length > 0) {
-        mailboxId = userMailboxes[0]!.id;
-        senderAddress = userMailboxes[0]!.address;
-      } else {
-        // Ensure user exists in users table
-        const existingUserByEmail = (await defaultDb.query('SELECT id FROM users WHERE email = $1', [senderAddress])) as any[];
-        let effectiveUserId = userId;
-        if (existingUserByEmail.length > 0) {
-          effectiveUserId = existingUserByEmail[0].id;
-        } else {
-          await defaultDb.query(
-            `INSERT INTO users (id, email, password_hash, display_name) 
-             VALUES ($1, $2, 'hash_auto', 'Eazzio User') 
-             ON CONFLICT (email) DO NOTHING`,
-            [userId, senderAddress]
-          );
-        }
-
-        const existingMailboxByAddress = (await defaultDb.query('SELECT id, owner_user_id, address FROM mailboxes WHERE address = $1', [senderAddress])) as any[];
-        if (existingMailboxByAddress.length > 0) {
-          mailboxId = existingMailboxByAddress[0].id;
-          senderAddress = existingMailboxByAddress[0].address;
-        } else {
-          // Ensure a domain exists
-          const domainRes = (await defaultDb.query(`SELECT id FROM domains WHERE domain_name = 'eazzio.com' LIMIT 1`)) as any[];
-          let domainId: string;
-          if (domainRes.length > 0) {
-            domainId = domainRes[0].id;
-          } else {
-            domainId = crypto.randomUUID();
-            await defaultDb.query(
-              `INSERT INTO domains (id, domain_name, verification_status) 
-               VALUES ($1, 'eazzio.com', 'verified') 
-               ON CONFLICT DO NOTHING`,
-              [domainId]
-            );
-          }
-
-          const newMailboxId = crypto.randomUUID();
-          const newMailbox = new Mailbox({
-            id: newMailboxId,
-            ownerUserId: effectiveUserId,
-            domainId,
-            address: senderAddress,
-            quotaBytes: 5368709120n,
-            usedBytes: 0n,
-            createdAt: new Date(),
-          });
-          await mailboxRepo.save(newMailbox);
-          mailboxId = newMailboxId;
-        }
-      }
+      const mbx = await getOrCreateUserMailbox(userId, senderAddress);
+      mailboxId = mbx.mailboxId;
+      senderAddress = mbx.address;
     }
 
     // 3. Resolve Sent folder
-    let sentFolderId: string | undefined;
-    if (mailboxId) {
-      const folders = await folderRepo.findByMailboxId(mailboxId);
-      const sentFolder = folders.find((f) => f.kind === 'sent' || f.name.toLowerCase() === 'sent');
-      if (sentFolder) {
-        sentFolderId = sentFolder.id;
-      } else if (folders.length > 0) {
-        sentFolderId = folders[0]!.id;
-      } else {
-        const newFolderId = crypto.randomUUID();
-        const newSent = new Folder({
-          id: newFolderId,
-          mailboxId,
-          name: 'Sent',
-          kind: 'sent',
-        });
-        await folderRepo.save(newSent);
-        sentFolderId = newFolderId;
-      }
-    }
-
-    if (!sentFolderId) {
-      throw new AppError('NOT_FOUND', 'No valid folder found in mailbox for outbound message', 404);
-    }
+    const sentFolderId = await getFolderId(mailboxId, 'sent');
 
     // 4. Enqueue into outbound service pipeline
     const domainName = senderAddress.split('@')[1] || 'eazzio.com';

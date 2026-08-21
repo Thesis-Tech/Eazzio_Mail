@@ -1,25 +1,25 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { DashboardLayout } from '../components/layout/DashboardLayout';
 import { ThreadList } from '../components/mail/ThreadList';
 import { ConversationViewer } from '../components/mail/ConversationViewer';
 import { MailComposer, ComposeEmailPayload } from '../components/mail/MailComposer';
 import { SettingsModal } from '../components/settings/SettingsModal';
 import { ThreadSummary, MessageDetail, FolderItem, LabelItem, FilterRule, UserPreferences } from '../types/mail';
-import { Mail, Sparkles, X, Search } from 'lucide-react';
+import { Mail, Sparkles, X, Search, RefreshCw } from 'lucide-react';
 import { parseSearchQuery } from '../components/search/SearchBar';
 import { realtimeClient, RealtimeMailEvent } from '../lib/websocket-client';
 import { ToastContainer, ToastNotification } from '../components/notification/ToastContainer';
 import { AuthStore } from '../lib/auth-store';
 
 const initialFolders: FolderItem[] = [
-  { id: 'fld-inbox', name: 'Inbox', slug: 'inbox', type: 'system', unreadCount: 3, totalCount: 142 },
-  { id: 'fld-sent', name: 'Sent', slug: 'sent', type: 'system', unreadCount: 0, totalCount: 89 },
-  { id: 'fld-drafts', name: 'Drafts', slug: 'drafts', type: 'system', unreadCount: 1, totalCount: 4 },
-  { id: 'fld-spam', name: 'Spam', slug: 'spam', type: 'system', unreadCount: 0, totalCount: 12 },
-  { id: 'fld-trash', name: 'Trash', slug: 'trash', type: 'system', unreadCount: 0, totalCount: 23 },
-  { id: 'fld-archive', name: 'Archive', slug: 'archive', type: 'system', unreadCount: 0, totalCount: 512 },
+  { id: 'fld-inbox', name: 'Inbox', slug: 'inbox', type: 'system', unreadCount: 0, totalCount: 0 },
+  { id: 'fld-sent', name: 'Sent', slug: 'sent', type: 'system', unreadCount: 0, totalCount: 0 },
+  { id: 'fld-drafts', name: 'Drafts', slug: 'drafts', type: 'system', unreadCount: 0, totalCount: 0 },
+  { id: 'fld-spam', name: 'Spam', slug: 'spam', type: 'system', unreadCount: 0, totalCount: 0 },
+  { id: 'fld-trash', name: 'Trash', slug: 'trash', type: 'system', unreadCount: 0, totalCount: 0 },
+  { id: 'fld-archive', name: 'Archive', slug: 'archive', type: 'system', unreadCount: 0, totalCount: 0 },
 ];
 
 const initialLabels: LabelItem[] = [
@@ -43,168 +43,17 @@ const initialFilters: FilterRule[] = [
 
 const initialPreferences: UserPreferences = {
   defaultMailbox: 'user@eazzio.com',
-  signature: 'Best regards,\nEazzio Mail Team',
+  signature: 'Best regards,\nEazzio Mail User',
   autoSummarizeWithAI: true,
   soundNotifications: true,
   theme: 'dark',
 };
 
-const initialThreads: ThreadSummary[] = [
-  {
-    id: 'th-101',
-    mailboxId: 'mbx-primary',
-    subject: 'Q3 Infrastructure Security Audit Report',
-    snippet: 'Please find the finalized security audit overview for the inbound mail daemon and LMTP delivery...',
-    sender: { name: 'Security Operations', email: 'security@eazzio.com' },
-    lastMessageAt: '10:42 AM',
-    messageCount: 2,
-    isUnread: true,
-    isStarred: false,
-    hasAttachments: true,
-    labels: ['Security'],
-  },
-  {
-    id: 'th-102',
-    mailboxId: 'mbx-primary',
-    subject: 'Valkey Cache & OpenSearch Cluster Scale Out',
-    snippet: 'Cluster nodes have been scaled horizontally across availability zones with automatic failover.',
-    sender: { name: 'DevOps Engineering', email: 'devops@eazzio.com' },
-    lastMessageAt: 'Yesterday',
-    messageCount: 3,
-    isUnread: false,
-    isStarred: true,
-    hasAttachments: false,
-    labels: ['Infrastructure'],
-  },
-  {
-    id: 'th-103',
-    mailboxId: 'mbx-primary',
-    subject: 'Argon2id Identity & Better Auth Migration',
-    snippet: 'The authentication service now uses modern Argon2id password hashing and session tokens.',
-    sender: { name: 'Identity Team', email: 'auth@eazzio.com' },
-    lastMessageAt: 'Aug 19',
-    messageCount: 1,
-    isUnread: true,
-    isStarred: false,
-    hasAttachments: false,
-    labels: ['Auth'],
-  },
-];
-
-const mockConversationMap: Record<string, MessageDetail[]> = {
-  'th-101': [
-    {
-      id: 'msg-101-1',
-      threadId: 'th-101',
-      mailboxId: 'mbx-primary',
-      folderId: 'fld-inbox',
-      from: { name: 'Security Operations', email: 'security@eazzio.com' },
-      to: [{ name: 'Alex Rivers', email: 'alex@eazzio.com' }],
-      subject: 'Q3 Infrastructure Security Audit Report',
-      snippet: 'Initial findings on LMTP and Rspamd integration...',
-      bodyText: `Hello Alex,\n\nWe have completed the Q3 automated vulnerability assessment and configuration audit for the Eazzio Mail platform.\n\nSummary of Checks:\n1. Strict TLS and Postfix LMTP transport isolation: PASS\n2. ClamAV streaming malware scan: PASS (0 threats found)\n3. SPF/DKIM/DMARC 4-check DNS alignment: 100% compliant\n\nPlease let us know if any further security assertions are required.`,
-      bodyHtml: '<p>Security audit overview complete.</p>',
-      receivedAt: 'Aug 21, 10:15 AM',
-      isRead: true,
-      isStarred: false,
-      security: {
-        spf: 'pass',
-        dkim: 'pass',
-        dmarc: 'pass',
-        clamavStatus: 'clean',
-        spamScore: 0.1,
-      },
-      attachments: [
-        {
-          id: 'att-1',
-          filename: 'Security_Audit_Report_Q3.pdf',
-          contentType: 'application/pdf',
-          sizeBytes: 142000,
-          antivirusStatus: 'clean',
-        },
-      ],
-    },
-    {
-      id: 'msg-101-2',
-      threadId: 'th-101',
-      mailboxId: 'mbx-primary',
-      folderId: 'fld-inbox',
-      from: { name: 'Security Operations', email: 'security@eazzio.com' },
-      to: [{ name: 'Alex Rivers', email: 'alex@eazzio.com' }],
-      subject: 'Re: Q3 Infrastructure Security Audit Report',
-      snippet: 'Action items attached for the team.',
-      bodyText: `Hi Alex,\n\nFollowing up on the audit, the final sign-off is ready. You may proceed with the next deployment phase.`,
-      bodyHtml: '<p>Final sign-off complete.</p>',
-      receivedAt: 'Aug 21, 10:42 AM',
-      isRead: false,
-      isStarred: false,
-      security: {
-        spf: 'pass',
-        dkim: 'pass',
-        dmarc: 'pass',
-        clamavStatus: 'clean',
-        spamScore: 0.0,
-      },
-      attachments: [],
-    },
-  ],
-  'th-102': [
-    {
-      id: 'msg-102-1',
-      threadId: 'th-102',
-      mailboxId: 'mbx-primary',
-      folderId: 'fld-inbox',
-      from: { name: 'DevOps Engineering', email: 'devops@eazzio.com' },
-      to: [{ name: 'Alex Rivers', email: 'alex@eazzio.com' }],
-      subject: 'Valkey Cache & OpenSearch Cluster Scale Out',
-      snippet: 'Cluster nodes have been scaled horizontally...',
-      bodyText: `Team,\n\nWe have expanded the search and caching infrastructure across all nodes.\n- Valkey latency: <1ms p99\n- OpenSearch query index: 320ms p95\n\nAll systems operational.`,
-      bodyHtml: '<p>All systems operational.</p>',
-      receivedAt: 'Aug 20, 04:30 PM',
-      isRead: true,
-      isStarred: true,
-      security: {
-        spf: 'pass',
-        dkim: 'pass',
-        dmarc: 'pass',
-        clamavStatus: 'clean',
-        spamScore: 0.0,
-      },
-      attachments: [],
-    },
-  ],
-  'th-103': [
-    {
-      id: 'msg-103-1',
-      threadId: 'th-103',
-      mailboxId: 'mbx-primary',
-      folderId: 'fld-inbox',
-      from: { name: 'Identity Team', email: 'auth@eazzio.com' },
-      to: [{ name: 'Alex Rivers', email: 'alex@eazzio.com' }],
-      subject: 'Argon2id Identity & Better Auth Migration',
-      snippet: 'The authentication service now uses modern Argon2id...',
-      bodyText: `Hello Alex,\n\nThe new password hashing engine with memory-hard Argon2id parameters (64MB memory, 3 iterations) is now live in production.`,
-      bodyHtml: '<p>Argon2id is live.</p>',
-      receivedAt: 'Aug 19, 02:15 PM',
-      isRead: false,
-      isStarred: false,
-      security: {
-        spf: 'pass',
-        dkim: 'pass',
-        dmarc: 'pass',
-        clamavStatus: 'clean',
-        spamScore: 0.0,
-      },
-      attachments: [],
-    },
-  ],
-};
-
 export default function MailDashboardPage() {
   const [activeFolderId, setActiveFolderId] = useState('fld-inbox');
   const [activeLabelId, setActiveLabelId] = useState<string | undefined>();
-  const [threads, setThreads] = useState<ThreadSummary[]>(initialThreads);
-  const [selectedThreadId, setSelectedThreadId] = useState<string | null>('th-101');
+  const [threads, setThreads] = useState<ThreadSummary[]>([]);
+  const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isComposeOpen, setIsComposeOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -213,7 +62,118 @@ export default function MailDashboardPage() {
   const [filterRules, setFilterRules] = useState<FilterRule[]>(initialFilters);
   const [preferences, setPreferences] = useState<UserPreferences>(initialPreferences);
   const [toasts, setToasts] = useState<ToastNotification[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [conversationMap, setConversationMap] = useState<Record<string, MessageDetail[]>>({});
 
+  // Helper to resolve folder slug from ID
+  const getFolderSlug = (folderId: string) => {
+    const f = folders.find((item) => item.id === folderId);
+    return f?.slug || folderId.replace('fld-', '');
+  };
+
+  // Fetch real messages from API
+  const loadMessages = useCallback(async (folderId: string) => {
+    setIsLoading(true);
+    const slug = getFolderSlug(folderId);
+
+    try {
+      const authState = AuthStore.getState();
+      const token = authState.token || 'default-token';
+      const senderEmail = authState.user?.email || 'user@eazzio.com';
+
+      const res = await fetch(`/api/messages?folder=${slug}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'x-user-email': senderEmail,
+        },
+      });
+
+      if (!res.ok) {
+        throw new Error(`Failed to fetch messages: ${res.statusText}`);
+      }
+
+      const json = await res.json();
+      if (json.success && json.data) {
+        const fetchedThreads: ThreadSummary[] = json.data.threads || [];
+        const rawMessages: any[] = json.data.messages || [];
+
+        setThreads(fetchedThreads);
+
+        // Update conversationMap
+        const newMap: Record<string, MessageDetail[]> = {};
+        for (const msg of rawMessages) {
+          const tId = msg.thread_id || msg.id;
+          const detail: MessageDetail = {
+            id: msg.id,
+            threadId: tId,
+            mailboxId: msg.mailbox_id,
+            folderId: folderId,
+            from: { name: msg.from_address.split('@')[0], email: msg.from_address },
+            to: [{ name: 'You', email: senderEmail }],
+            subject: msg.subject || '(No Subject)',
+            snippet: msg.snippet || '',
+            bodyText: msg.snippet || '',
+            bodyHtml: `<p>${(msg.snippet || '').replace(/\n/g, '<br>')}</p>`,
+            receivedAt: new Date(msg.received_at).toLocaleString([], {
+              month: 'short',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+            }),
+            isRead: Boolean(msg.is_read),
+            isStarred: Boolean(msg.is_starred),
+            security: {
+              spf: 'pass',
+              dkim: 'pass',
+              dmarc: 'pass',
+              clamavStatus: 'clean',
+              spamScore: 0.0,
+            },
+            attachments: [],
+          };
+
+          if (!newMap[tId]) {
+            newMap[tId] = [detail];
+          } else {
+            newMap[tId].push(detail);
+          }
+        }
+
+        setConversationMap((prev) => ({ ...prev, ...newMap }));
+
+        // Auto-select first thread if available
+        if (fetchedThreads.length > 0) {
+          setSelectedThreadId((prev) => (prev && fetchedThreads.some((t) => t.id === prev) ? prev : fetchedThreads[0].id));
+        } else {
+          setSelectedThreadId(null);
+        }
+
+        // Update folder counts
+        setFolders((prev) =>
+          prev.map((f) =>
+            f.id === folderId
+              ? {
+                  ...f,
+                  totalCount: fetchedThreads.length,
+                  unreadCount: fetchedThreads.filter((t) => t.isUnread).length,
+                }
+              : f
+          )
+        );
+      }
+    } catch (err) {
+      console.error('Error loading messages from backend:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [folders]);
+
+  // Initial load and folder switch
+  useEffect(() => {
+    loadMessages(activeFolderId);
+  }, [activeFolderId]);
+
+  // Realtime WebSocket Subscription
   useEffect(() => {
     realtimeClient.connect();
 
@@ -241,7 +201,7 @@ export default function MailDashboardPage() {
           mailboxId: event.mailboxId,
           folderId: 'fld-inbox',
           from: data.from || { name: 'External Relay', email: 'relay@eazzio.com' },
-          to: [{ name: 'You', email: 'user@eazzio.com' }],
+          to: [{ name: 'You', email: AuthStore.getState().user?.email || 'user@eazzio.com' }],
           subject: data.subject || 'Incoming Transmission',
           snippet: data.snippet || 'You have received a new message.',
           bodyText: data.snippet || 'Message received via live WebSocket pipeline.',
@@ -259,7 +219,11 @@ export default function MailDashboardPage() {
           attachments: [],
         };
 
-        mockConversationMap[newThreadId] = [newMsg];
+        setConversationMap((prev) => ({
+          ...prev,
+          [newThreadId]: [newMsg],
+        }));
+
         setThreads((prev) => [newThread, ...prev]);
 
         // Add toast notification
@@ -327,7 +291,6 @@ export default function MailDashboardPage() {
 
   const handleSelectThread = (threadId: string) => {
     setSelectedThreadId(threadId);
-    // Mark thread as read when clicked
     setThreads((prev) =>
       prev.map((t) => (t.id === threadId ? { ...t, isUnread: false } : t))
     );
@@ -363,14 +326,14 @@ export default function MailDashboardPage() {
   };
 
   const handleSendReply = (threadId: string, replyText: string) => {
-    const activeMessages = mockConversationMap[threadId] || [];
+    const activeMessages = conversationMap[threadId] || [];
     const newMsg: MessageDetail = {
       id: `msg-${Date.now()}`,
       threadId,
       mailboxId: 'mbx-primary',
       folderId: activeFolderId,
-      from: { name: 'You', email: 'user@eazzio.com' },
-      to: [{ name: 'Sender', email: 'sender@eazzio.com' }],
+      from: { name: 'You', email: AuthStore.getState().user?.email || 'user@eazzio.com' },
+      to: [{ name: 'Sender', email: activeMessages[0]?.from.email || 'sender@eazzio.com' }],
       subject: `Re: ${activeMessages[0]?.subject || 'Conversation'}`,
       snippet: replyText.slice(0, 80),
       bodyText: replyText,
@@ -388,15 +351,18 @@ export default function MailDashboardPage() {
       attachments: [],
     };
 
-    mockConversationMap[threadId] = [...activeMessages, newMsg];
-    // Update thread message count & snippet
+    setConversationMap((prev) => ({
+      ...prev,
+      [threadId]: [...(prev[threadId] || []), newMsg],
+    }));
+
     setThreads((prev) =>
       prev.map((t) =>
         t.id === threadId
           ? {
               ...t,
               messageCount: t.messageCount + 1,
-              snippet: `You: ${replyText.slice(0, 60)}...`,
+              snippet: replyText.slice(0, 80),
               lastMessageAt: 'Just now',
             }
           : t
@@ -405,11 +371,10 @@ export default function MailDashboardPage() {
   };
 
   const selectedThread = threads.find((t) => t.id === selectedThreadId);
-  const currentMessages = selectedThreadId ? mockConversationMap[selectedThreadId] || [] : [];
+  const currentMessages = selectedThreadId ? conversationMap[selectedThreadId] || [] : [];
 
   const handleSendComposeEmail = async (payload: ComposeEmailPayload) => {
     let assignedMessageId = `msg-${Date.now()}`;
-    let deliveryState = 'queued';
 
     try {
       const authState = AuthStore.getState();
@@ -437,13 +402,12 @@ export default function MailDashboardPage() {
       const result = await response.json();
       if (result.success) {
         assignedMessageId = result.messageId || assignedMessageId;
-        deliveryState = result.deliveryState || 'queued';
         setToasts((prev) => [
           {
             id: `toast-${Date.now()}`,
             title: 'Message Queued for Delivery',
             senderName: 'Outbound Mail Pipeline',
-            message: `Delivering to ${payload.to.join(', ')} via Direct MTA`,
+            message: `Delivering to ${payload.to.join(', ')} via Eazzio Outbound Transport`,
             timestamp: 'Just now',
           },
           ...prev,
@@ -502,13 +466,13 @@ export default function MailDashboardPage() {
       mailboxId: 'mbx-primary',
       folderId: 'fld-sent',
       from: { name: 'You', email: AuthStore.getState().user?.email || 'user@eazzio.com' },
-      to: payload.to.map((addr) => ({ name: addr, email: addr })),
-      cc: payload.cc?.map((addr) => ({ name: addr, email: addr })),
-      bcc: payload.bcc?.map((addr) => ({ name: addr, email: addr })),
+      to: payload.to.map((email) => ({ name: email.split('@')[0], email })),
+      cc: payload.cc?.map((email) => ({ name: email.split('@')[0], email })),
+      bcc: payload.bcc?.map((email) => ({ name: email.split('@')[0], email })),
       subject: payload.subject,
       snippet: payload.body.slice(0, 80),
       bodyText: payload.body,
-      bodyHtml: `<p>${payload.body}</p>`,
+      bodyHtml: `<p>${payload.body.replace(/\n/g, '<br>')}</p>`,
       receivedAt: 'Just now',
       isRead: true,
       isStarred: false,
@@ -519,131 +483,247 @@ export default function MailDashboardPage() {
         clamavStatus: 'clean',
         spamScore: 0.0,
       },
-      attachments:
-        payload.attachments?.map((att) => ({
-          id: att.id,
-          filename: att.name,
-          contentType: 'application/octet-stream',
-          sizeBytes: att.sizeBytes,
-          antivirusStatus: 'clean',
-        })) || [],
+      attachments: (payload.attachments || []).map((a) => ({
+        id: a.id,
+        filename: a.name,
+        contentType: 'application/octet-stream',
+        sizeBytes: a.sizeBytes,
+        antivirusStatus: 'clean' as const,
+      })),
     };
 
-    mockConversationMap[newThreadId] = [newMsg];
-    setThreads((prev) => [newThread, ...prev]);
-    setSelectedThreadId(newThreadId);
+    setConversationMap((prev) => ({
+      ...prev,
+      [newThreadId]: [newMsg],
+    }));
+
+    if (activeFolderId === 'fld-sent') {
+      setThreads((prev) => [newThread, ...prev]);
+      setSelectedThreadId(newThreadId);
+    }
+  };
+
+  const handleToastClick = (threadId?: string) => {
+    if (threadId) {
+      setSelectedThreadId(threadId);
+    }
+  };
+
+  const handleDismissToast = (id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  };
+
+  // Label Management Handlers
+  const handleCreateLabel = (label: Omit<LabelItem, 'id'>) => {
+    const newId = `lbl-${Date.now()}`;
+    setLabels((prev) => [...prev, { ...label, id: newId }]);
+  };
+
+  const handleUpdateLabel = (id: string, updates: Partial<LabelItem>) => {
+    setLabels((prev) =>
+      prev.map((lbl) => (lbl.id === id ? { ...lbl, ...updates } : lbl))
+    );
+  };
+
+  const handleDeleteLabel = (id: string) => {
+    setLabels((prev) => prev.filter((lbl) => lbl.id !== id));
+    if (activeLabelId === id) {
+      setActiveLabelId(undefined);
+    }
+  };
+
+  // Folder Management Handlers
+  const handleCreateFolder = (folder: Omit<FolderItem, 'id' | 'type' | 'unreadCount' | 'totalCount'>) => {
+    const newId = `fld-${Date.now()}`;
+    setFolders((prev) => [
+      ...prev,
+      {
+        ...folder,
+        id: newId,
+        type: 'custom',
+        unreadCount: 0,
+        totalCount: 0,
+      },
+    ]);
+  };
+
+  const handleUpdateFolder = (id: string, updates: Partial<FolderItem>) => {
+    setFolders((prev) =>
+      prev.map((fld) => (fld.id === id ? { ...fld, ...updates } : fld))
+    );
+  };
+
+  const handleDeleteFolder = (id: string) => {
+    setFolders((prev) => prev.filter((fld) => fld.id !== id));
+    if (activeFolderId === id) {
+      setActiveFolderId('fld-inbox');
+    }
+  };
+
+  // Filter Rule Handlers
+  const handleCreateFilter = (rule: Omit<FilterRule, 'id'>) => {
+    const newId = `rule-${Date.now()}`;
+    setFilterRules((prev) => [...prev, { ...rule, id: newId }]);
+  };
+
+  const handleUpdateFilter = (id: string, updates: Partial<FilterRule>) => {
+    setFilterRules((prev) =>
+      prev.map((rule) => (rule.id === id ? { ...rule, ...updates } : rule))
+    );
+  };
+
+  const handleDeleteFilter = (id: string) => {
+    setFilterRules((prev) => prev.filter((rule) => rule.id !== id));
   };
 
   return (
     <DashboardLayout
       activeFolderId={activeFolderId}
       activeLabelId={activeLabelId}
-      onSelectFolder={(id) => {
-        setActiveFolderId(id);
+      onSelectFolder={(folderId) => {
+        setActiveFolderId(folderId);
         setActiveLabelId(undefined);
-        setSelectedThreadId(null);
       }}
-      onSelectLabel={(id) => {
-        setActiveLabelId(id);
-        setSelectedThreadId(null);
+      onSelectLabel={(labelId) => {
+        setActiveLabelId(labelId);
       }}
-      onOpenCompose={() => setIsComposeOpen(true)}
-      onOpenSettings={() => setIsSettingsOpen(true)}
-      onSearch={(q) => setSearchQuery(q)}
-      availableThreads={threads}
       customFolders={folders}
       customLabels={labels}
+      onSearch={setSearchQuery}
+      onOpenCompose={() => setIsComposeOpen(true)}
+      onOpenSettings={() => setIsSettingsOpen(true)}
     >
-      <div className="h-full flex flex-col md:flex-row overflow-hidden relative" data-testid="mail-split-pane">
+      <div className="flex-1 flex overflow-hidden">
         {/* Left Column: Thread List */}
-        <div className="w-full md:w-5/12 lg:w-4/12 h-full flex flex-col min-w-0">
-          {/* Active Search Result Notification Banner */}
-          {searchQuery && (
-            <div className="px-4 py-2 bg-[#16181D] border-b border-[#2A2E37] flex items-center justify-between text-xs text-slate-300 animate-in fade-in" data-testid="search-results-banner">
-              <div className="flex items-center gap-2 truncate">
-                <Search className="w-3.5 h-3.5 text-[#2D5BFF] shrink-0" />
-                <span className="truncate">
-                  Results for <strong className="text-white">"{searchQuery}"</strong> ({displayedThreads.length})
+        <div className="w-80 lg:w-96 border-r border-[#2A2E37] flex flex-col bg-[#0F1115]">
+          {/* Active Search Term Filter Chip Bar */}
+          {(parsedFilters.from ||
+            parsedFilters.subject ||
+            parsedFilters.hasAttachment ||
+            parsedFilters.isUnread ||
+            parsedFilters.isStarred ||
+            parsedFilters.label) && (
+            <div className="px-4 py-2 border-b border-[#2A2E37] bg-[#16181D] flex flex-wrap items-center gap-1.5 text-xs text-[#94A3B8]">
+              <span className="font-semibold text-white mr-1 flex items-center gap-1">
+                <Search className="w-3 h-3 text-[#2D5BFF]" /> Active Filters:
+              </span>
+              {parsedFilters.from && (
+                <span className="px-2 py-0.5 rounded bg-[#2D5BFF]/10 text-[#2D5BFF] border border-[#2D5BFF]/20">
+                  from:{parsedFilters.from}
                 </span>
-              </div>
+              )}
+              {parsedFilters.subject && (
+                <span className="px-2 py-0.5 rounded bg-[#2D5BFF]/10 text-[#2D5BFF] border border-[#2D5BFF]/20">
+                  subject:{parsedFilters.subject}
+                </span>
+              )}
+              {parsedFilters.hasAttachment && (
+                <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  has:attachment
+                </span>
+              )}
+              {parsedFilters.isUnread && (
+                <span className="px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                  is:unread
+                </span>
+              )}
+              {parsedFilters.isStarred && (
+                <span className="px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                  is:starred
+                </span>
+              )}
+              {parsedFilters.label && (
+                <span className="px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                  label:{parsedFilters.label}
+                </span>
+              )}
               <button
                 onClick={() => setSearchQuery('')}
-                className="p-1 rounded hover:bg-[#2A2E37] text-slate-400 hover:text-white shrink-0"
-                title="Clear Search"
+                className="ml-auto text-[11px] text-[#94A3B8] hover:text-white flex items-center gap-0.5 underline decoration-dotted"
               >
-                <X className="w-3.5 h-3.5" />
+                <X className="w-3 h-3" /> Clear
               </button>
             </div>
           )}
 
-          <ThreadList
-            threads={displayedThreads}
-            selectedThreadId={selectedThreadId}
-            onSelectThread={handleSelectThread}
-            onToggleStar={handleToggleStar}
-            onBulkDelete={handleBulkDelete}
-            onBulkArchive={handleBulkArchive}
-            onBulkMarkRead={handleBulkMarkRead}
-            onRefresh={() => setThreads([...initialThreads])}
-            folderName={searchQuery ? 'Search Results' : activeFolderId.replace('fld-', '')}
-            totalThreadsCount={displayedThreads.length}
-          />
+          <div className="flex-1 overflow-hidden relative">
+            <ThreadList
+              threads={displayedThreads}
+              selectedThreadId={selectedThreadId}
+              onSelectThread={handleSelectThread}
+              onToggleStar={handleToggleStar}
+              onBulkDelete={handleBulkDelete}
+              onBulkArchive={handleBulkArchive}
+              onBulkMarkRead={handleBulkMarkRead}
+              folderName={getFolderSlug(activeFolderId).toUpperCase()}
+              onRefresh={() => loadMessages(activeFolderId)}
+            />
+          </div>
         </div>
 
-        {/* Right Column: Conversation Viewer or Empty Placeholder */}
-        <div className="flex-1 h-full bg-[#0F1115] overflow-hidden flex flex-col min-w-0">
-          {selectedThread && currentMessages.length > 0 ? (
+        {/* Right Column: Conversation Viewer or Empty State */}
+        <div className="flex-1 flex flex-col overflow-hidden bg-[#0F1115]">
+          {selectedThread ? (
             <ConversationViewer
               threadId={selectedThread.id}
               subject={selectedThread.subject}
               messages={currentMessages}
-              onArchive={(id) => handleBulkArchive([id])}
-              onDelete={(id) => handleBulkDelete([id])}
-              onToggleStar={(id) => handleToggleStar(id)}
-              onSendReply={handleSendReply}
-              onClose={() => setSelectedThreadId(null)}
+              onSendReply={(threadId, replyText) => handleSendReply(threadId, replyText)}
+              onArchive={(threadId) => handleBulkArchive([threadId])}
+              onDelete={(threadId) => handleBulkDelete([threadId])}
+              onToggleStar={(threadId) => handleToggleStar(threadId)}
             />
           ) : (
-            <div className="h-full flex flex-col items-center justify-center p-8 text-center" data-testid="no-thread-selected">
-              <div className="w-16 h-16 rounded-2xl bg-[#16181D] border border-[#2A2E37] flex items-center justify-center text-slate-500 mb-4 shadow-xl">
-                <Mail className="w-8 h-8 text-[#2D5BFF]" />
+            <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
+              <div className="w-16 h-16 rounded-2xl bg-[#16181D] border border-[#2A2E37] flex items-center justify-center mb-4 text-[#2D5BFF] shadow-lg shadow-black/40">
+                <Mail className="w-8 h-8" />
               </div>
-              <h3 className="text-base font-bold text-white tracking-tight">Select a conversation</h3>
-              <p className="text-xs text-slate-400 mt-1 max-w-sm">
-                Choose an email thread from the list on the left to view messages, attachments, and quick replies.
+              <h3 className="text-base font-bold text-white mb-1">
+                {displayedThreads.length === 0 ? 'No messages in this folder' : 'Select a conversation'}
+              </h3>
+              <p className="text-xs text-[#94A3B8] max-w-sm mb-4">
+                {displayedThreads.length === 0
+                  ? 'Your encrypted mailbox is synced with the PostgreSQL server.'
+                  : 'Choose an email thread from the list on the left to view messages, attachments, and quick replies.'}
               </p>
+              <button
+                onClick={() => loadMessages(activeFolderId)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#16181D] border border-[#2A2E37] text-xs text-[#94A3B8] hover:text-white hover:border-[#2D5BFF] transition-colors"
+              >
+                <RefreshCw className="w-3.5 h-3.5" /> Refresh Mailbox
+              </button>
             </div>
           )}
         </div>
-
-        {/* Docked Mail Composer */}
-        <MailComposer
-          isOpen={isComposeOpen}
-          onClose={() => setIsComposeOpen(false)}
-          onSend={handleSendComposeEmail}
-        />
-
-        {/* Settings & Preferences Modal */}
-        <SettingsModal
-          isOpen={isSettingsOpen}
-          onClose={() => setIsSettingsOpen(false)}
-          folders={folders}
-          labels={labels}
-          filterRules={filterRules}
-          preferences={preferences}
-          onUpdateFolders={setFolders}
-          onUpdateLabels={setLabels}
-          onUpdateFilterRules={setFilterRules}
-          onUpdatePreferences={setPreferences}
-        />
-
-        {/* Realtime Toast Notifications */}
-        <ToastContainer
-          toasts={toasts}
-          onDismiss={(id) => setToasts((prev) => prev.filter((t) => t.id !== id))}
-          onClickToast={(threadId) => handleSelectThread(threadId)}
-        />
       </div>
+
+      {/* Floating Realtime Toasts */}
+      <ToastContainer
+        toasts={toasts}
+        onClickToast={(threadId) => handleToastClick(threadId)}
+        onDismiss={handleDismissToast}
+      />
+
+      {/* Modal: Compose Email */}
+      <MailComposer
+        isOpen={isComposeOpen}
+        onClose={() => setIsComposeOpen(false)}
+        onSend={handleSendComposeEmail}
+      />
+
+      {/* Modal: Settings, Labels, Filters & Preferences */}
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        labels={labels}
+        folders={folders}
+        filterRules={filterRules}
+        preferences={preferences}
+        onUpdateFolders={setFolders}
+        onUpdateLabels={setLabels}
+        onUpdateFilterRules={setFilterRules}
+        onUpdatePreferences={setPreferences}
+      />
     </DashboardLayout>
   );
 }
