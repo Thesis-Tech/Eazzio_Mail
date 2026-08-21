@@ -100,6 +100,7 @@ async function main() {
 
   console.log(`[Step 2] Composing RFC 5322 MIME & Generating RSA-SHA256 DKIM Signature...`);
   const now = new Date().toISOString();
+  const plannedMessageId = `<${crypto.randomUUID()}@${senderEmail.split('@')[1] || 'eazzio.com'}>`;
   const { rawMime, messageId } = OutboundService.composeAndSign({
     fromAddress: senderEmail,
     to: [recipient],
@@ -113,7 +114,7 @@ async function main() {
   <p style="color: #666; font-size: 12px; margin: 0;">
     <strong>Sender:</strong> ${senderEmail}<br>
     <strong>Timestamp:</strong> ${now}<br>
-    <strong>Message-ID:</strong> ${messageId}
+    <strong>Message-ID:</strong> ${plannedMessageId}
   </p>
 </div>`,
     domainName: senderEmail.split('@')[1] || 'eazzio.com',
