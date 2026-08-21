@@ -193,7 +193,7 @@
 
 ## PHASE 7 — Security Hardening
 
-- [ ] **TASK-032** — Static & Dynamic Security Hardening
+- [x] **TASK-032** — Static & Dynamic Security Hardening
   - **Action:** Audit and enforce rate limiting across all API endpoints, implement strict CSP/security headers in Next.js apps, sanitize all email HTML rendering with DOMPurify, verify tenant RLS isolation, and ensure secure DKIM key custody.
   - **Verification:** Security test suite verifying SQL injection resistance, XSS sandboxing, rate limit triggers, and multi-tenant RLS boundaries.
   - **Definition of Done:** Zero high/critical security vulnerabilities across backend, web, admin, and mobile.
@@ -202,7 +202,7 @@
 
 ## PHASE 8 — Testing & Performance Benchmarks
 
-- [ ] **TASK-033** — Test Suite Expansion & Performance Benchmarking
+- [x] **TASK-033** — Test Suite Expansion & Performance Benchmarking
   - **Action:** Expand unit, integration, and E2E test coverage across all packages and services. Execute performance benchmarks verifying search latency <400ms and API response time <100ms.
   - **Verification:** Benchmark logs demonstrating compliant response times under load.
   - **Definition of Done:** All performance budgets met and test suite achieves >85% coverage.
@@ -211,7 +211,7 @@
 
 ## PHASE 9 — Deployment & Production Packaging
 
-- [ ] **TASK-034** — Production Containerization & Deployment Orchestration
+- [x] **TASK-034** — Production Containerization & Deployment Orchestration
   - **Action:** Create multi-stage production Dockerfiles for `apps/web`, `apps/admin`, and `services/*`, complete production Docker Compose, and document deployment runbooks.
   - **Verification:** Successful container build and deployment smoke test.
   - **Definition of Done:** Entire stack deploys via reproducible container orchestration.
@@ -220,7 +220,7 @@
 
 ## PHASE 10 — Final Release Audit
 
-- [ ] **TASK-035** — Final Release Audit & Launch Readiness Verification
+- [x] **TASK-035** — Final Release Audit & Launch Readiness Verification
   - **Action:** Conduct final audit against `Docs/PRD.md` requirements, verify all phase gates, and generate final launch certification.
   - **Verification:** 100% of P0/P1 PRD requirements verified in code with passing test proofs.
   - **Definition of Done:** Release certified and ready for production deployment.
