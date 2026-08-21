@@ -2,98 +2,306 @@
 
 import React, { useState } from 'react';
 import { DashboardLayout } from '../components/layout/DashboardLayout';
-import { Inbox, Mail, Search, Sparkles, Filter, RefreshCw, Star, AlertCircle } from 'lucide-react';
+import { ThreadList } from '../components/mail/ThreadList';
+import { ConversationViewer } from '../components/mail/ConversationViewer';
+import { ThreadSummary, MessageDetail } from '../types/mail';
+import { Mail, Sparkles } from 'lucide-react';
+
+const initialThreads: ThreadSummary[] = [
+  {
+    id: 'th-101',
+    mailboxId: 'mbx-primary',
+    subject: 'Q3 Infrastructure Security Audit Report',
+    snippet: 'Please find the finalized security audit overview for the inbound mail daemon and LMTP delivery...',
+    sender: { name: 'Security Operations', email: 'security@eazzio.com' },
+    lastMessageAt: '10:42 AM',
+    messageCount: 2,
+    isUnread: true,
+    isStarred: false,
+    hasAttachments: true,
+    labels: ['Security'],
+  },
+  {
+    id: 'th-102',
+    mailboxId: 'mbx-primary',
+    subject: 'Valkey Cache & OpenSearch Cluster Scale Out',
+    snippet: 'Cluster nodes have been scaled horizontally across availability zones with automatic failover.',
+    sender: { name: 'DevOps Engineering', email: 'devops@eazzio.com' },
+    lastMessageAt: 'Yesterday',
+    messageCount: 3,
+    isUnread: false,
+    isStarred: true,
+    hasAttachments: false,
+    labels: ['Infrastructure'],
+  },
+  {
+    id: 'th-103',
+    mailboxId: 'mbx-primary',
+    subject: 'Argon2id Identity & Better Auth Migration',
+    snippet: 'The authentication service now uses modern Argon2id password hashing and session tokens.',
+    sender: { name: 'Identity Team', email: 'auth@eazzio.com' },
+    lastMessageAt: 'Aug 19',
+    messageCount: 1,
+    isUnread: true,
+    isStarred: false,
+    hasAttachments: false,
+    labels: ['Auth'],
+  },
+];
+
+const mockConversationMap: Record<string, MessageDetail[]> = {
+  'th-101': [
+    {
+      id: 'msg-101-1',
+      threadId: 'th-101',
+      mailboxId: 'mbx-primary',
+      folderId: 'fld-inbox',
+      from: { name: 'Security Operations', email: 'security@eazzio.com' },
+      to: [{ name: 'Alex Rivers', email: 'alex@eazzio.com' }],
+      subject: 'Q3 Infrastructure Security Audit Report',
+      snippet: 'Initial findings on LMTP and Rspamd integration...',
+      bodyText: `Hello Alex,\n\nWe have completed the Q3 automated vulnerability assessment and configuration audit for the Eazzio Mail platform.\n\nSummary of Checks:\n1. Strict TLS and Postfix LMTP transport isolation: PASS\n2. ClamAV streaming malware scan: PASS (0 threats found)\n3. SPF/DKIM/DMARC 4-check DNS alignment: 100% compliant\n\nPlease let us know if any further security assertions are required.`,
+      bodyHtml: '<p>Security audit overview complete.</p>',
+      receivedAt: 'Aug 21, 10:15 AM',
+      isRead: true,
+      isStarred: false,
+      security: {
+        spf: 'pass',
+        dkim: 'pass',
+        dmarc: 'pass',
+        clamavStatus: 'clean',
+        spamScore: 0.1,
+      },
+      attachments: [
+        {
+          id: 'att-1',
+          filename: 'Security_Audit_Report_Q3.pdf',
+          contentType: 'application/pdf',
+          sizeBytes: 142000,
+          antivirusStatus: 'clean',
+        },
+      ],
+    },
+    {
+      id: 'msg-101-2',
+      threadId: 'th-101',
+      mailboxId: 'mbx-primary',
+      folderId: 'fld-inbox',
+      from: { name: 'Security Operations', email: 'security@eazzio.com' },
+      to: [{ name: 'Alex Rivers', email: 'alex@eazzio.com' }],
+      subject: 'Re: Q3 Infrastructure Security Audit Report',
+      snippet: 'Action items attached for the team.',
+      bodyText: `Hi Alex,\n\nFollowing up on the audit, the final sign-off is ready. You may proceed with the next deployment phase.`,
+      bodyHtml: '<p>Final sign-off complete.</p>',
+      receivedAt: 'Aug 21, 10:42 AM',
+      isRead: false,
+      isStarred: false,
+      security: {
+        spf: 'pass',
+        dkim: 'pass',
+        dmarc: 'pass',
+        clamavStatus: 'clean',
+        spamScore: 0.0,
+      },
+      attachments: [],
+    },
+  ],
+  'th-102': [
+    {
+      id: 'msg-102-1',
+      threadId: 'th-102',
+      mailboxId: 'mbx-primary',
+      folderId: 'fld-inbox',
+      from: { name: 'DevOps Engineering', email: 'devops@eazzio.com' },
+      to: [{ name: 'Alex Rivers', email: 'alex@eazzio.com' }],
+      subject: 'Valkey Cache & OpenSearch Cluster Scale Out',
+      snippet: 'Cluster nodes have been scaled horizontally...',
+      bodyText: `Team,\n\nWe have expanded the search and caching infrastructure across all nodes.\n- Valkey latency: <1ms p99\n- OpenSearch query index: 320ms p95\n\nAll systems operational.`,
+      bodyHtml: '<p>All systems operational.</p>',
+      receivedAt: 'Aug 20, 04:30 PM',
+      isRead: true,
+      isStarred: true,
+      security: {
+        spf: 'pass',
+        dkim: 'pass',
+        dmarc: 'pass',
+        clamavStatus: 'clean',
+        spamScore: 0.0,
+      },
+      attachments: [],
+    },
+  ],
+  'th-103': [
+    {
+      id: 'msg-103-1',
+      threadId: 'th-103',
+      mailboxId: 'mbx-primary',
+      folderId: 'fld-inbox',
+      from: { name: 'Identity Team', email: 'auth@eazzio.com' },
+      to: [{ name: 'Alex Rivers', email: 'alex@eazzio.com' }],
+      subject: 'Argon2id Identity & Better Auth Migration',
+      snippet: 'The authentication service now uses modern Argon2id...',
+      bodyText: `Hello Alex,\n\nThe new password hashing engine with memory-hard Argon2id parameters (64MB memory, 3 iterations) is now live in production.`,
+      bodyHtml: '<p>Argon2id is live.</p>',
+      receivedAt: 'Aug 19, 02:15 PM',
+      isRead: false,
+      isStarred: false,
+      security: {
+        spf: 'pass',
+        dkim: 'pass',
+        dmarc: 'pass',
+        clamavStatus: 'clean',
+        spamScore: 0.0,
+      },
+      attachments: [],
+    },
+  ],
+};
 
 export default function MailDashboardPage() {
   const [activeFolderId, setActiveFolderId] = useState('fld-inbox');
   const [activeLabelId, setActiveLabelId] = useState<string | undefined>();
+  const [threads, setThreads] = useState<ThreadSummary[]>(initialThreads);
+  const [selectedThreadId, setSelectedThreadId] = useState<string | null>('th-101');
   const [isComposeOpen, setIsComposeOpen] = useState(false);
+
+  const handleSelectThread = (threadId: string) => {
+    setSelectedThreadId(threadId);
+    // Mark thread as read when clicked
+    setThreads((prev) =>
+      prev.map((t) => (t.id === threadId ? { ...t, isUnread: false } : t))
+    );
+  };
+
+  const handleToggleStar = (threadId: string) => {
+    setThreads((prev) =>
+      prev.map((t) => (t.id === threadId ? { ...t, isStarred: !t.isStarred } : t))
+    );
+  };
+
+  const handleBulkDelete = (threadIds: string[]) => {
+    const idSet = new Set(threadIds);
+    setThreads((prev) => prev.filter((t) => !idSet.has(t.id)));
+    if (selectedThreadId && idSet.has(selectedThreadId)) {
+      setSelectedThreadId(null);
+    }
+  };
+
+  const handleBulkArchive = (threadIds: string[]) => {
+    const idSet = new Set(threadIds);
+    setThreads((prev) => prev.filter((t) => !idSet.has(t.id)));
+    if (selectedThreadId && idSet.has(selectedThreadId)) {
+      setSelectedThreadId(null);
+    }
+  };
+
+  const handleBulkMarkRead = (threadIds: string[], isRead: boolean) => {
+    const idSet = new Set(threadIds);
+    setThreads((prev) =>
+      prev.map((t) => (idSet.has(t.id) ? { ...t, isUnread: !isRead } : t))
+    );
+  };
+
+  const handleSendReply = (threadId: string, replyText: string) => {
+    const activeMessages = mockConversationMap[threadId] || [];
+    const newMsg: MessageDetail = {
+      id: `msg-${Date.now()}`,
+      threadId,
+      mailboxId: 'mbx-primary',
+      folderId: activeFolderId,
+      from: { name: 'You', email: 'user@eazzio.com' },
+      to: [{ name: 'Sender', email: 'sender@eazzio.com' }],
+      subject: `Re: ${activeMessages[0]?.subject || 'Conversation'}`,
+      snippet: replyText.slice(0, 80),
+      bodyText: replyText,
+      bodyHtml: `<p>${replyText}</p>`,
+      receivedAt: 'Just now',
+      isRead: true,
+      isStarred: false,
+      security: {
+        spf: 'pass',
+        dkim: 'pass',
+        dmarc: 'pass',
+        clamavStatus: 'clean',
+        spamScore: 0.0,
+      },
+      attachments: [],
+    };
+
+    mockConversationMap[threadId] = [...activeMessages, newMsg];
+    // Update thread message count & snippet
+    setThreads((prev) =>
+      prev.map((t) =>
+        t.id === threadId
+          ? {
+              ...t,
+              messageCount: t.messageCount + 1,
+              snippet: `You: ${replyText.slice(0, 60)}...`,
+              lastMessageAt: 'Just now',
+            }
+          : t
+      )
+    );
+  };
+
+  const selectedThread = threads.find((t) => t.id === selectedThreadId);
+  const currentMessages = selectedThreadId ? mockConversationMap[selectedThreadId] || [] : [];
 
   return (
     <DashboardLayout
       activeFolderId={activeFolderId}
       activeLabelId={activeLabelId}
-      onSelectFolder={(id) => setActiveFolderId(id)}
-      onSelectLabel={(id) => setActiveLabelId(id)}
+      onSelectFolder={(id) => {
+        setActiveFolderId(id);
+        setSelectedThreadId(null);
+      }}
+      onSelectLabel={(id) => {
+        setActiveLabelId(id);
+        setSelectedThreadId(null);
+      }}
       onOpenCompose={() => setIsComposeOpen(true)}
     >
-      <div className="h-full flex flex-col p-6 space-y-6" data-testid="mail-dashboard">
-        {/* Top Action Bar */}
-        <div className="flex items-center justify-between border-b border-[#2A2E37] pb-4">
-          <div className="flex items-center gap-3">
-            <h1 className="text-xl font-bold tracking-tight text-white capitalize">
-              {activeFolderId.replace('fld-', '')}
-            </h1>
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#2D5BFF]/15 text-[#2D5BFF]">
-              3 unread
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              className="p-2 rounded-xl bg-[#16181D] border border-[#2A2E37] text-slate-300 hover:text-white hover:border-slate-600 transition-all"
-              title="Refresh Mailbox"
-            >
-              <RefreshCw className="w-4 h-4" />
-            </button>
-            <button className="px-3 py-2 rounded-xl bg-[#16181D] border border-[#2A2E37] text-xs font-medium text-slate-300 hover:text-white hover:border-slate-600 flex items-center gap-2 transition-all">
-              <Filter className="w-3.5 h-3.5" />
-              <span>Filter</span>
-            </button>
-          </div>
+      <div className="h-full flex flex-col md:flex-row overflow-hidden" data-testid="mail-split-pane">
+        {/* Left Column: Thread List */}
+        <div className="w-full md:w-5/12 lg:w-4/12 h-full flex flex-col min-w-0">
+          <ThreadList
+            threads={threads}
+            selectedThreadId={selectedThreadId}
+            onSelectThread={handleSelectThread}
+            onToggleStar={handleToggleStar}
+            onBulkDelete={handleBulkDelete}
+            onBulkArchive={handleBulkArchive}
+            onBulkMarkRead={handleBulkMarkRead}
+            onRefresh={() => setThreads([...initialThreads])}
+            folderName={activeFolderId.replace('fld-', '')}
+            totalThreadsCount={threads.length}
+          />
         </div>
 
-        {/* Sample Message Thread Feed */}
-        <div className="space-y-2">
-          {/* Thread Item 1 */}
-          <div className="p-4 rounded-xl bg-[#16181D] border border-[#2A2E37] hover:border-[#2D5BFF]/50 flex items-center justify-between gap-4 cursor-pointer transition-all">
-            <div className="flex items-center gap-3 min-w-0">
-              <button className="text-slate-500 hover:text-amber-400">
-                <Star className="w-4 h-4" />
-              </button>
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold text-sm text-white truncate">Security Team</span>
-                  <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-emerald-500/10 text-emerald-400">
-                    SPF/DKIM Valid
-                  </span>
-                </div>
-                <p className="text-xs font-medium text-slate-300 truncate">
-                  Q3 Infrastructure Security Audit Report
-                </p>
-                <p className="text-xs text-slate-500 truncate">
-                  Please find the finalized security audit overview for the inbound mail daemon...
-                </p>
+        {/* Right Column: Conversation Viewer or Empty Placeholder */}
+        <div className="flex-1 h-full bg-[#0F1115] overflow-hidden flex flex-col min-w-0">
+          {selectedThread && currentMessages.length > 0 ? (
+            <ConversationViewer
+              threadId={selectedThread.id}
+              subject={selectedThread.subject}
+              messages={currentMessages}
+              onArchive={(id) => handleBulkArchive([id])}
+              onDelete={(id) => handleBulkDelete([id])}
+              onToggleStar={(id) => handleToggleStar(id)}
+              onSendReply={handleSendReply}
+              onClose={() => setSelectedThreadId(null)}
+            />
+          ) : (
+            <div className="h-full flex flex-col items-center justify-center p-8 text-center" data-testid="no-thread-selected">
+              <div className="w-16 h-16 rounded-2xl bg-[#16181D] border border-[#2A2E37] flex items-center justify-center text-slate-500 mb-4 shadow-xl">
+                <Mail className="w-8 h-8 text-[#2D5BFF]" />
               </div>
+              <h3 className="text-base font-bold text-white tracking-tight">Select a conversation</h3>
+              <p className="text-xs text-slate-400 mt-1 max-w-sm">
+                Choose an email thread from the list on the left to view messages, attachments, and quick replies.
+              </p>
             </div>
-            <span className="text-xs text-slate-400 shrink-0">10:42 AM</span>
-          </div>
-
-          {/* Thread Item 2 */}
-          <div className="p-4 rounded-xl bg-[#16181D] border border-[#2A2E37] hover:border-[#2D5BFF]/50 flex items-center justify-between gap-4 cursor-pointer transition-all">
-            <div className="flex items-center gap-3 min-w-0">
-              <button className="text-amber-400">
-                <Star className="w-4 h-4 fill-amber-400" />
-              </button>
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold text-sm text-white truncate">
-                    DevOps Engineering
-                  </span>
-                  <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-blue-500/10 text-blue-400">
-                    CI/CD
-                  </span>
-                </div>
-                <p className="text-xs font-medium text-slate-300 truncate">
-                  Valkey Cache & OpenSearch Cluster Scale Out
-                </p>
-                <p className="text-xs text-slate-500 truncate">
-                  Cluster nodes have been scaled horizontally across availability zones...
-                </p>
-              </div>
-            </div>
-            <span className="text-xs text-slate-400 shrink-0">Yesterday</span>
-          </div>
+          )}
         </div>
       </div>
     </DashboardLayout>

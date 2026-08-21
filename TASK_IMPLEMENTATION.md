@@ -97,7 +97,7 @@
   - **Verification:** End-to-end web test for login flow, session persistence, and authenticated shell rendering.
   - **Definition of Done:** Users can log in, view authenticated dashboard shell, and navigate system folders.
 
-- [ ] **TASK-016** — Mailbox Thread List & Conversation Viewer
+- [x] **TASK-016** — Mailbox Thread List & Conversation Viewer
   - **Action:** Build responsive Mailbox thread list component with unread badges, multi-select bulk actions, star/important toggles, and threaded conversation view.
   - **Verification:** Web component tests verifying thread rendering, selection state, and pagination.
   - **Definition of Done:** Users can browse threads, expand messages in a conversation, and trigger message actions.
