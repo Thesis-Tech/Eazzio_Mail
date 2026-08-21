@@ -53,7 +53,6 @@ export class SmtpSubmissionTransport implements EazzioEmailTransport {
         socket = net.createConnection(this.config.port, this.config.host);
       }
 
-      let buffer = '';
       let isTls = isDirectTls;
       let step:
         | 'BANNER'
@@ -98,16 +97,13 @@ export class SmtpSubmissionTransport implements EazzioEmailTransport {
         socket.write(cmd + '\r\n');
       };
 
-      const processResponse = (line: string) => {
+      const processResponse = (line: string, fullResponse: string) => {
         const code = line.slice(0, 3);
-        const isLastLine = line.charAt(3) === ' ';
-        if (!isLastLine) return;
-
         const isPositive = code.startsWith('2') || code.startsWith('3');
         if (!isPositive) {
           const isTransient = code.startsWith('4');
           const errorType = isTransient ? 'Transient SMTP Deferral' : 'Permanent SMTP Rejection';
-          finishWithError(new Error(`${errorType} (${code}): ${line}`), code);
+          finishWithError(new Error(`${errorType} (${code}): ${fullResponse || line}`), code);
           return;
         }
 
@@ -118,7 +114,7 @@ export class SmtpSubmissionTransport implements EazzioEmailTransport {
             break;
 
           case 'EHLO_1':
-            if (buffer.toUpperCase().includes('STARTTLS') && !isTls) {
+            if (fullResponse.toUpperCase().includes('STARTTLS') && !isTls) {
               step = 'STARTTLS';
               send('STARTTLS');
             } else if (this.config.user && this.config.pass) {
@@ -135,7 +131,7 @@ export class SmtpSubmissionTransport implements EazzioEmailTransport {
             const tlsSocket = tls.connect({
               socket,
               host: this.config.host,
-              rejectUnauthorized: process.env.NODE_ENV === 'production',
+              rejectUnauthorized: true,
             });
 
             tlsSocket.on('error', (tlsErr) => {
@@ -214,17 +210,27 @@ export class SmtpSubmissionTransport implements EazzioEmailTransport {
             finishSuccess();
             break;
         }
-        buffer = '';
       };
+
+      let rawChunkBuffer = '';
+      let accumulatedLines: string[] = [];
 
       const setupDataListener = (s: net.Socket | tls.TLSSocket) => {
         s.on('data', (chunk) => {
-          buffer += chunk.toString('utf-8');
-          const lines = buffer.split(/\r?\n/);
-          for (let i = 0; i < lines.length - 1; i++) {
-            const line = lines[i]!.trim();
-            if (line.length >= 3 && /^\d{3}/.test(line)) {
-              processResponse(line);
+          rawChunkBuffer += chunk.toString('utf-8');
+          const lines = rawChunkBuffer.split(/\r?\n/);
+          rawChunkBuffer = lines.pop() || '';
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (trimmed.length >= 3 && /^\d{3}/.test(trimmed)) {
+              accumulatedLines.push(trimmed);
+              const isLastLine = trimmed.length === 3 || trimmed.charAt(3) === ' ';
+              if (isLastLine) {
+                const fullResponse = accumulatedLines.join('\n');
+                accumulatedLines = [];
+                processResponse(trimmed, fullResponse);
+              }
             }
           }
         });
