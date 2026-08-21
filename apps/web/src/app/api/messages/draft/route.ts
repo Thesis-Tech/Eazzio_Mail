@@ -24,29 +24,31 @@ function createDevToken(email: string = 'rahulkumar@eazzio.com'): string {
   return `${header}.${payload}.${signature}`;
 }
 
-export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(req: NextRequest) {
   try {
-    const { id } = await params;
     const userEmail = req.headers.get('x-user-email') || 'rahulkumar@eazzio.com';
     let authHeader = req.headers.get('authorization') || '';
     if (!authHeader || !authHeader.startsWith('Bearer ') || authHeader.includes('default-token') || authHeader.includes('token_')) {
       authHeader = `Bearer ${createDevToken(userEmail)}`;
     }
 
-    const response = await fetch(`${API_BACKEND_URL}/v1/messages/${id}`, {
-      method: 'GET',
+    const body = await req.json();
+
+    const response = await fetch(`${API_BACKEND_URL}/v1/messages/draft`, {
+      method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: authHeader,
       },
+      body: JSON.stringify(body),
     });
 
     const data = await response.json();
     return NextResponse.json(data, { status: response.status });
   } catch (error: any) {
-    console.error('Message detail API proxy error:', error);
+    console.error('Draft API proxy error:', error);
     return NextResponse.json(
-      { success: false, error: error.message || 'Error fetching message detail' },
+      { success: false, error: error.message || 'Draft saving error' },
       { status: 502 }
     );
   }

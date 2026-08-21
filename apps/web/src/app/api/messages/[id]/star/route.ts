@@ -24,7 +24,7 @@ function createDevToken(email: string = 'rahulkumar@eazzio.com'): string {
   return `${header}.${payload}.${signature}`;
 }
 
-export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
     const userEmail = req.headers.get('x-user-email') || 'rahulkumar@eazzio.com';
@@ -33,20 +33,28 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       authHeader = `Bearer ${createDevToken(userEmail)}`;
     }
 
-    const response = await fetch(`${API_BACKEND_URL}/v1/messages/${id}`, {
-      method: 'GET',
+    let body = {};
+    try {
+      body = await req.json();
+    } catch {
+      // Empty body allowed
+    }
+
+    const response = await fetch(`${API_BACKEND_URL}/v1/messages/${id}/star`, {
+      method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: authHeader,
       },
+      body: JSON.stringify(body),
     });
 
     const data = await response.json();
     return NextResponse.json(data, { status: response.status });
   } catch (error: any) {
-    console.error('Message detail API proxy error:', error);
+    console.error('Star API proxy error:', error);
     return NextResponse.json(
-      { success: false, error: error.message || 'Error fetching message detail' },
+      { success: false, error: error.message || 'Star update error' },
       { status: 502 }
     );
   }

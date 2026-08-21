@@ -15,6 +15,7 @@ import { AuthStore } from '../lib/auth-store';
 
 const initialFolders: FolderItem[] = [
   { id: 'fld-inbox', name: 'Inbox', slug: 'inbox', type: 'system', unreadCount: 0, totalCount: 0 },
+  { id: 'fld-starred', name: 'Starred', slug: 'starred', type: 'system', unreadCount: 0, totalCount: 0 },
   { id: 'fld-sent', name: 'Sent', slug: 'sent', type: 'system', unreadCount: 0, totalCount: 0 },
   { id: 'fld-drafts', name: 'Drafts', slug: 'drafts', type: 'system', unreadCount: 0, totalCount: 0 },
   { id: 'fld-spam', name: 'Spam', slug: 'spam', type: 'system', unreadCount: 0, totalCount: 0 },
@@ -42,7 +43,7 @@ const initialFilters: FilterRule[] = [
 ];
 
 const initialPreferences: UserPreferences = {
-  defaultMailbox: 'user@eazzio.com',
+  defaultMailbox: 'rahulkumar@eazzio.com',
   signature: 'Best regards,\nEazzio Mail User',
   autoSummarizeWithAI: true,
   soundNotifications: true,
@@ -56,6 +57,7 @@ export default function MailDashboardPage() {
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isComposeOpen, setIsComposeOpen] = useState(false);
+  const [composeInitialData, setComposeInitialData] = useState<{ to?: string[]; subject?: string; body?: string }>({});
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [folders, setFolders] = useState<FolderItem[]>(initialFolders);
   const [labels, setLabels] = useState<LabelItem[]>(initialLabels);
@@ -66,12 +68,12 @@ export default function MailDashboardPage() {
   const [conversationMap, setConversationMap] = useState<Record<string, MessageDetail[]>>({});
 
   // Helper to resolve folder slug from ID
-  const getFolderSlug = (folderId: string) => {
+  const getFolderSlug = useCallback((folderId: string) => {
     const f = folders.find((item) => item.id === folderId);
     return f?.slug || folderId.replace('fld-', '');
-  };
+  }, [folders]);
 
-  // Fetch real messages from API
+  // Fetch real messages from API for active folder
   const loadMessages = useCallback(async (folderId: string) => {
     setIsLoading(true);
     const slug = getFolderSlug(folderId);
@@ -79,7 +81,7 @@ export default function MailDashboardPage() {
     try {
       const authState = AuthStore.getState();
       const token = authState.token || 'default-token';
-      const senderEmail = authState.user?.email || 'user@eazzio.com';
+      const senderEmail = authState.user?.email || 'rahulkumar@eazzio.com';
 
       const res = await fetch(`/api/messages?folder=${slug}`, {
         headers: {
@@ -166,12 +168,12 @@ export default function MailDashboardPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [folders]);
+  }, [getFolderSlug]);
 
   // Initial load and folder switch
   useEffect(() => {
     loadMessages(activeFolderId);
-  }, [activeFolderId]);
+  }, [activeFolderId, loadMessages]);
 
   // Realtime WebSocket Subscription
   useEffect(() => {
@@ -201,7 +203,7 @@ export default function MailDashboardPage() {
           mailboxId: event.mailboxId,
           folderId: 'fld-inbox',
           from: data.from || { name: 'External Relay', email: 'relay@eazzio.com' },
-          to: [{ name: 'You', email: AuthStore.getState().user?.email || 'user@eazzio.com' }],
+          to: [{ name: 'You', email: AuthStore.getState().user?.email || 'rahulkumar@eazzio.com' }],
           subject: data.subject || 'Incoming Transmission',
           snippet: data.snippet || 'You have received a new message.',
           bodyText: data.snippet || 'Message received via live WebSocket pipeline.',
@@ -224,7 +226,9 @@ export default function MailDashboardPage() {
           [newThreadId]: [newMsg],
         }));
 
-        setThreads((prev) => [newThread, ...prev]);
+        if (activeFolderId === 'fld-inbox') {
+          setThreads((prev) => [newThread, ...prev]);
+        }
 
         // Add toast notification
         setToasts((prev) => [
@@ -244,7 +248,7 @@ export default function MailDashboardPage() {
     return () => {
       unsubscribe();
     };
-  }, []);
+  }, [activeFolderId]);
 
   const parsedFilters = parseSearchQuery(searchQuery);
   const displayedThreads = threads.filter((t) => {
@@ -290,16 +294,68 @@ export default function MailDashboardPage() {
   });
 
   const handleSelectThread = (threadId: string) => {
+    if (activeFolderId === 'fld-drafts') {
+      // If clicking a draft, open composer with draft contents to edit/send
+      const msgs = conversationMap[threadId] || [];
+      const current = msgs[0];
+      setComposeInitialData({
+        to: current?.to.map((r) => r.email) || [],
+        subject: current?.subject || '',
+        body: current?.bodyText || '',
+      });
+      setIsComposeOpen(true);
+      return;
+    }
+
     setSelectedThreadId(threadId);
     setThreads((prev) =>
       prev.map((t) => (t.id === threadId ? { ...t, isUnread: false } : t))
     );
   };
 
-  const handleToggleStar = (threadId: string) => {
+  // Toggle Star / Mark Important in real backend
+  const handleToggleStar = async (threadId: string) => {
+    const thread = threads.find((t) => t.id === threadId);
+    const newStarred = !thread?.isStarred;
+
+    // Optimistically update UI
     setThreads((prev) =>
-      prev.map((t) => (t.id === threadId ? { ...t, isStarred: !t.isStarred } : t))
+      prev.map((t) => (t.id === threadId ? { ...t, isStarred: newStarred } : t))
     );
+
+    setConversationMap((prev) => {
+      const current = prev[threadId] || [];
+      return {
+        ...prev,
+        [threadId]: current.map((m) => ({ ...m, isStarred: newStarred })),
+      };
+    });
+
+    try {
+      const authState = AuthStore.getState();
+      const token = authState.token || 'default-token';
+      const senderEmail = authState.user?.email || 'rahulkumar@eazzio.com';
+
+      // Call API to persist star state
+      const targetMsgId = (thread as any)?.messageId || threadId;
+      await fetch(`/api/messages/${targetMsgId}/star`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+          'x-user-email': senderEmail,
+        },
+        body: JSON.stringify({ isStarred: newStarred }),
+      });
+
+      // If in Starred folder and unstarred, remove from view
+      if (activeFolderId === 'fld-starred' && !newStarred) {
+        setThreads((prev) => prev.filter((t) => t.id !== threadId));
+        if (selectedThreadId === threadId) setSelectedThreadId(null);
+      }
+    } catch (err) {
+      console.error('Failed to toggle star in backend:', err);
+    }
   };
 
   const handleBulkDelete = (threadIds: string[]) => {
@@ -332,7 +388,7 @@ export default function MailDashboardPage() {
       threadId,
       mailboxId: 'mbx-primary',
       folderId: activeFolderId,
-      from: { name: 'You', email: AuthStore.getState().user?.email || 'user@eazzio.com' },
+      from: { name: 'You', email: AuthStore.getState().user?.email || 'rahulkumar@eazzio.com' },
       to: [{ name: 'Sender', email: activeMessages[0]?.from.email || 'sender@eazzio.com' }],
       subject: `Re: ${activeMessages[0]?.subject || 'Conversation'}`,
       snippet: replyText.slice(0, 80),
@@ -373,13 +429,60 @@ export default function MailDashboardPage() {
   const selectedThread = threads.find((t) => t.id === selectedThreadId);
   const currentMessages = selectedThreadId ? conversationMap[selectedThreadId] || [] : [];
 
+  // Save as Draft Handler
+  const handleSaveDraft = async (payload: ComposeEmailPayload) => {
+    try {
+      const authState = AuthStore.getState();
+      const token = authState.token || 'default-token';
+      const senderEmail = authState.user?.email || 'rahulkumar@eazzio.com';
+
+      const response = await fetch('/api/messages/draft', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+          'x-user-email': senderEmail,
+        },
+        body: JSON.stringify({
+          to: payload.to,
+          cc: payload.cc,
+          bcc: payload.bcc,
+          subject: payload.subject,
+          bodyText: payload.body,
+          bodyHtml: `<p>${payload.body.replace(/\n/g, '<br>')}</p>`,
+        }),
+      });
+
+      const res = await response.json();
+      if (res.success) {
+        setToasts((prev) => [
+          {
+            id: `toast-${Date.now()}`,
+            title: 'Draft Saved',
+            senderName: 'Eazzio Mailbox',
+            message: `Draft "${payload.subject || 'No Subject'}" saved in Drafts folder.`,
+            timestamp: 'Just now',
+          },
+          ...prev,
+        ]);
+
+        if (activeFolderId === 'fld-drafts') {
+          loadMessages('fld-drafts');
+        }
+      }
+    } catch (err: any) {
+      console.error('Failed to save draft:', err);
+    }
+  };
+
+  // Send Outbound Email Handler
   const handleSendComposeEmail = async (payload: ComposeEmailPayload) => {
     let assignedMessageId = `msg-${Date.now()}`;
 
     try {
       const authState = AuthStore.getState();
       const token = authState.token || 'default-token';
-      const senderEmail = authState.user?.email || 'user@eazzio.com';
+      const senderEmail = authState.user?.email || 'rahulkumar@eazzio.com';
 
       // 1. Dispatch through internal Eazzio Outbound Mail Pipeline
       const response = await fetch('/api/messages/compose', {
@@ -412,6 +515,10 @@ export default function MailDashboardPage() {
           },
           ...prev,
         ]);
+
+        if (activeFolderId === 'fld-sent') {
+          loadMessages('fld-sent');
+        }
       } else {
         const errorText =
           typeof result.error === 'string'
@@ -444,63 +551,6 @@ export default function MailDashboardPage() {
         ...prev,
       ]);
     }
-
-    const newThreadId = `th-${Date.now()}`;
-    const newThread: ThreadSummary = {
-      id: newThreadId,
-      mailboxId: 'mbx-primary',
-      subject: payload.subject,
-      snippet: payload.body.slice(0, 80) || '(No Body)',
-      sender: { name: 'You', email: AuthStore.getState().user?.email || 'user@eazzio.com' },
-      lastMessageAt: 'Just now',
-      messageCount: 1,
-      isUnread: false,
-      isStarred: false,
-      hasAttachments: (payload.attachments && payload.attachments.length > 0) || false,
-      labels: ['Sent'],
-    };
-
-    const newMsg: MessageDetail = {
-      id: assignedMessageId,
-      threadId: newThreadId,
-      mailboxId: 'mbx-primary',
-      folderId: 'fld-sent',
-      from: { name: 'You', email: AuthStore.getState().user?.email || 'user@eazzio.com' },
-      to: payload.to.map((email) => ({ name: email.split('@')[0], email })),
-      cc: payload.cc?.map((email) => ({ name: email.split('@')[0], email })),
-      bcc: payload.bcc?.map((email) => ({ name: email.split('@')[0], email })),
-      subject: payload.subject,
-      snippet: payload.body.slice(0, 80),
-      bodyText: payload.body,
-      bodyHtml: `<p>${payload.body.replace(/\n/g, '<br>')}</p>`,
-      receivedAt: 'Just now',
-      isRead: true,
-      isStarred: false,
-      security: {
-        spf: 'pass',
-        dkim: 'pass',
-        dmarc: 'pass',
-        clamavStatus: 'clean',
-        spamScore: 0.0,
-      },
-      attachments: (payload.attachments || []).map((a) => ({
-        id: a.id,
-        filename: a.name,
-        contentType: 'application/octet-stream',
-        sizeBytes: a.sizeBytes,
-        antivirusStatus: 'clean' as const,
-      })),
-    };
-
-    setConversationMap((prev) => ({
-      ...prev,
-      [newThreadId]: [newMsg],
-    }));
-
-    if (activeFolderId === 'fld-sent') {
-      setThreads((prev) => [newThread, ...prev]);
-      setSelectedThreadId(newThreadId);
-    }
   };
 
   const handleToastClick = (threadId?: string) => {
@@ -511,69 +561,6 @@ export default function MailDashboardPage() {
 
   const handleDismissToast = (id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
-  };
-
-  // Label Management Handlers
-  const handleCreateLabel = (label: Omit<LabelItem, 'id'>) => {
-    const newId = `lbl-${Date.now()}`;
-    setLabels((prev) => [...prev, { ...label, id: newId }]);
-  };
-
-  const handleUpdateLabel = (id: string, updates: Partial<LabelItem>) => {
-    setLabels((prev) =>
-      prev.map((lbl) => (lbl.id === id ? { ...lbl, ...updates } : lbl))
-    );
-  };
-
-  const handleDeleteLabel = (id: string) => {
-    setLabels((prev) => prev.filter((lbl) => lbl.id !== id));
-    if (activeLabelId === id) {
-      setActiveLabelId(undefined);
-    }
-  };
-
-  // Folder Management Handlers
-  const handleCreateFolder = (folder: Omit<FolderItem, 'id' | 'type' | 'unreadCount' | 'totalCount'>) => {
-    const newId = `fld-${Date.now()}`;
-    setFolders((prev) => [
-      ...prev,
-      {
-        ...folder,
-        id: newId,
-        type: 'custom',
-        unreadCount: 0,
-        totalCount: 0,
-      },
-    ]);
-  };
-
-  const handleUpdateFolder = (id: string, updates: Partial<FolderItem>) => {
-    setFolders((prev) =>
-      prev.map((fld) => (fld.id === id ? { ...fld, ...updates } : fld))
-    );
-  };
-
-  const handleDeleteFolder = (id: string) => {
-    setFolders((prev) => prev.filter((fld) => fld.id !== id));
-    if (activeFolderId === id) {
-      setActiveFolderId('fld-inbox');
-    }
-  };
-
-  // Filter Rule Handlers
-  const handleCreateFilter = (rule: Omit<FilterRule, 'id'>) => {
-    const newId = `rule-${Date.now()}`;
-    setFilterRules((prev) => [...prev, { ...rule, id: newId }]);
-  };
-
-  const handleUpdateFilter = (id: string, updates: Partial<FilterRule>) => {
-    setFilterRules((prev) =>
-      prev.map((rule) => (rule.id === id ? { ...rule, ...updates } : rule))
-    );
-  };
-
-  const handleDeleteFilter = (id: string) => {
-    setFilterRules((prev) => prev.filter((rule) => rule.id !== id));
   };
 
   return (
@@ -590,7 +577,10 @@ export default function MailDashboardPage() {
       customFolders={folders}
       customLabels={labels}
       onSearch={setSearchQuery}
-      onOpenCompose={() => setIsComposeOpen(true)}
+      onOpenCompose={() => {
+        setComposeInitialData({});
+        setIsComposeOpen(true);
+      }}
       onOpenSettings={() => setIsSettingsOpen(true)}
     >
       <div className="flex-1 flex overflow-hidden">
@@ -679,18 +669,20 @@ export default function MailDashboardPage() {
                 <Mail className="w-8 h-8" />
               </div>
               <h3 className="text-base font-bold text-white mb-1">
-                {displayedThreads.length === 0 ? 'No messages in this folder' : 'Select a conversation'}
+                {displayedThreads.length === 0
+                  ? `No messages in ${getFolderSlug(activeFolderId)}`
+                  : 'Select a conversation'}
               </h3>
               <p className="text-xs text-[#94A3B8] max-w-sm mb-4">
                 {displayedThreads.length === 0
-                  ? 'Your encrypted mailbox is synced with the PostgreSQL server.'
+                  ? `Your ${getFolderSlug(activeFolderId)} folder is clean and synced with PostgreSQL.`
                   : 'Choose an email thread from the list on the left to view messages, attachments, and quick replies.'}
               </p>
               <button
                 onClick={() => loadMessages(activeFolderId)}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#16181D] border border-[#2A2E37] text-xs text-[#94A3B8] hover:text-white hover:border-[#2D5BFF] transition-colors"
               >
-                <RefreshCw className="w-3.5 h-3.5" /> Refresh Mailbox
+                <RefreshCw className="w-3.5 h-3.5" /> Refresh Folder
               </button>
             </div>
           )}
@@ -709,6 +701,10 @@ export default function MailDashboardPage() {
         isOpen={isComposeOpen}
         onClose={() => setIsComposeOpen(false)}
         onSend={handleSendComposeEmail}
+        onSaveDraft={handleSaveDraft}
+        initialTo={composeInitialData.to}
+        initialSubject={composeInitialData.subject}
+        initialBody={composeInitialData.body}
       />
 
       {/* Modal: Settings, Labels, Filters & Preferences */}

@@ -8,6 +8,8 @@ import {
   AlertOctagon,
   Trash2,
   Archive,
+  Star,
+  Bookmark,
   Plus,
   Tag,
   ShieldCheck,
@@ -46,6 +48,10 @@ export const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
     switch (slug) {
       case 'inbox':
         return <Inbox className="w-4 h-4 text-blue-500" />;
+      case 'starred':
+        return <Star className="w-4 h-4 text-amber-400 fill-amber-400/30" />;
+      case 'important':
+        return <Bookmark className="w-4 h-4 text-amber-500" />;
       case 'sent':
         return <Send className="w-4 h-4 text-blue-400" />;
       case 'drafts':

@@ -243,19 +243,40 @@ messagesRouter.get('/', async (req: AuthenticatedRequest, res: Response, next: N
     const { mailboxId } = await getOrCreateUserMailbox(userId, userEmail);
     const activeMailboxId = (requestedMailboxId as string) || mailboxId;
     const activeFolderId = await getFolderId(activeMailboxId, folder as string);
+    const folderSlug = (folder as string).toLowerCase().replace('fld-', '');
 
-    // Query messages in active folder
-    const messages = (await defaultDb.query(
-      `SELECT m.id, m.mailbox_id, m.folder_id, m.thread_id, m.message_id_header,
-              m.from_address, m.subject, m.snippet, m.size_bytes, m.raw_object_key,
-              m.is_read, m.is_starred, m.is_important, m.direction, m.delivery_state,
-              m.received_at
-       FROM messages m
-       WHERE m.mailbox_id = $1 AND m.folder_id = $2
-       ORDER BY m.received_at DESC
-       LIMIT $3`,
-      [activeMailboxId, activeFolderId, Number(limit)]
-    )) as any[];
+    let sql = `
+      SELECT m.id, m.mailbox_id, m.folder_id, m.thread_id, m.message_id_header,
+             m.from_address, m.subject, m.snippet, m.size_bytes, m.raw_object_key,
+             m.is_read, m.is_starred, m.is_important, m.direction, m.delivery_state,
+             m.received_at
+      FROM messages m
+      WHERE m.mailbox_id = $1
+    `;
+    const params: any[] = [activeMailboxId];
+
+    if (folderSlug === 'starred' || folderSlug === 'important') {
+      sql += ` AND (m.is_starred = true OR m.is_important = true)`;
+    } else if (folderSlug === 'sent') {
+      sql += ` AND (m.folder_id = $2 OR m.direction = 'outbound') AND (m.delivery_state != 'draft' OR m.delivery_state IS NULL)`;
+      params.push(activeFolderId);
+    } else if (folderSlug === 'drafts') {
+      sql += ` AND (m.folder_id = $2 OR m.delivery_state = 'draft')`;
+      params.push(activeFolderId);
+    } else if (folderSlug === 'inbox') {
+      sql += ` AND (m.folder_id = $2 OR m.direction = 'inbound') 
+               AND (m.delivery_state != 'draft' OR m.delivery_state IS NULL)
+               AND m.folder_id NOT IN (SELECT id FROM folders WHERE mailbox_id = $1 AND kind IN ('trash', 'spam', 'archive'))`;
+      params.push(activeFolderId);
+    } else {
+      sql += ` AND m.folder_id = $2`;
+      params.push(activeFolderId);
+    }
+
+    params.push(Number(limit));
+    sql += ` ORDER BY m.received_at DESC LIMIT $${params.length}`;
+
+    const messages = (await defaultDb.query(sql, params)) as any[];
 
     // Group messages into thread summaries
     const threadMap = new Map<string, any>();
@@ -265,6 +286,7 @@ messagesRouter.get('/', async (req: AuthenticatedRequest, res: Response, next: N
       if (!threadMap.has(tId)) {
         threadMap.set(tId, {
           id: tId,
+          messageId: msg.id,
           mailboxId: msg.mailbox_id,
           subject: msg.subject || '(No Subject)',
           snippet: msg.snippet || '',
@@ -273,8 +295,19 @@ messagesRouter.get('/', async (req: AuthenticatedRequest, res: Response, next: N
           messageCount: 1,
           isUnread: !msg.is_read,
           isStarred: Boolean(msg.is_starred),
+          isImportant: Boolean(msg.is_important),
           hasAttachments: false,
-          labels: [folder === 'inbox' ? 'Inbox' : folder === 'sent' ? 'Sent' : 'General'],
+          labels: [
+            folderSlug === 'inbox'
+              ? 'Inbox'
+              : folderSlug === 'sent'
+              ? 'Sent'
+              : folderSlug === 'drafts'
+              ? 'Drafts'
+              : folderSlug === 'starred'
+              ? 'Starred'
+              : 'General',
+          ],
         });
       } else {
         const existing = threadMap.get(tId);
@@ -300,6 +333,169 @@ messagesRouter.get('/', async (req: AuthenticatedRequest, res: Response, next: N
   }
 });
 
+// POST /v1/messages/draft - Save or update draft
+messagesRouter.post('/draft', async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId;
+    const userEmail = req.user!.email;
+    const { draftId, to = [], cc = [], bcc = [], subject = '', bodyText = '', bodyHtml } = req.body;
+
+    const { mailboxId } = await getOrCreateUserMailbox(userId, userEmail);
+    const draftsFolderId = await getFolderId(mailboxId, 'drafts');
+
+    const messageId = draftId || crypto.randomUUID();
+    const threadId = crypto.randomUUID();
+    const cleanSubject = subject || '(Draft - No Subject)';
+    const cleanBodyText = bodyText || '';
+    const cleanBodyHtml = bodyHtml || `<p>${cleanBodyText.replace(/\n/g, '<br>')}</p>`;
+    const rawKey = `raw_${messageId}.eml`;
+
+    await storage.put(rawKey, Buffer.from(cleanBodyHtml, 'utf-8'), 'text/html');
+
+    // Thread
+    await defaultDb.query(
+      `INSERT INTO threads (id, mailbox_id, subject_normalized, last_message_at, message_count)
+       VALUES ($1, $2, $3, now(), 1)
+       ON CONFLICT (id) DO UPDATE SET subject_normalized = EXCLUDED.subject_normalized, last_message_at = now()`,
+      [threadId, mailboxId, cleanSubject]
+    );
+
+    // Message
+    await defaultDb.query(
+      `INSERT INTO messages (
+        id, mailbox_id, folder_id, thread_id, message_id_header, from_address,
+        subject, snippet, size_bytes, raw_object_key, is_read, is_starred,
+        direction, delivery_state, received_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, true, false, 'outbound', 'draft', now())
+      ON CONFLICT (id) DO UPDATE SET
+        subject = EXCLUDED.subject,
+        snippet = EXCLUDED.snippet,
+        folder_id = EXCLUDED.folder_id,
+        received_at = now()`,
+      [
+        messageId,
+        mailboxId,
+        draftsFolderId,
+        threadId,
+        `<${messageId}@eazzio.com>`,
+        userEmail,
+        cleanSubject,
+        cleanBodyText.slice(0, 100) || cleanSubject,
+        Buffer.byteLength(cleanBodyHtml),
+        rawKey,
+      ]
+    );
+
+    // Recipients
+    await defaultDb.query(`DELETE FROM message_recipients WHERE message_id = $1`, [messageId]);
+    if (to && Array.isArray(to) && to.length > 0) {
+      for (const addr of to) {
+        await defaultDb.query(
+          `INSERT INTO message_recipients (id, message_id, kind, address) VALUES ($1, $2, 'to', $3)`,
+          [crypto.randomUUID(), messageId, addr]
+        );
+      }
+    }
+    if (cc && Array.isArray(cc) && cc.length > 0) {
+      for (const addr of cc) {
+        await defaultDb.query(
+          `INSERT INTO message_recipients (id, message_id, kind, address) VALUES ($1, $2, 'cc', $3)`,
+          [crypto.randomUUID(), messageId, addr]
+        );
+      }
+    }
+    if (bcc && Array.isArray(bcc) && bcc.length > 0) {
+      for (const addr of bcc) {
+        await defaultDb.query(
+          `INSERT INTO message_recipients (id, message_id, kind, address) VALUES ($1, $2, 'bcc', $3)`,
+          [crypto.randomUUID(), messageId, addr]
+        );
+      }
+    }
+
+    res.status(201).json({
+      success: true,
+      data: {
+        draftId: messageId,
+        threadId,
+        subject: cleanSubject,
+        updatedAt: new Date().toISOString(),
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /v1/messages/:id/star - Toggle star / important
+messagesRouter.post('/:id/star', async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const { isStarred } = req.body;
+
+    const rows = (await defaultDb.query(
+      `UPDATE messages 
+       SET is_starred = COALESCE($2, NOT is_starred),
+           is_important = COALESCE($2, NOT is_starred)
+       WHERE id = $1
+       RETURNING id, is_starred, is_important`,
+      [id, isStarred !== undefined ? isStarred : null]
+    )) as any[];
+
+    if (rows.length === 0) {
+      throw new AppError('NOT_FOUND', 'Message not found', 404);
+    }
+
+    res.json({ success: true, data: rows[0] });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /v1/messages/:id/trash - Move message to trash
+messagesRouter.post('/:id/trash', async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user!.userId;
+    const userEmail = req.user!.email;
+
+    const { mailboxId } = await getOrCreateUserMailbox(userId, userEmail);
+    const trashFolderId = await getFolderId(mailboxId, 'trash');
+
+    await defaultDb.query(`UPDATE messages SET folder_id = $2 WHERE id = $1 AND mailbox_id = $3`, [
+      id,
+      trashFolderId,
+      mailboxId,
+    ]);
+
+    res.json({ success: true, message: 'Message moved to Trash' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /v1/messages/:id/archive - Move message to archive
+messagesRouter.post('/:id/archive', async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user!.userId;
+    const userEmail = req.user!.email;
+
+    const { mailboxId } = await getOrCreateUserMailbox(userId, userEmail);
+    const archiveFolderId = await getFolderId(mailboxId, 'archive');
+
+    await defaultDb.query(`UPDATE messages SET folder_id = $2 WHERE id = $1 AND mailbox_id = $3`, [
+      id,
+      archiveFolderId,
+      mailboxId,
+    ]);
+
+    res.json({ success: true, message: 'Message moved to Archive' });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // GET /v1/messages/:id - Get full message detail with body
 messagesRouter.get('/:id', async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
@@ -309,7 +505,7 @@ messagesRouter.get('/:id', async (req: AuthenticatedRequest, res: Response, next
       `SELECT m.*, r.address as recipient_address, r.kind as recipient_kind
        FROM messages m
        LEFT JOIN message_recipients r ON r.message_id = m.id
-       WHERE m.id = $1`,
+       WHERE m.id = $1 OR m.thread_id = $1`,
       [id]
     )) as any[];
 
@@ -332,15 +528,20 @@ messagesRouter.get('/:id', async (req: AuthenticatedRequest, res: Response, next
     if (first.raw_object_key) {
       try {
         const rawBuf = await storage.get(first.raw_object_key);
-        if (rawBuf) {
-          const content = rawBuf.toString('utf-8');
+          let content = rawBuf.toString('utf-8');
+          if (content.includes('\r\n\r\n') && (content.startsWith('DKIM-') || content.startsWith('From:') || content.startsWith('Received:'))) {
+            content = content.split('\r\n\r\n').slice(1).join('\r\n\r\n');
+          } else if (content.includes('\n\n') && (content.startsWith('DKIM-') || content.startsWith('From:') || content.startsWith('Received:'))) {
+            content = content.split('\n\n').slice(1).join('\n\n');
+          }
+
           if (content.includes('<') && content.includes('>')) {
             bodyHtml = content;
+            bodyText = content.replace(/<[^>]*>/g, '').trim();
           } else {
             bodyText = content;
             bodyHtml = `<p>${content.replace(/\n/g, '<br>')}</p>`;
           }
-        }
       } catch {
         // Fallback to snippet
       }
@@ -364,6 +565,7 @@ messagesRouter.get('/:id', async (req: AuthenticatedRequest, res: Response, next
         receivedAt: new Date(first.received_at).toLocaleString(),
         isRead: Boolean(first.is_read),
         isStarred: Boolean(first.is_starred),
+        isImportant: Boolean(first.is_important),
         security: {
           spf: 'pass',
           dkim: 'pass',

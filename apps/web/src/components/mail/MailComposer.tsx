@@ -20,6 +20,7 @@ import {
   ChevronDown,
   CheckCircle2,
   AlertCircle,
+  Save,
 } from 'lucide-react';
 
 export interface ComposerAttachment {
@@ -42,6 +43,7 @@ export interface MailComposerProps {
   isOpen: boolean;
   onClose: () => void;
   onSend: (email: ComposeEmailPayload) => Promise<void> | void;
+  onSaveDraft?: (email: ComposeEmailPayload) => Promise<void> | void;
   initialTo?: string[];
   initialSubject?: string;
   initialBody?: string;
@@ -51,6 +53,7 @@ export const MailComposer: React.FC<MailComposerProps> = ({
   isOpen,
   onClose,
   onSend,
+  onSaveDraft,
   initialTo = [],
   initialSubject = '',
   initialBody = '',
@@ -73,10 +76,19 @@ export const MailComposer: React.FC<MailComposerProps> = ({
   const [attachments, setAttachments] = useState<ComposerAttachment[]>([]);
 
   const [isSending, setIsSending] = useState(false);
-  const [draftStatus, setDraftStatus] = useState<string>('Draft saved');
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
+  const [draftStatus, setDraftStatus] = useState<string>('Draft ready');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setToChips(initialTo);
+      setSubject(initialSubject);
+      setBody(initialBody);
+    }
+  }, [isOpen, initialTo, initialSubject, initialBody]);
 
   // Autosave simulation every 3 seconds
   useEffect(() => {
@@ -184,6 +196,32 @@ export const MailComposer: React.FC<MailComposerProps> = ({
       setErrorMessage((err as Error).message || 'Failed to send message');
     } finally {
       setIsSending(false);
+    }
+  };
+
+  const handleSaveDraft = async () => {
+    let finalTo = [...toChips];
+    if (toInput.trim() && validateEmail(toInput.trim())) {
+      finalTo.push(toInput.trim());
+    }
+
+    setIsSavingDraft(true);
+    try {
+      if (onSaveDraft) {
+        await onSaveDraft({
+          to: finalTo,
+          cc: ccChips,
+          bcc: bccChips,
+          subject: subject.trim() || '(Draft - No Subject)',
+          body: body.trim(),
+          attachments,
+        });
+      }
+      setDraftStatus('Draft saved');
+    } catch (err: unknown) {
+      setErrorMessage((err as Error).message || 'Failed to save draft');
+    } finally {
+      setIsSavingDraft(false);
     }
   };
 
@@ -407,12 +445,24 @@ export const MailComposer: React.FC<MailComposerProps> = ({
               <button
                 type="button"
                 onClick={handleSend}
-                disabled={isSending}
+                disabled={isSending || isSavingDraft}
                 className="py-2 px-4 rounded-xl bg-[#2D5BFF] hover:bg-[#1E48E0] active:scale-[0.98] disabled:opacity-50 text-white font-semibold text-xs shadow-md shadow-blue-500/20 transition-all flex items-center gap-2"
                 data-testid="composer-send-btn"
               >
                 <Send className="w-3.5 h-3.5" />
                 <span>{isSending ? 'Sending...' : 'Send'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleSaveDraft}
+                disabled={isSending || isSavingDraft}
+                className="py-2 px-3 rounded-xl bg-[#1C1F26] hover:bg-[#2A2E37] text-slate-300 hover:text-white font-medium text-xs border border-[#2A2E37] transition-all flex items-center gap-1.5"
+                data-testid="composer-save-draft-btn"
+                title="Save this message as a draft in Drafts folder"
+              >
+                <Save className="w-3.5 h-3.5 text-amber-400" />
+                <span>{isSavingDraft ? 'Saving...' : 'Save Draft'}</span>
               </button>
 
               {/* Attachment Trigger */}
