@@ -51,6 +51,8 @@ async function clearMailpit(): Promise<void> {
 async function runLocalE2ETests() {
   console.log(`\n===============================================================`);
   console.log(`🧪 Eazzio Mail — Local-Only E2E Mail Pipeline Verification`);
+  console.log(`   Mode:      LOCAL (Zero Cost / Offline / Zero External Services)`);
+  console.log(`   Transport: SmtpSubmissionTransport ➔ Mailpit (127.0.0.1:1025)`);
   console.log(`===============================================================\n`);
 
   // 1. Dependency Checks

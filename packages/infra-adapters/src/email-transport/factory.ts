@@ -5,7 +5,7 @@ import { LocalTestTransport } from './local-test-adapter.js';
 
 import { SmtpAuthenticatedTransport } from './smtp-authenticated-adapter.js';
 
-export type TransportType = 'direct' | 'smtp' | 'smtp-auth' | 'relay' | 'local';
+export type TransportType = 'direct' | 'smtp' | 'smtp-auth' | 'relay' | 'local' | 'memory';
 
 export function createEmailTransport(type?: TransportType): EazzioEmailTransport {
   const emailMode = (process.env.EMAIL_MODE || '').toLowerCase();
@@ -14,37 +14,34 @@ export function createEmailTransport(type?: TransportType): EazzioEmailTransport
   let selectedType: TransportType;
   if (type) {
     selectedType = type;
+  } else if (rawTransport === 'memory' || emailMode === 'memory') {
+    selectedType = 'memory';
   } else if (rawTransport === 'relay' || rawTransport === 'smtp-auth' || emailMode === 'relay') {
     selectedType = 'relay';
-  } else if (rawTransport === 'local' || emailMode === 'local') {
-    selectedType = 'local';
   } else if (rawTransport === 'direct' || emailMode === 'direct') {
     selectedType = 'direct';
-  } else if (rawTransport === 'smtp') {
-    selectedType = 'smtp';
+  } else if (rawTransport === 'local' || emailMode === 'local') {
+    selectedType = 'local';
   } else if (
     process.env.SMTP_PASSWORD ||
     process.env.SMTP_PASS ||
-    process.env.SMTP_AUTH_PASS ||
-    process.env.SMTP_USERNAME ||
-    process.env.SMTP_USER ||
-    process.env.SMTP_AUTH_USER
+    process.env.SMTP_AUTH_PASS
   ) {
     selectedType = 'relay';
-  } else if (process.env.NODE_ENV === 'production') {
-    selectedType = 'relay';
   } else {
-    selectedType = 'smtp';
+    // Default for local development: Local Mailpit (port 1025) / Local LMTP
+    selectedType = 'local';
   }
 
   switch (selectedType) {
-    case 'local':
+    case 'memory':
       return new LocalTestTransport();
     case 'direct':
       return new DirectMtaEmailTransport();
     case 'relay':
     case 'smtp-auth':
       return new SmtpAuthenticatedTransport();
+    case 'local':
     case 'smtp':
     default:
       return new SmtpSubmissionTransport({

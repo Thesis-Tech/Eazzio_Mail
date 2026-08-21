@@ -378,7 +378,9 @@ async function main() {
   const report = await runDirectSmtpTest(recipient);
 
   console.log(`\n==================================================`);
-  console.log(`EAZZIO — CONTROLLED GMAIL DELIVERY TEST`);
+  console.log(`🌐 EAZZIO — DIRECT-TO-MX PRODUCTION SMTP TEST`);
+  console.log(`   Mode:      DIRECT (Production Server / Static IP + PTR Required)`);
+  console.log(`   Transport: DirectMtaEmailTransport ➔ Recipient MX (Port 25)`);
   console.log(`==================================================\n`);
   console.log(`Recipient:\n${report.recipient}\n`);
   console.log(`Source IPv4:\n${report.sourceIpv4}\n`);
