@@ -19,6 +19,13 @@ class AuthProvider extends ChangeNotifier {
   bool get isInitialized => _isInitialized;
   String? get errorMessage => _errorMessage;
 
+  void setUserForTesting(AuthUser? user) {
+    _currentUser = user;
+    _isInitialized = true;
+    _isLoading = false;
+    notifyListeners();
+  }
+
   Future<void> restoreSession() async {
     _isLoading = true;
     notifyListeners();

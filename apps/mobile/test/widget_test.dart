@@ -48,9 +48,9 @@ void main() {
       await tester.tap(find.byKey(const Key('login_button')));
       await tester.pumpAndSettle();
 
-      // Verify HomeScreen is rendered with user email and security badge
-      expect(find.text('rahul@eazzio.com'), findsOneWidget);
-      expect(find.text('Protected by Eazzio TLS & Zero-Access Vault'), findsOneWidget);
+      // Verify InboxScreen is rendered with folder title, compose FAB, and logout button
+      expect(find.text('Inbox'), findsOneWidget);
+      expect(find.byKey(const Key('compose_fab')), findsOneWidget);
       expect(find.byKey(const Key('logout_button')), findsOneWidget);
     });
 

@@ -155,17 +155,17 @@
   - **Verification:** Flutter widget tests for splash screen, login screen, and token storage.
   - **Definition of Done:** Mobile app launches, handles login/logout, and stores session tokens securely.
 
-- [ ] **TASK-026** — Mobile Inbox & Thread List Screen
+- [x] **TASK-026** — Mobile Inbox & Thread List Screen
   - **Action:** Build mobile Inbox screen featuring swipe-to-archive/delete actions, pull-to-refresh, unread badges, and folder drawer navigation.
   - **Verification:** Flutter widget tests verifying swipe actions, list rendering, and pull-to-refresh.
   - **Definition of Done:** Mobile inbox lists threads with smooth scrolling and gesture interactions.
 
-- [ ] **TASK-027** — Mobile Message Detail & Conversation View
+- [x] **TASK-027** — Mobile Message Detail & Conversation View
   - **Action:** Build mobile conversation view displaying message history, sanitized HTML bodies, attachment previews, and quick reply actions.
   - **Verification:** Flutter tests verifying conversation rendering and HTML body sandboxing.
   - **Definition of Done:** Users can view full message threads and download attachments on mobile.
 
-- [ ] **TASK-028** — Mobile Message Composer
+- [x] **TASK-028** — Mobile Message Composer
   - **Action:** Build mobile composer with rich text editing, recipient lookup, attachment picker, and offline draft storage.
   - **Verification:** Flutter widget tests for message composition and sending.
   - **Definition of Done:** Users can compose and send emails directly from mobile devices.
