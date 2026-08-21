@@ -62,3 +62,22 @@ export interface MessageDetail {
     antivirusStatus: 'clean' | 'infected';
   }>;
 }
+
+export interface FilterRule {
+  id: string;
+  name: string;
+  field: 'from' | 'to' | 'subject' | 'body';
+  operator: 'contains' | 'equals' | 'starts_with' | 'ends_with';
+  value: string;
+  action: 'apply_label' | 'move_to_folder' | 'mark_as_read' | 'star';
+  actionValue?: string;
+  isEnabled: boolean;
+}
+
+export interface UserPreferences {
+  defaultMailbox: string;
+  signature: string;
+  autoSummarizeWithAI: boolean;
+  soundNotifications: boolean;
+  theme: 'dark' | 'light' | 'system';
+}

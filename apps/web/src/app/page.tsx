@@ -5,12 +5,49 @@ import { DashboardLayout } from '../components/layout/DashboardLayout';
 import { ThreadList } from '../components/mail/ThreadList';
 import { ConversationViewer } from '../components/mail/ConversationViewer';
 import { MailComposer, ComposeEmailPayload } from '../components/mail/MailComposer';
-import { ThreadSummary, MessageDetail } from '../types/mail';
+import { SettingsModal } from '../components/settings/SettingsModal';
+import { ThreadSummary, MessageDetail, FolderItem, LabelItem, FilterRule, UserPreferences } from '../types/mail';
 import { Mail, Sparkles, X, Search } from 'lucide-react';
 import { parseSearchQuery } from '../components/search/SearchBar';
 import { realtimeClient, RealtimeMailEvent } from '../lib/websocket-client';
 import { ToastContainer, ToastNotification } from '../components/notification/ToastContainer';
 import { AuthStore } from '../lib/auth-store';
+
+const initialFolders: FolderItem[] = [
+  { id: 'fld-inbox', name: 'Inbox', slug: 'inbox', type: 'system', unreadCount: 3, totalCount: 142 },
+  { id: 'fld-sent', name: 'Sent', slug: 'sent', type: 'system', unreadCount: 0, totalCount: 89 },
+  { id: 'fld-drafts', name: 'Drafts', slug: 'drafts', type: 'system', unreadCount: 1, totalCount: 4 },
+  { id: 'fld-spam', name: 'Spam', slug: 'spam', type: 'system', unreadCount: 0, totalCount: 12 },
+  { id: 'fld-trash', name: 'Trash', slug: 'trash', type: 'system', unreadCount: 0, totalCount: 23 },
+  { id: 'fld-archive', name: 'Archive', slug: 'archive', type: 'system', unreadCount: 0, totalCount: 512 },
+];
+
+const initialLabels: LabelItem[] = [
+  { id: 'lbl-work', name: 'Work', color: '#2D5BFF' },
+  { id: 'lbl-finance', name: 'Finance', color: '#10B981' },
+  { id: 'lbl-urgent', name: 'Urgent', color: '#EF4444' },
+];
+
+const initialFilters: FilterRule[] = [
+  {
+    id: 'rule-1',
+    name: 'Auto-tag Security Alerts',
+    field: 'subject',
+    operator: 'contains',
+    value: 'Security',
+    action: 'apply_label',
+    actionValue: 'Work',
+    isEnabled: true,
+  },
+];
+
+const initialPreferences: UserPreferences = {
+  defaultMailbox: 'user@eazzio.com',
+  signature: 'Best regards,\nEazzio Mail Team',
+  autoSummarizeWithAI: true,
+  soundNotifications: true,
+  theme: 'dark',
+};
 
 const initialThreads: ThreadSummary[] = [
   {
@@ -170,6 +207,11 @@ export default function MailDashboardPage() {
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>('th-101');
   const [searchQuery, setSearchQuery] = useState('');
   const [isComposeOpen, setIsComposeOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [folders, setFolders] = useState<FolderItem[]>(initialFolders);
+  const [labels, setLabels] = useState<LabelItem[]>(initialLabels);
+  const [filterRules, setFilterRules] = useState<FilterRule[]>(initialFilters);
+  const [preferences, setPreferences] = useState<UserPreferences>(initialPreferences);
   const [toasts, setToasts] = useState<ToastNotification[]>([]);
 
   useEffect(() => {
@@ -460,9 +502,9 @@ export default function MailDashboardPage() {
       mailboxId: 'mbx-primary',
       folderId: 'fld-sent',
       from: { name: 'You', email: AuthStore.getState().user?.email || 'user@eazzio.com' },
-      to: payload.to.map((addr) => ({ name: addr.split('@')[0] || 'Recipient', email: addr })),
-      cc: payload.cc?.map((addr) => ({ name: addr.split('@')[0] || 'Recipient', email: addr })),
-      bcc: payload.bcc?.map((addr) => ({ name: addr.split('@')[0] || 'Recipient', email: addr })),
+      to: payload.to.map((addr) => ({ name: addr, email: addr })),
+      cc: payload.cc?.map((addr) => ({ name: addr, email: addr })),
+      bcc: payload.bcc?.map((addr) => ({ name: addr, email: addr })),
       subject: payload.subject,
       snippet: payload.body.slice(0, 80),
       bodyText: payload.body,
@@ -498,6 +540,7 @@ export default function MailDashboardPage() {
       activeLabelId={activeLabelId}
       onSelectFolder={(id) => {
         setActiveFolderId(id);
+        setActiveLabelId(undefined);
         setSelectedThreadId(null);
       }}
       onSelectLabel={(id) => {
@@ -505,8 +548,11 @@ export default function MailDashboardPage() {
         setSelectedThreadId(null);
       }}
       onOpenCompose={() => setIsComposeOpen(true)}
+      onOpenSettings={() => setIsSettingsOpen(true)}
       onSearch={(q) => setSearchQuery(q)}
       availableThreads={threads}
+      customFolders={folders}
+      customLabels={labels}
     >
       <div className="h-full flex flex-col md:flex-row overflow-hidden relative" data-testid="mail-split-pane">
         {/* Left Column: Thread List */}
@@ -575,6 +621,20 @@ export default function MailDashboardPage() {
           isOpen={isComposeOpen}
           onClose={() => setIsComposeOpen(false)}
           onSend={handleSendComposeEmail}
+        />
+
+        {/* Settings & Preferences Modal */}
+        <SettingsModal
+          isOpen={isSettingsOpen}
+          onClose={() => setIsSettingsOpen(false)}
+          folders={folders}
+          labels={labels}
+          filterRules={filterRules}
+          preferences={preferences}
+          onUpdateFolders={setFolders}
+          onUpdateLabels={setLabels}
+          onUpdateFilterRules={setFilterRules}
+          onUpdatePreferences={setPreferences}
         />
 
         {/* Realtime Toast Notifications */}

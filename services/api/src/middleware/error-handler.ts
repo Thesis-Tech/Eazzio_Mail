@@ -34,6 +34,7 @@ export function errorHandler(
   }
 
   // Fallback to INTERNAL_ERROR (Rule 63: no internal stack traces leaked)
+  console.error('API Unhandled Error:', err);
   res.status(500).json({
     error: {
       code: 'INTERNAL_ERROR',

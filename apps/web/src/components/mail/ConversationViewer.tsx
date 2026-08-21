@@ -221,8 +221,10 @@ export const ConversationViewer: React.FC<ConversationViewerProps> = ({
                 <div className="px-5 pb-5 pt-1 border-t border-[#2A2E37]/60 space-y-4">
                   {/* Recipients Line */}
                   <div className="text-xs text-slate-400 flex items-center gap-2">
-                    <span className="text-slate-500">To:</span>
-                    <span>{msg.to.map((t) => t.name || t.email).join(', ')}</span>
+                    <span className="text-slate-500 font-medium">To:</span>
+                    <span className="text-slate-200" title={msg.to.map((t) => t.email || t.name).join(', ')}>
+                      {msg.to.map((t) => t.email || t.name).join(', ')}
+                    </span>
                   </div>
 
                   {/* Body Text / HTML */}

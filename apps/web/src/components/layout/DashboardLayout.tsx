@@ -14,6 +14,7 @@ export interface DashboardLayoutProps {
   onSelectFolder?: (folderId: string) => void;
   onSelectLabel?: (labelId: string) => void;
   onOpenCompose?: () => void;
+  onOpenSettings?: () => void;
   onSearch?: (query: string) => void;
   availableThreads?: ThreadSummary[];
   customFolders?: FolderItem[];
@@ -42,6 +43,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   onSelectFolder,
   onSelectLabel,
   onOpenCompose,
+  onOpenSettings,
   onSearch,
   availableThreads = [],
   customFolders = defaultFolders,
@@ -103,6 +105,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         onSelectFolder={handleFolderSelect}
         onSelectLabel={handleLabelSelect}
         onOpenCompose={onOpenCompose || (() => {})}
+        onOpenSettings={onOpenSettings}
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
       />

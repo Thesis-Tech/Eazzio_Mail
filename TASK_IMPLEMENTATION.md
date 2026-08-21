@@ -117,7 +117,7 @@
   - **Verification:** Test verifying live inbox update upon receiving simulated WebSocket arrival message.
   - **Definition of Done:** New incoming messages appear in real-time in the web client.
 
-- [ ] **TASK-020** — Settings, Labels, Filters & Folder Management UI
+- [x] **TASK-020** — Settings, Labels, Filters & Folder Management UI
   - **Action:** Build settings pages for custom label creation, color tagging, folder hierarchy management, filter rules, and user preferences.
   - **Verification:** Web UI tests for creating custom folders, assigning labels, and defining filter rules.
   - **Definition of Done:** Users can manage mailbox organization and preferences through dedicated settings views.

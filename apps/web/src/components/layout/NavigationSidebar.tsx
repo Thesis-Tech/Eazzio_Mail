@@ -26,6 +26,7 @@ interface NavigationSidebarProps {
   onSelectFolder: (folderId: string) => void;
   onSelectLabel: (labelId: string) => void;
   onOpenCompose: () => void;
+  onOpenSettings?: () => void;
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
 }
@@ -38,6 +39,7 @@ export const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
   onSelectFolder,
   onSelectLabel,
   onOpenCompose,
+  onOpenSettings,
   isCollapsed = false,
 }) => {
   const getFolderIcon = (slug: string) => {
@@ -176,8 +178,10 @@ export const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
         )}
         <div className="flex items-center justify-between pt-1">
           <button
+            onClick={onOpenSettings}
             className="p-1.5 rounded-lg text-slate-400 hover:bg-[#1C1F26] hover:text-white transition-colors"
             title="Settings"
+            data-testid="sidebar-settings-btn"
           >
             <Settings className="w-4 h-4" />
           </button>
