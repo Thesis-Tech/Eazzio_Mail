@@ -13,7 +13,7 @@ import {
 import { RspamdScanner } from './security/rspamd-scanner.js';
 import { ClamAVScanner } from './security/clamav-scanner.js';
 
-const PORT = Number(process.env.LMTP_PORT || process.env.PORT || 24);
+const PORT = Number(process.env.LMTP_PORT || process.env.PORT || 2424);
 const HOST = process.env.HOST || '0.0.0.0';
 const DATABASE_URL = process.env.DATABASE_URL || 'postgresql://eazzio_user:eazzio_password@localhost:5432/eazzio_mail';
 const RSPAMD_URL = process.env.RSPAMD_URL || 'http://localhost:11333';
