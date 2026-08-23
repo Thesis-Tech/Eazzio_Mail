@@ -54,6 +54,8 @@ export interface MessageDetail {
     clamavStatus: 'clean' | 'infected';
     spamScore: number;
   };
+  listUnsubscribe?: string | null;
+  listId?: string | null;
   attachments: Array<{
     id: string;
     filename: string;

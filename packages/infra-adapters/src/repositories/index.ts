@@ -6,3 +6,4 @@ export * from './postgres-label-repository.js';
 export * from './postgres-thread-repository.js';
 export * from './postgres-domain-repository.js';
 export * from './postgres-organization-repository.js';
+export * from './postgres-filter-repository.js';

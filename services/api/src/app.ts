@@ -2,6 +2,9 @@ import express, { Express } from 'express';
 import { mailboxRouter } from './api/v1/mailboxes.js';
 import { messagesRouter } from './api/v1/messages.js';
 import { searchRouter } from './api/v1/search.js';
+import { filtersRouter } from './api/v1/filters.js';
+import { webhooksRouter } from './api/v1/webhooks.js';
+import { statsRouter } from './api/v1/stats.js';
 import { errorHandler } from './middleware/error-handler.js';
 
 export const app: Express = express();
@@ -17,11 +20,17 @@ app.get('/health', (_req, res) => {
 app.use('/v1/mailboxes', mailboxRouter);
 app.use('/v1/messages', messagesRouter);
 app.use('/v1/search', searchRouter);
+app.use('/v1/filters', filtersRouter);
+app.use('/v1/webhooks', webhooksRouter);
+app.use('/v1/stats', statsRouter);
 
 // Support /api/v1 prefixes
 app.use('/api/v1/mailboxes', mailboxRouter);
 app.use('/api/v1/messages', messagesRouter);
 app.use('/api/v1/search', searchRouter);
+app.use('/api/v1/filters', filtersRouter);
+app.use('/api/v1/webhooks', webhooksRouter);
+app.use('/api/v1/stats', statsRouter);
 
 // Standard error handling envelope
 app.use(errorHandler);

@@ -245,3 +245,23 @@
   - **Artifacts:** [`004_message_body_columns.sql`](file:///home/rahul-kumar/Desktop/Eazzio_Mail/packages/infra-adapters/src/database/migrations/004_message_body_columns.sql), [`ConversationViewer.tsx`](file:///home/rahul-kumar/Desktop/Eazzio_Mail/apps/web/src/components/mail/ConversationViewer.tsx), [`postgres-message-repository.ts`](file:///home/rahul-kumar/Desktop/Eazzio_Mail/packages/infra-adapters/src/repositories/postgres-message-repository.ts)
   - **Verification:** Fixed schema missing body columns by adding `body_text` and `body_html` columns with migration 004. Updated `MimeParser` and `InboundPipeline` to persist full body text and HTML to PostgreSQL, updated API queries to return body content, and updated web conversation viewer to render rich HTML formatting, line breaks, and signatures.
 
+- [x] **TASK-040** — Inbound Filtering Rule Engine & Rule Management API (FR-RULE-01)
+  - **Artifacts:** [`filter.ts`](file:///home/rahul-kumar/Desktop/Eazzio_Mail/packages/domain/src/models/filter.ts), [`postgres-filter-repository.ts`](file:///home/rahul-kumar/Desktop/Eazzio_Mail/packages/infra-adapters/src/repositories/postgres-filter-repository.ts), [`filters.ts`](file:///home/rahul-kumar/Desktop/Eazzio_Mail/services/api/src/api/v1/filters.ts), [`inbound-pipeline.ts`](file:///home/rahul-kumar/Desktop/Eazzio_Mail/services/mail-inbound/src/application/inbound-pipeline.ts)
+  - **Verification:** Implemented domain `Filter` model and `PostgresFilterRepository`. Wired `/v1/filters` CRUD API endpoints in `services/api`. Connected `InboundPipeline` to evaluate active user filter rules on arrival (matching sender, recipient, subject, body, or headers) and automatically apply folder moves, labels, stars, and read/unread flags.
+
+- [x] **TASK-041** — Mailing-List Recognition & One-Click Unsubscribe (FR-RULE-02)
+  - **Artifacts:** [`mime-parser.ts`](file:///home/rahul-kumar/Desktop/Eazzio_Mail/services/mail-inbound/src/domain/mime-parser.ts), [`ConversationViewer.tsx`](file:///home/rahul-kumar/Desktop/Eazzio_Mail/apps/web/src/components/mail/ConversationViewer.tsx)
+  - **Verification:** Parsed `List-Unsubscribe` and `List-Id` RFC 2369 / RFC 8058 headers during MIME parsing, persisted header metadata in `auth_results`, and rendered one-click Unsubscribe badge and link in the conversation viewer.
+
+- [x] **TASK-042** — Webhooks & Event Subscription Engine (FR-API-04, FR-RT-04)
+  - **Artifacts:** [`005_webhooks_schema.sql`](file:///home/rahul-kumar/Desktop/Eazzio_Mail/packages/infra-adapters/src/database/migrations/005_webhooks_schema.sql), [`webhooks.ts`](file:///home/rahul-kumar/Desktop/Eazzio_Mail/services/api/src/api/v1/webhooks.ts)
+  - **Verification:** Created `webhooks` and `webhook_deliveries` tables via migration 005. Implemented `/v1/webhooks` endpoint for webhook registration, management, and HMAC-SHA256 test ping dispatch (`POST /v1/webhooks/:id/test`).
+
+- [x] **TASK-043** — Enhanced Privacy Mode & Zero-Data-Leak AI Enforcer (FR-ENC-02, FR-ENC-04, FR-AI-03)
+  - **Artifacts:** [`ai-policy.ts`](file:///home/rahul-kumar/Desktop/Eazzio_Mail/services/ai-gateway/src/domain/ai-policy.ts), [`ai-service.ts`](file:///home/rahul-kumar/Desktop/Eazzio_Mail/services/ai-gateway/src/application/ai-service.ts)
+  - **Verification:** Implemented privacy tier checking in `AiPolicyEvaluator` to strictly deny AI processing when enhanced privacy or user AI opt-out is enabled, ensuring zero external data leakage.
+
+- [x] **TASK-044** — System Observability & Mail Flow Stats API (FR-OBS-02, FR-OBS-03)
+  - **Artifacts:** [`stats.ts`](file:///home/rahul-kumar/Desktop/Eazzio_Mail/services/api/src/api/v1/stats.ts)
+  - **Verification:** Implemented `/v1/stats` endpoint exposing live mail flow metrics (inbound/outbound counts & volume), delivery states breakdown, total users, active domains, and queue depths. Verified with live curl test.
+

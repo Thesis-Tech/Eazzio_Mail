@@ -149,6 +149,8 @@ export default function MailDashboardPage() {
               clamavStatus: 'clean',
               spamScore: 0.0,
             },
+            listUnsubscribe: msg.auth_results?.listUnsubscribe || msg.listUnsubscribe || null,
+            listId: msg.auth_results?.listId || msg.listId || null,
             attachments: [],
           };
 

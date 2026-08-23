@@ -184,6 +184,23 @@ export const ConversationViewer: React.FC<ConversationViewerProps> = ({
                       </span>
                     </div>
 
+                    {msg.listUnsubscribe && (
+                      <div className="mt-1 flex items-center gap-2">
+                        <a
+                          href={msg.listUnsubscribe.match(/<([^>]+)>/)?.[1] || msg.listUnsubscribe}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-[11px] font-medium text-slate-400 hover:text-amber-400 bg-[#1C1F26] border border-[#2A2E37] hover:border-amber-500/40 px-2 py-0.5 rounded-md transition-colors inline-flex items-center gap-1"
+                          title="One-click Unsubscribe from this mailing list"
+                        >
+                          <span>Mailing List</span>
+                          <span className="text-slate-600">•</span>
+                          <span className="text-amber-400/90 underline">Unsubscribe</span>
+                        </a>
+                      </div>
+                    )}
+
                     {!isExpanded && (
                       <p className="text-xs text-slate-400 truncate max-w-lg mt-0.5">
                         {msg.snippet}

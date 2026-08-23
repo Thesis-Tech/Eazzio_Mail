@@ -12,5 +12,6 @@ export * from './models/label.js';
 export * from './models/thread.js';
 export * from './models/message.js';
 export * from './models/policy.js';
+export * from './models/filter.js';
 
 export * from './repositories/interfaces.js';

@@ -6,6 +6,7 @@ import { Label } from '../models/label.js';
 import { Thread } from '../models/thread.js';
 import { Domain } from '../models/domain.js';
 import { Organization } from '../models/organization.js';
+import { Filter } from '../models/filter.js';
 
 export interface UserRepository {
   findById(id: string): Promise<User | null>;
@@ -72,4 +73,12 @@ export interface DomainRepository {
 export interface OrganizationRepository {
   findById(id: string): Promise<Organization | null>;
   save(org: Organization): Promise<void>;
+}
+
+export interface FilterRepository {
+  findById(id: string): Promise<Filter | null>;
+  findByMailboxId(mailboxId: string): Promise<Filter[]>;
+  save(filter: Filter): Promise<void>;
+  updateEnabled(id: string, isEnabled: boolean): Promise<void>;
+  delete(id: string): Promise<void>;
 }

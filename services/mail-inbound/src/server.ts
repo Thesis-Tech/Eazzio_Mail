@@ -8,6 +8,8 @@ import {
   PostgresFolderRepository,
   PostgresMessageRepository,
   PostgresThreadRepository,
+  PostgresFilterRepository,
+  PostgresLabelRepository,
   MemoryStorageAdapter,
 } from '@eazzio/infra-adapters';
 import { RspamdScanner } from './security/rspamd-scanner.js';
@@ -26,6 +28,8 @@ const mailboxRepo = new PostgresMailboxRepository(db);
 const folderRepo = new PostgresFolderRepository(db);
 const messageRepo = new PostgresMessageRepository(db);
 const threadRepo = new PostgresThreadRepository(db);
+const filterRepo = new PostgresFilterRepository(db);
+const labelRepo = new PostgresLabelRepository(db);
 const storage = new MemoryStorageAdapter();
 
 const rspamdScanner = new RspamdScanner({ endpoint: RSPAMD_URL });
@@ -40,6 +44,8 @@ const pipeline = new InboundPipeline(
   storage,
   rspamdScanner,
   clamavScanner,
+  filterRepo,
+  labelRepo,
 );
 
 export function createLmtpServer(customPipeline?: InboundPipeline): net.Server {

@@ -23,6 +23,9 @@ export interface ParsedMimeMessage {
   bodyText: string;
   bodyHtml?: string;
   attachments: ParsedAttachment[];
+  listUnsubscribe?: string | null;
+  listId?: string | null;
+  headers?: Record<string, string>;
 }
 
 export class MimeParser {
@@ -102,6 +105,16 @@ export class MimeParser {
         },
       );
 
+      const rawHeaders: Record<string, string> = {};
+      if (parsed.headers) {
+        for (const [k, v] of parsed.headers) {
+          rawHeaders[k.toLowerCase()] = typeof v === 'string' ? v : (v as any)?.text || JSON.stringify(v);
+        }
+      }
+
+      const listUnsubscribeHeader = rawHeaders['list-unsubscribe'] || null;
+      const listIdHeader = rawHeaders['list-id'] || null;
+
       return {
         messageIdHeader,
         inReplyTo,
@@ -113,6 +126,9 @@ export class MimeParser {
         bodyText: parsed.text || '',
         bodyHtml: parsed.html || undefined,
         attachments,
+        listUnsubscribe: listUnsubscribeHeader,
+        listId: listIdHeader,
+        headers: rawHeaders,
       };
     } catch {
       // Fallback simple parsing if rawMime is malformed
@@ -154,6 +170,9 @@ export class MimeParser {
       subject: headers['subject'] || '(No Subject)',
       bodyText,
       attachments: [],
+      listUnsubscribe: headers['list-unsubscribe'] || null,
+      listId: headers['list-id'] || null,
+      headers,
     };
   }
 }

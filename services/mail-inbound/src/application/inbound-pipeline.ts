@@ -13,6 +13,8 @@ import {
   ThreadRepository,
   DomainRepository,
   MailboxRepository,
+  FilterRepository,
+  LabelRepository,
 } from '@eazzio/domain';
 import { EazzioStorage } from '@eazzio/infra-adapters';
 import crypto from 'crypto';
@@ -44,6 +46,8 @@ export class InboundPipeline {
     private readonly storage?: EazzioStorage,
     private readonly rspamdScanner?: RspamdScanner,
     private readonly clamavScanner?: ClamAVScanner,
+    private readonly filterRepo?: FilterRepository,
+    private readonly labelRepo?: LabelRepository,
   ) {}
 
   public async process(input: InboundProcessInput): Promise<InboundProcessResult> {
@@ -173,12 +177,70 @@ export class InboundPipeline {
       await this.threadRepo.save(newThread);
     }
 
+    let isRead = false;
+    let isStarred = false;
+    let isImportant = false;
+    let finalFolderId = effectiveFolderId;
+    const appliedLabelIds: string[] = [];
+
+    // 7.1 Rule Engine Evaluation (FR-RULE-01)
+    if (this.filterRepo && effectiveMailboxId) {
+      try {
+        const rules = await this.filterRepo.findByMailboxId(effectiveMailboxId);
+        const activeRules = rules.filter((r) => r.isEnabled);
+        for (const rule of activeRules) {
+          if (
+            rule.matches({
+              from: input.envelope.from.value,
+              to: input.envelope.to.map((t) => t.value),
+              subject: parsed.subject,
+              bodyText: parsed.bodyText,
+              headers: parsed.headers,
+            })
+          ) {
+            for (const action of rule.actions) {
+              if (action.type === 'mark_as_read') isRead = true;
+              if (action.type === 'star') isStarred = true;
+              if (action.type === 'mark_important') isImportant = true;
+              if (action.type === 'move_to_folder' && action.value && this.folderRepo) {
+                const folders = await this.folderRepo.findByMailboxId(effectiveMailboxId);
+                const match = folders.find(
+                  (f) =>
+                    f.id === action.value ||
+                    f.name.toLowerCase() === action.value!.toLowerCase() ||
+                    f.kind === action.value!.toLowerCase()
+                );
+                if (match) finalFolderId = match.id;
+              }
+              if (action.type === 'apply_label' && action.value && this.labelRepo) {
+                const labels = await this.labelRepo.findByMailboxId(effectiveMailboxId);
+                const match = labels.find(
+                  (l) => l.id === action.value || l.name.toLowerCase() === action.value!.toLowerCase()
+                );
+                if (match && !appliedLabelIds.includes(match.id)) {
+                  appliedLabelIds.push(match.id);
+                }
+              }
+            }
+          }
+        }
+      } catch {
+        // Continue processing without dropping mail on rule error
+      }
+    }
+
     // 8. Database Persistence via MessageRepository
     if (this.messageRepo && effectiveMailboxId) {
+      const combinedAuthResults = {
+        ...(input.authResults as unknown as Record<string, unknown>),
+        listUnsubscribe: parsed.listUnsubscribe || undefined,
+        listId: parsed.listId || undefined,
+      };
+
       const message = new Message({
         id: messageId,
         mailboxId: effectiveMailboxId,
-        folderId: effectiveFolderId,
+        folderId: finalFolderId,
         threadId,
         messageIdHeader: parsed.messageIdHeader,
         inReplyTo: parsed.inReplyTo,
@@ -190,17 +252,21 @@ export class InboundPipeline {
         bodyHtml: parsed.bodyHtml || null,
         sizeBytes: input.rawMime.length,
         rawObjectKey,
-        isRead: false,
-        isStarred: false,
-        isImportant: false,
+        isRead,
+        isStarred,
+        isImportant,
         spamScore: decision.spamScore,
-        authResults: input.authResults as unknown as Record<string, unknown>,
+        authResults: combinedAuthResults,
         direction: 'inbound',
         deliveryState: 'delivered',
         receivedAt: now,
       });
 
       await this.messageRepo.save(message);
+
+      if (appliedLabelIds.length > 0) {
+        await this.messageRepo.setLabels(messageId, appliedLabelIds);
+      }
     }
 
     // 9. Emit Quarantined or Accepted Event
