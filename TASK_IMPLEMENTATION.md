@@ -240,3 +240,8 @@
 - [x] **TASK-038** — ISP Port 25 Firewall & IPv6 Reachability Audit
   - **Artifacts:** [`scripts/test-ipv6-inbound.sh`](file:///home/rahul-kumar/Desktop/Eazzio_Mail/scripts/test-ipv6-inbound.sh), [`scripts/setup-ipv6-mailserver.sh`](file:///home/rahul-kumar/Desktop/Eazzio_Mail/scripts/setup-ipv6-mailserver.sh), [`docs/IPV6_MAIL_SERVER.md`](file:///home/rahul-kumar/Desktop/Eazzio_Mail/docs/IPV6_MAIL_SERVER.md)
   - **Verification:** Conclusively tested and verified that Airtel residential broadband drops inbound TCP port 25 packets on both IPv4 (CGNAT) and IPv6 (firewall policy). Automated Postfix IPv6 configuration and DuckDNS AAAA synchronization are documented and ready for production deployment.
+
+- [x] **TASK-039** — Full Email Body Ingestion & Rich HTML Rendering
+  - **Artifacts:** [`004_message_body_columns.sql`](file:///home/rahul-kumar/Desktop/Eazzio_Mail/packages/infra-adapters/src/database/migrations/004_message_body_columns.sql), [`ConversationViewer.tsx`](file:///home/rahul-kumar/Desktop/Eazzio_Mail/apps/web/src/components/mail/ConversationViewer.tsx), [`postgres-message-repository.ts`](file:///home/rahul-kumar/Desktop/Eazzio_Mail/packages/infra-adapters/src/repositories/postgres-message-repository.ts)
+  - **Verification:** Fixed schema missing body columns by adding `body_text` and `body_html` columns with migration 004. Updated `MimeParser` and `InboundPipeline` to persist full body text and HTML to PostgreSQL, updated API queries to return body content, and updated web conversation viewer to render rich HTML formatting, line breaks, and signatures.
+

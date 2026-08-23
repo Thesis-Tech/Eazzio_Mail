@@ -35,3 +35,10 @@ coverage/
 .flutter-plugins-dependencies
 apps/mobile/.dart_tool/
 apps/mobile/.flutter-plugins-dependencies
+apps/mobile/build/
+
+# Local session and bridge files
+.mailtm-account.json
+*.wav
+*.mp3
+
