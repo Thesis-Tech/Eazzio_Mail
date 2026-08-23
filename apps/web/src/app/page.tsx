@@ -742,6 +742,53 @@ export default function MailDashboardPage() {
             </div>
           )}
 
+          {/* Quick Filter Preset Bar */}
+          <div className="px-3 py-1.5 border-b border-[#2A2E37] bg-[#121418] flex items-center gap-1.5 overflow-x-auto text-[11px]">
+            <button
+              onClick={() => setSearchQuery('')}
+              className={`px-2 py-0.5 rounded-full font-medium transition-all ${
+                !searchQuery
+                  ? 'bg-[#2D5BFF] text-white'
+                  : 'bg-[#1C1F26] text-slate-400 hover:text-white border border-[#2A2E37]'
+              }`}
+            >
+              All
+            </button>
+            <button
+              onClick={() => setSearchQuery(searchQuery.includes('is:unread') ? searchQuery.replace('is:unread', '').trim() : `${searchQuery} is:unread`.trim())}
+              className={`px-2 py-0.5 rounded-full font-medium transition-all flex items-center gap-1 ${
+                searchQuery.includes('is:unread')
+                  ? 'bg-blue-500/20 text-blue-400 border border-blue-500/40'
+                  : 'bg-[#1C1F26] text-slate-400 hover:text-white border border-[#2A2E37]'
+              }`}
+            >
+              <Mail className="w-3 h-3" />
+              <span>Unread</span>
+            </button>
+            <button
+              onClick={() => setSearchQuery(searchQuery.includes('has:attachment') ? searchQuery.replace('has:attachment', '').trim() : `${searchQuery} has:attachment`.trim())}
+              className={`px-2 py-0.5 rounded-full font-medium transition-all flex items-center gap-1 ${
+                searchQuery.includes('has:attachment')
+                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
+                  : 'bg-[#1C1F26] text-slate-400 hover:text-white border border-[#2A2E37]'
+              }`}
+            >
+              <Paperclip className="w-3 h-3" />
+              <span>Attachments</span>
+            </button>
+            <button
+              onClick={() => setSearchQuery(searchQuery.includes('is:starred') ? searchQuery.replace('is:starred', '').trim() : `${searchQuery} is:starred`.trim())}
+              className={`px-2 py-0.5 rounded-full font-medium transition-all flex items-center gap-1 ${
+                searchQuery.includes('is:starred')
+                  ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40'
+                  : 'bg-[#1C1F26] text-slate-400 hover:text-white border border-[#2A2E37]'
+              }`}
+            >
+              <Star className="w-3 h-3" />
+              <span>Starred</span>
+            </button>
+          </div>
+
           <div className="flex-1 overflow-hidden relative">
             <ThreadList
               threads={displayedThreads}

@@ -19,6 +19,8 @@ import {
 import { EazzioStorage } from '@eazzio/infra-adapters';
 import crypto from 'crypto';
 
+import { DsnParser } from '../domain/dsn-parser.js';
+
 export interface InboundProcessInput {
   envelope: InboundEnvelope;
   rawMime: Buffer;
@@ -226,6 +228,23 @@ export class InboundPipeline {
         }
       } catch {
         // Continue processing without dropping mail on rule error
+      }
+    }
+
+    // 7.2 DSN Bounce Detection & Return Path Processing (FR-OUT-07)
+    const dsnReport = DsnParser.parse(parsed.bodyText, parsed.headers);
+    if (dsnReport.isBounce && this.messageRepo) {
+      isImportant = true;
+      if (dsnReport.originalMessageId) {
+        try {
+          const originalMsg = await this.messageRepo.findByMessageIdHeader(dsnReport.originalMessageId);
+          if (originalMsg) {
+            await this.messageRepo.updateDeliveryState(originalMsg.id, 'bounced');
+            threadId = originalMsg.threadId; // Thread bounce directly into the same conversation
+          }
+        } catch {
+          // Continue without failing delivery
+        }
       }
     }
 
