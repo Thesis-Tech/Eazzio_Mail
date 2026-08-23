@@ -165,18 +165,59 @@ export class InboundPipeline {
     let threadId: string = crypto.randomUUID();
     if (this.threadRepo && effectiveMailboxId) {
       const normalizedSubject = (parsed.subject || '')
-        .replace(/^(Re|Fwd|Fw):\s*/i, '')
+        .replace(/^(Re|Fwd|Fw|Reply|Forward):\s*/gi, '')
+        .replace(/^\[.*?\]\s*/g, '')
         .trim()
         .toLowerCase();
 
-      const newThread = new Thread({
-        id: threadId,
-        mailboxId: effectiveMailboxId,
-        subjectNormalized: normalizedSubject,
-        lastMessageAt: now,
-        messageCount: 1,
-      });
-      await this.threadRepo.save(newThread);
+      let existingThread: Thread | null = null;
+
+      // 1. Match by RFC 5322 In-Reply-To or References
+      const inReplyToHeader = parsed.headers['in-reply-to'] || parsed.headers['references'];
+      if (inReplyToHeader && this.messageRepo) {
+        try {
+          const parentMsg = await this.messageRepo.findByMessageIdHeader(inReplyToHeader.trim());
+          if (parentMsg && parentMsg.threadId) {
+            existingThread = await this.threadRepo.findById(parentMsg.threadId);
+          }
+        } catch {
+          // Fallback to subject matching
+        }
+      }
+
+      // 2. Fallback: match by normalized subject within the same mailbox
+      if (!existingThread && normalizedSubject) {
+        try {
+          existingThread = await this.threadRepo.findByNormalizedSubject(
+            effectiveMailboxId,
+            normalizedSubject,
+          );
+        } catch {
+          // Ignore
+        }
+      }
+
+      if (existingThread) {
+        threadId = existingThread.id;
+        const updatedCount = (existingThread.messageCount || 1) + 1;
+        const updatedThread = new Thread({
+          id: existingThread.id,
+          mailboxId: effectiveMailboxId,
+          subjectNormalized: existingThread.subjectNormalized || normalizedSubject,
+          lastMessageAt: now,
+          messageCount: updatedCount,
+        });
+        await this.threadRepo.save(updatedThread);
+      } else {
+        const newThread = new Thread({
+          id: threadId,
+          mailboxId: effectiveMailboxId,
+          subjectNormalized: normalizedSubject,
+          lastMessageAt: now,
+          messageCount: 1,
+        });
+        await this.threadRepo.save(newThread);
+      }
     }
 
     let isRead = false;
