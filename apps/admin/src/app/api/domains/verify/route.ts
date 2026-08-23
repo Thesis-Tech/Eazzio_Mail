@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { Dns4CheckRunner, DomainVerifier } from '@eazzio/admin-service';
 
 export async function POST(req: NextRequest) {
   try {
-    const { domainId, domainName } = await req.json();
+    const { domainId, domainName, dkimSelector = 'mail' } = await req.json();
 
     if (!domainName || typeof domainName !== 'string') {
       return NextResponse.json(
@@ -12,20 +13,20 @@ export async function POST(req: NextRequest) {
     }
 
     const cleanDomain = domainName.toLowerCase().trim();
-
-    // Perform live simulation / 4-check evaluation
-    // If domain contains "fail" or "pending", simulate partial check
-    const isMockFail = cleanDomain.includes('fail') || cleanDomain.includes('pending');
+    const runner = new Dns4CheckRunner();
+    const dnsResult = await runner.checkDomain(cleanDomain, dkimSelector);
+    const { status, isFullyVerified } = DomainVerifier.evaluateStatus(dnsResult);
 
     const result = {
       domainId: domainId || `dom-${Date.now()}`,
       domainName: cleanDomain,
-      mxVerified: true,
-      spfVerified: true,
-      dkimVerified: !isMockFail,
-      dmarcVerified: true,
-      verificationStatus: isMockFail ? 'partially_verified' : 'verified',
-      isFullyVerified: !isMockFail,
+      mxVerified: dnsResult.mx,
+      spfVerified: dnsResult.spf,
+      dkimVerified: dnsResult.dkim,
+      dmarcVerified: dnsResult.dmarc,
+      verificationStatus: status,
+      isFullyVerified,
+      details: dnsResult.details,
       evaluatedAt: new Date().toISOString(),
     };
 

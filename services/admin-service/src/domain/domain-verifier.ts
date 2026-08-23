@@ -5,6 +5,15 @@ export interface DnsRecordResult {
   dmarc: boolean;
 }
 
+export interface DetailedDnsRecordResult extends DnsRecordResult {
+  details?: {
+    mx: { verified: boolean; records: string[]; isCloudflare: boolean };
+    spf: { verified: boolean; rawRecord?: string; hasBrevo: boolean };
+    dkim: { verified: boolean; selectorUsed?: string; rawRecord?: string; isBrevo: boolean };
+    dmarc: { verified: boolean; rawRecord?: string; policy?: string };
+  };
+}
+
 export type DomainVerificationStatus = 'pending' | 'partially_verified' | 'verified' | 'failed';
 
 export class DomainVerifier {

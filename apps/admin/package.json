@@ -12,6 +12,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@eazzio/admin-service": "workspace:*",
     "@eazzio/contracts": "workspace:*",
     "@eazzio/identity": "workspace:*",
     "@eazzio/ui-kit": "workspace:*",

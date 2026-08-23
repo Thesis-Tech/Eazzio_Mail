@@ -1,6 +1,6 @@
 import {
   DomainVerifier,
-  DnsRecordResult,
+  DetailedDnsRecordResult,
   DomainVerificationStatus,
 } from '../domain/domain-verifier.js';
 import { Dns4CheckRunner, DnsResolverInterface } from '../domain/dns-resolver.js';
@@ -18,7 +18,7 @@ export interface VerifyDomainResult {
   domainName: string;
   status: DomainVerificationStatus;
   isFullyVerified: boolean;
-  dnsRecords: DnsRecordResult;
+  dnsRecords: DetailedDnsRecordResult;
   event?: DomainVerifiedEvent;
 }
 
