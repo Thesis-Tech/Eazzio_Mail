@@ -19,6 +19,9 @@ import {
   Send,
   X,
   FileText,
+  Printer,
+  ExternalLink,
+  Smile,
 } from 'lucide-react';
 import { MessageDetail } from '../../types/mail';
 
@@ -172,21 +175,25 @@ export const ConversationViewer: React.FC<ConversationViewerProps> = ({
   return (
     <div className="flex flex-col h-full bg-[#0F1115] text-[#EDEEF0] overflow-hidden" data-testid="conversation-viewer">
       {/* Top Header & Actions */}
-      <div className="h-14 px-6 border-b border-[#2A2E37] flex items-center justify-between gap-4 shrink-0 bg-[#16181D]">
-        <div className="flex items-center gap-3 min-w-0">
+      <div className="h-14 px-6 border-b border-[#22262E] flex items-center justify-between gap-4 shrink-0 bg-[#16181D]">
+        <div className="flex items-center gap-2.5 min-w-0">
           <h1 className="text-base font-bold text-white tracking-tight truncate">
             {subject || '(No Subject)'}
           </h1>
-          <span className="text-xs px-2 py-0.5 rounded-full bg-[#2A2E37] text-slate-300 font-semibold shrink-0">
-            {messages.length} {messages.length === 1 ? 'message' : 'messages'}
+          <span className="text-[11px] px-2 py-0.5 rounded bg-[#1E293B] text-slate-300 font-medium flex items-center gap-1 shrink-0">
+            <span>Inbox</span>
+            <X className="w-2.5 h-2.5 text-slate-400 hover:text-white cursor-pointer" />
+          </span>
+          <span className="text-xs px-2 py-0.5 rounded-full bg-[#22262E] text-slate-400 font-mono shrink-0">
+            {messages.length}
           </span>
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 text-slate-400">
           <button
             onClick={handleGenerateAiSummary}
-            className="px-2.5 py-1.5 rounded-lg bg-[#2D5BFF]/15 border border-[#2D5BFF]/30 text-[#2D5BFF] hover:bg-[#2D5BFF]/25 text-xs font-semibold flex items-center gap-1.5 transition-all"
+            className="px-2.5 py-1 rounded-lg bg-[#2D5BFF]/15 border border-[#2D5BFF]/30 text-[#2D5BFF] hover:bg-[#2D5BFF]/25 text-xs font-semibold flex items-center gap-1.5 transition-all mr-1"
             title="Summarize thread with AI"
             data-testid="ai-summarize-btn"
           >
@@ -195,8 +202,24 @@ export const ConversationViewer: React.FC<ConversationViewerProps> = ({
           </button>
 
           <button
+            onClick={() => window.print()}
+            className="p-1.5 rounded-lg hover:text-white hover:bg-[#22262E] transition-colors"
+            title="Print all"
+          >
+            <Printer className="w-4 h-4" />
+          </button>
+
+          <button
+            onClick={() => window.open(window.location.href, '_blank')}
+            className="p-1.5 rounded-lg hover:text-white hover:bg-[#22262E] transition-colors"
+            title="In new window"
+          >
+            <ExternalLink className="w-4 h-4" />
+          </button>
+
+          <button
             onClick={() => onToggleStar && onToggleStar(threadId)}
-            className="p-2 rounded-lg text-slate-400 hover:text-amber-400 hover:bg-[#1C1F26] transition-colors"
+            className="p-1.5 rounded-lg hover:text-amber-400 hover:bg-[#22262E] transition-colors"
             title="Star conversation"
             data-testid="thread-star-btn"
           >
@@ -205,7 +228,7 @@ export const ConversationViewer: React.FC<ConversationViewerProps> = ({
 
           <button
             onClick={() => onArchive && onArchive(threadId)}
-            className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-[#1C1F26] transition-colors"
+            className="p-1.5 rounded-lg hover:text-white hover:bg-[#22262E] transition-colors"
             title="Archive"
             data-testid="thread-archive-btn"
           >
@@ -214,7 +237,7 @@ export const ConversationViewer: React.FC<ConversationViewerProps> = ({
 
           <button
             onClick={() => onDelete && onDelete(threadId)}
-            className="p-2 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+            className="p-1.5 rounded-lg hover:text-red-400 hover:bg-red-500/10 transition-colors"
             title="Delete"
             data-testid="thread-delete-btn"
           >
@@ -386,6 +409,38 @@ export const ConversationViewer: React.FC<ConversationViewerProps> = ({
             </div>
           );
         })}
+
+        {/* Gmail-Style Action Button Pills */}
+        <div className="flex items-center gap-2 pt-2">
+          <button
+            onClick={() => {
+              const textarea = document.querySelector('textarea');
+              textarea?.focus();
+            }}
+            className="px-4 py-2 rounded-full bg-[#16181D] hover:bg-[#1E232B] border border-[#2A2E37] text-slate-300 hover:text-white text-xs font-semibold flex items-center gap-2 transition-all"
+          >
+            <Reply className="w-3.5 h-3.5" />
+            <span>Reply</span>
+          </button>
+
+          <button
+            onClick={() => {
+              const textarea = document.querySelector('textarea');
+              textarea?.focus();
+            }}
+            className="px-4 py-2 rounded-full bg-[#16181D] hover:bg-[#1E232B] border border-[#2A2E37] text-slate-300 hover:text-white text-xs font-semibold flex items-center gap-2 transition-all"
+          >
+            <Forward className="w-3.5 h-3.5" />
+            <span>Forward</span>
+          </button>
+
+          <button
+            className="p-2 rounded-full bg-[#16181D] hover:bg-[#1E232B] border border-[#2A2E37] text-slate-400 hover:text-white text-xs transition-all"
+            title="Add reaction"
+          >
+            <Smile className="w-3.5 h-3.5" />
+          </button>
+        </div>
 
         {/* Quick Reply & Smart Suggestions Box */}
         <div className="p-4 rounded-2xl bg-[#16181D] border border-[#2A2E37] space-y-3" data-testid="quick-reply-card">

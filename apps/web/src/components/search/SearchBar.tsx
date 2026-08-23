@@ -194,6 +194,14 @@ export const SearchBar: React.FC<SearchBarProps> = ({
               <X className="w-3.5 h-3.5" />
             </button>
           )}
+          <button
+            type="button"
+            onClick={() => setIsOpen(!isOpen)}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[#1C1F26] transition-colors"
+            title="Show search options"
+          >
+            <Filter className="w-3.5 h-3.5" />
+          </button>
           <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-mono text-slate-400 bg-[#1C1F26] border border-[#2A2E37] rounded">
             ⌘K
           </kbd>

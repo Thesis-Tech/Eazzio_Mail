@@ -742,50 +742,76 @@ export default function MailDashboardPage() {
             </div>
           )}
 
-          {/* Quick Filter Preset Bar */}
-          <div className="px-3 py-1.5 border-b border-[#2A2E37] bg-[#121418] flex items-center gap-1.5 overflow-x-auto text-[11px]">
+          {/* Gmail-Style Filter Chips Bar */}
+          <div className="px-4 py-2 border-b border-[#22262E] bg-[#16181D] flex items-center gap-2 overflow-x-auto text-xs shrink-0 custom-scrollbar">
+            {/* From ▾ */}
             <button
-              onClick={() => setSearchQuery('')}
-              className={`px-2 py-0.5 rounded-full font-medium transition-all ${
-                !searchQuery
-                  ? 'bg-[#2D5BFF] text-white'
-                  : 'bg-[#1C1F26] text-slate-400 hover:text-white border border-[#2A2E37]'
-              }`}
+              onClick={() => setSearchQuery(searchQuery.includes('from:') ? '' : 'from: ')}
+              className="px-3 py-1 rounded-lg border border-[#2A2E37] bg-[#111317] hover:bg-[#1E232B] text-slate-300 flex items-center gap-1.5 shrink-0 transition-colors"
             >
-              All
+              <span>From</span>
+              <ChevronDown className="w-3 h-3 text-slate-400" />
             </button>
+
+            {/* Any time ▾ */}
             <button
-              onClick={() => setSearchQuery(searchQuery.includes('is:unread') ? searchQuery.replace('is:unread', '').trim() : `${searchQuery} is:unread`.trim())}
-              className={`px-2 py-0.5 rounded-full font-medium transition-all flex items-center gap-1 ${
-                searchQuery.includes('is:unread')
-                  ? 'bg-blue-500/20 text-blue-400 border border-blue-500/40'
-                  : 'bg-[#1C1F26] text-slate-400 hover:text-white border border-[#2A2E37]'
-              }`}
+              className="px-3 py-1 rounded-lg border border-[#2A2E37] bg-[#111317] hover:bg-[#1E232B] text-slate-300 flex items-center gap-1.5 shrink-0 transition-colors"
             >
-              <Mail className="w-3 h-3" />
-              <span>Unread</span>
+              <span>Any time</span>
+              <ChevronDown className="w-3 h-3 text-slate-400" />
             </button>
+
+            {/* Has attachment */}
             <button
               onClick={() => setSearchQuery(searchQuery.includes('has:attachment') ? searchQuery.replace('has:attachment', '').trim() : `${searchQuery} has:attachment`.trim())}
-              className={`px-2 py-0.5 rounded-full font-medium transition-all flex items-center gap-1 ${
+              className={`px-3 py-1 rounded-lg border flex items-center gap-1.5 shrink-0 transition-colors ${
                 searchQuery.includes('has:attachment')
-                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
-                  : 'bg-[#1C1F26] text-slate-400 hover:text-white border border-[#2A2E37]'
+                  ? 'border-[#2D5BFF] bg-[#2D5BFF]/20 text-[#2D5BFF] font-semibold'
+                  : 'border-[#2A2E37] bg-[#111317] hover:bg-[#1E232B] text-slate-300'
               }`}
             >
-              <Paperclip className="w-3 h-3" />
-              <span>Attachments</span>
+              <span>Has attachment</span>
             </button>
+
+            {/* To ▾ */}
             <button
-              onClick={() => setSearchQuery(searchQuery.includes('is:starred') ? searchQuery.replace('is:starred', '').trim() : `${searchQuery} is:starred`.trim())}
-              className={`px-2 py-0.5 rounded-full font-medium transition-all flex items-center gap-1 ${
-                searchQuery.includes('is:starred')
-                  ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40'
-                  : 'bg-[#1C1F26] text-slate-400 hover:text-white border border-[#2A2E37]'
+              onClick={() => setSearchQuery(searchQuery.includes('to:') ? '' : 'to: ')}
+              className="px-3 py-1 rounded-lg border border-[#2A2E37] bg-[#111317] hover:bg-[#1E232B] text-slate-300 flex items-center gap-1.5 shrink-0 transition-colors"
+            >
+              <span>To</span>
+              <ChevronDown className="w-3 h-3 text-slate-400" />
+            </button>
+
+            {/* Exclude Social */}
+            <button
+              onClick={() => setSearchQuery(searchQuery.includes('-label:social') ? searchQuery.replace('-label:social', '').trim() : `${searchQuery} -label:social`.trim())}
+              className={`px-3 py-1 rounded-lg border flex items-center gap-1.5 shrink-0 transition-colors ${
+                searchQuery.includes('-label:social')
+                  ? 'border-[#2D5BFF] bg-[#2D5BFF]/20 text-[#2D5BFF] font-semibold'
+                  : 'border-[#2A2E37] bg-[#111317] hover:bg-[#1E232B] text-slate-300'
               }`}
             >
-              <Star className="w-3 h-3" />
-              <span>Starred</span>
+              <span>Exclude Social</span>
+            </button>
+
+            {/* Is unread */}
+            <button
+              onClick={() => setSearchQuery(searchQuery.includes('is:unread') ? searchQuery.replace('is:unread', '').trim() : `${searchQuery} is:unread`.trim())}
+              className={`px-3 py-1 rounded-lg border flex items-center gap-1.5 shrink-0 transition-colors ${
+                searchQuery.includes('is:unread')
+                  ? 'border-[#2D5BFF] bg-[#2D5BFF]/20 text-[#2D5BFF] font-semibold'
+                  : 'border-[#2A2E37] bg-[#111317] hover:bg-[#1E232B] text-slate-300'
+              }`}
+            >
+              <span>Is unread</span>
+            </button>
+
+            {/* Advanced search */}
+            <button
+              onClick={() => setSearchQuery('is:unread has:attachment')}
+              className="ml-auto text-xs text-[#2D5BFF] hover:underline font-medium shrink-0"
+            >
+              Advanced search
             </button>
           </div>
 
