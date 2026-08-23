@@ -132,8 +132,8 @@ export default function MailDashboardPage() {
             to: [{ name: 'You', email: senderEmail }],
             subject: msg.subject || '(No Subject)',
             snippet: msg.snippet || '',
-            bodyText: msg.snippet || '',
-            bodyHtml: `<p>${(msg.snippet || '').replace(/\n/g, '<br>')}</p>`,
+            bodyText: msg.body_text || msg.bodyText || msg.snippet || '',
+            bodyHtml: msg.body_html || msg.bodyHtml || (msg.body_text ? `<p>${msg.body_text.replace(/\n/g, '<br>')}</p>` : `<p>${(msg.snippet || '').replace(/\n/g, '<br>')}</p>`),
             receivedAt: new Date(msg.received_at).toLocaleString([], {
               month: 'short',
               day: 'numeric',

@@ -186,6 +186,8 @@ export class InboundPipeline {
         fromAddress: input.envelope.from.value,
         subject: parsed.subject,
         snippet: parsed.bodyText.slice(0, 200).replace(/\s+/g, ' ').trim(),
+        bodyText: parsed.bodyText || '',
+        bodyHtml: parsed.bodyHtml || null,
         sizeBytes: input.rawMime.length,
         rawObjectKey,
         isRead: false,

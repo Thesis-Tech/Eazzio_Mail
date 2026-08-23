@@ -250,7 +250,7 @@ messagesRouter.get('/', async (req: AuthenticatedRequest, res: Response, next: N
 
     let sql = `
       SELECT m.id, m.mailbox_id, m.folder_id, m.thread_id, m.message_id_header,
-             m.from_address, m.subject, m.snippet, m.size_bytes, m.raw_object_key,
+             m.from_address, m.subject, m.snippet, m.body_text, m.body_html, m.size_bytes, m.raw_object_key,
              m.is_read, m.is_starred, m.is_important, m.direction, m.delivery_state,
              m.received_at
       FROM messages m
@@ -591,26 +591,27 @@ messagesRouter.get('/:id', async (req: AuthenticatedRequest, res: Response, next
         type: r.recipient_kind || 'to',
       }));
 
-    // Retrieve body from storage
-    let bodyHtml = `<p>${first.snippet || ''}</p>`;
-    let bodyText = first.snippet || '';
-    if (first.raw_object_key) {
+    // Retrieve body from database or storage
+    let bodyHtml = first.body_html || (first.body_text ? `<p>${first.body_text.replace(/\n/g, '<br>')}</p>` : `<p>${first.snippet || ''}</p>`);
+    let bodyText = first.body_text || first.snippet || '';
+
+    if (!first.body_html && !first.body_text && first.raw_object_key) {
       try {
         const rawBuf = await storage.get(first.raw_object_key);
-          let content = rawBuf.toString('utf-8');
-          if (content.includes('\r\n\r\n') && (content.startsWith('DKIM-') || content.startsWith('From:') || content.startsWith('Received:'))) {
-            content = content.split('\r\n\r\n').slice(1).join('\r\n\r\n');
-          } else if (content.includes('\n\n') && (content.startsWith('DKIM-') || content.startsWith('From:') || content.startsWith('Received:'))) {
-            content = content.split('\n\n').slice(1).join('\n\n');
-          }
+        let content = rawBuf.toString('utf-8');
+        if (content.includes('\r\n\r\n') && (content.startsWith('DKIM-') || content.startsWith('From:') || content.startsWith('Received:'))) {
+          content = content.split('\r\n\r\n').slice(1).join('\r\n\r\n');
+        } else if (content.includes('\n\n') && (content.startsWith('DKIM-') || content.startsWith('From:') || content.startsWith('Received:'))) {
+          content = content.split('\n\n').slice(1).join('\n\n');
+        }
 
-          if (content.includes('<') && content.includes('>')) {
-            bodyHtml = content;
-            bodyText = content.replace(/<[^>]*>/g, '').trim();
-          } else {
-            bodyText = content;
-            bodyHtml = `<p>${content.replace(/\n/g, '<br>')}</p>`;
-          }
+        if (content.includes('<') && content.includes('>')) {
+          bodyHtml = content;
+          bodyText = content.replace(/<[^>]*>/g, '').trim();
+        } else {
+          bodyText = content;
+          bodyHtml = `<p>${content.replace(/\n/g, '<br>')}</p>`;
+        }
       } catch {
         // Fallback to snippet
       }

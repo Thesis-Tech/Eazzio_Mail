@@ -14,6 +14,8 @@ interface MessageRow {
   from_address: string;
   subject: string | null;
   snippet: string | null;
+  body_text: string | null;
+  body_html: string | null;
   size_bytes: number;
   raw_object_key: string;
   is_read: boolean;
@@ -41,6 +43,8 @@ export class PostgresMessageRepository implements MessageRepository {
       fromAddress: row.from_address,
       subject: row.subject,
       snippet: row.snippet,
+      bodyText: row.body_text,
+      bodyHtml: row.body_html,
       sizeBytes: Number(row.size_bytes),
       rawObjectKey: row.raw_object_key,
       isRead: Boolean(row.is_read),
@@ -58,7 +62,7 @@ export class PostgresMessageRepository implements MessageRepository {
     if (!UUID_REGEX.test(id)) return null;
     const rows = await this.db.query<MessageRow>(
       `SELECT id, mailbox_id, folder_id, thread_id, message_id_header, in_reply_to,
-              references_header, from_address, subject, snippet, size_bytes, raw_object_key,
+              references_header, from_address, subject, snippet, body_text, body_html, size_bytes, raw_object_key,
               is_read, is_starred, is_important, spam_score, auth_results, direction,
               delivery_state, received_at
        FROM messages
@@ -77,7 +81,7 @@ export class PostgresMessageRepository implements MessageRepository {
     if (!UUID_REGEX.test(mailboxId)) return [];
     let sql = `
       SELECT id, mailbox_id, folder_id, thread_id, message_id_header, in_reply_to,
-             references_header, from_address, subject, snippet, size_bytes, raw_object_key,
+             references_header, from_address, subject, snippet, body_text, body_html, size_bytes, raw_object_key,
              is_read, is_starred, is_important, spam_score, auth_results, direction,
              delivery_state, received_at
       FROM messages
@@ -109,7 +113,7 @@ export class PostgresMessageRepository implements MessageRepository {
     if (!UUID_REGEX.test(mailboxId)) return null;
     const rows = await this.db.query<MessageRow>(
       `SELECT id, mailbox_id, folder_id, thread_id, message_id_header, in_reply_to,
-              references_header, from_address, subject, snippet, size_bytes, raw_object_key,
+              references_header, from_address, subject, snippet, body_text, body_html, size_bytes, raw_object_key,
               is_read, is_starred, is_important, spam_score, auth_results, direction,
               delivery_state, received_at
        FROM messages
@@ -123,11 +127,11 @@ export class PostgresMessageRepository implements MessageRepository {
     await this.db.query(
       `INSERT INTO messages (
          id, mailbox_id, folder_id, thread_id, message_id_header, in_reply_to,
-         references_header, from_address, subject, snippet, size_bytes, raw_object_key,
+         references_header, from_address, subject, snippet, body_text, body_html, size_bytes, raw_object_key,
          is_read, is_starred, is_important, spam_score, auth_results, direction,
          delivery_state, received_at
        ) VALUES (
-         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20
+         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22
        ) ON CONFLICT (id) DO UPDATE SET
          folder_id = EXCLUDED.folder_id,
          thread_id = EXCLUDED.thread_id,
@@ -135,6 +139,8 @@ export class PostgresMessageRepository implements MessageRepository {
          references_header = EXCLUDED.references_header,
          subject = EXCLUDED.subject,
          snippet = EXCLUDED.snippet,
+         body_text = EXCLUDED.body_text,
+         body_html = EXCLUDED.body_html,
          is_read = EXCLUDED.is_read,
          is_starred = EXCLUDED.is_starred,
          is_important = EXCLUDED.is_important,
@@ -152,6 +158,8 @@ export class PostgresMessageRepository implements MessageRepository {
         message.fromAddress,
         message.subject ?? null,
         message.snippet ?? null,
+        message.bodyText ?? '',
+        message.bodyHtml ?? null,
         message.sizeBytes,
         message.rawObjectKey,
         message.isRead,

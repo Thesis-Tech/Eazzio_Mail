@@ -228,9 +228,16 @@ export const ConversationViewer: React.FC<ConversationViewerProps> = ({
                   </div>
 
                   {/* Body Text / HTML */}
-                  <div className="text-sm text-slate-200 leading-relaxed whitespace-pre-wrap font-sans">
-                    {msg.bodyText}
-                  </div>
+                  {msg.bodyHtml && msg.bodyHtml.includes('<') && msg.bodyHtml.includes('>') && msg.bodyHtml !== '<p></p>' && msg.bodyHtml !== '<p><br></p>' ? (
+                    <div
+                      className="text-sm text-slate-200 leading-relaxed font-sans prose prose-invert max-w-none [&_a]:text-[#2D5BFF] [&_a]:underline"
+                      dangerouslySetInnerHTML={{ __html: msg.bodyHtml }}
+                    />
+                  ) : (
+                    <div className="text-sm text-slate-200 leading-relaxed whitespace-pre-wrap font-sans">
+                      {msg.bodyText || msg.snippet || '(No content)'}
+                    </div>
+                  )}
 
                   {/* Attachments Section */}
                   {msg.attachments && msg.attachments.length > 0 && (

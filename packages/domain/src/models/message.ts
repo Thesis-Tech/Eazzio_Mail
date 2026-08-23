@@ -9,6 +9,8 @@ export interface MessageProps {
   fromAddress: string;
   subject?: string | null;
   snippet?: string | null;
+  bodyText?: string | null;
+  bodyHtml?: string | null;
   sizeBytes: number;
   rawObjectKey: string;
   isRead: boolean;
@@ -34,6 +36,8 @@ export class Message {
   public get fromAddress(): string { return this.props.fromAddress; }
   public get subject(): string | null | undefined { return this.props.subject; }
   public get snippet(): string | null | undefined { return this.props.snippet; }
+  public get bodyText(): string | null | undefined { return this.props.bodyText; }
+  public get bodyHtml(): string | null | undefined { return this.props.bodyHtml; }
   public get sizeBytes(): number { return this.props.sizeBytes; }
   public get rawObjectKey(): string { return this.props.rawObjectKey; }
   public get isRead(): boolean { return this.props.isRead; }
