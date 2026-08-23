@@ -41,7 +41,10 @@ export default function ForgotPasswordPage() {
     setErrorMessage(null);
 
     try {
-      await AuthStore.forgotPassword(identifier);
+      const res = await AuthStore.forgotPassword(identifier);
+      if (res.devToken) {
+        setResetToken(res.devToken);
+      }
       setStep('code');
     } catch (err: any) {
       setErrorMessage(err.message || 'Could not initiate recovery. Please check your email.');

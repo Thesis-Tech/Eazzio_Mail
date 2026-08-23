@@ -181,7 +181,7 @@ export class AuthStore {
     }
   }
 
-  public static async sendOtp(identifier: string): Promise<{ message: string; cooldownSeconds: number }> {
+  public static async sendOtp(identifier: string): Promise<{ message: string; cooldownSeconds: number; devCode?: string }> {
     const res = await fetch('/api/v1/auth/otp/send', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -222,7 +222,7 @@ export class AuthStore {
     return authUser;
   }
 
-  public static async forgotPassword(identifier: string): Promise<{ message: string }> {
+  public static async forgotPassword(identifier: string): Promise<{ message: string; devToken?: string }> {
     const res = await fetch('/api/v1/auth/forgot-password', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
