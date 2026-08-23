@@ -1,9 +1,10 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { AuthStore, AuthUser } from '../src/lib/auth-store.js';
 
-describe('Web App Auth Flow & Session Management (TASK-015)', () => {
+describe('Web App Auth Flow & Progressive Authentication (TASK-AUTH-UPGRADE)', () => {
   beforeEach(() => {
     AuthStore.clearSession();
+    vi.restoreAllMocks();
   });
 
   it('should initialize with unauthenticated state', () => {
@@ -68,5 +69,81 @@ describe('Web App Auth Flow & Session Management (TASK-015)', () => {
     expect(usernameRegex.test('rahul_kumar')).toBe(false); // underscore
     expect(usernameRegex.test('rahul-kumar')).toBe(false); // dash
     expect(usernameRegex.test('rahul@kumar')).toBe(false); // @ symbol
+  });
+
+  it('should identify username and resolve full @eazzio.com domain in progressive flow', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        success: true,
+        data: {
+          exists: true,
+          email: 'rahulkumar@eazzio.com',
+          displayName: 'Rahul Kumar',
+          authMethods: ['password', 'otp', 'passkey'],
+          requiresChallenge: false,
+        },
+      }),
+    } as any);
+
+    const result = await AuthStore.identify('rahulkumar');
+    expect(result.email).toBe('rahulkumar@eazzio.com');
+    expect(result.authMethods).toContain('password');
+    expect(result.authMethods).toContain('otp');
+    expect(result.authMethods).toContain('passkey');
+    expect(result.requiresChallenge).toBe(false);
+  });
+
+  it('should handle progressive password authentication and store session token', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        success: true,
+        data: {
+          token: 'mock-jwt-token-12345',
+          user: {
+            id: 'usr-dev-101',
+            email: 'rahulkumar@eazzio.com',
+            displayName: 'Rahul Kumar',
+            role: 'user',
+          },
+          sessionId: 'sess-abc-xyz',
+        },
+      }),
+    } as any);
+
+    const user = await AuthStore.login('rahulkumar@eazzio.com', 'SecurePass123!');
+    expect(user.email).toBe('rahulkumar@eazzio.com');
+    expect(AuthStore.getState().isAuthenticated).toBe(true);
+    expect(AuthStore.getState().token).toBe('mock-jwt-token-12345');
+  });
+
+  it('should support email OTP request and verification in alternative auth flow', async () => {
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          success: true,
+          data: { message: 'Verification code sent', cooldownSeconds: 60 },
+        }),
+      } as any)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          success: true,
+          data: {
+            token: 'mock-otp-jwt-token',
+            user: { id: 'usr-otp', email: 'rahulkumar@eazzio.com', displayName: 'Rahul Kumar', role: 'user' },
+            sessionId: 'sess-otp-123',
+          },
+        }),
+      } as any);
+
+    const otpSent = await AuthStore.sendOtp('rahulkumar@eazzio.com');
+    expect(otpSent.cooldownSeconds).toBe(60);
+
+    const user = await AuthStore.verifyOtp('rahulkumar@eazzio.com', '123456');
+    expect(user.email).toBe('rahulkumar@eazzio.com');
+    expect(AuthStore.getState().isAuthenticated).toBe(true);
   });
 });

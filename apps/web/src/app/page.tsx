@@ -190,8 +190,13 @@ export default function MailDashboardPage() {
     }
   }, [getFolderSlug]);
 
-  // Initial load and folder switch
+  // Initial load and folder switch with Auth Guard
   useEffect(() => {
+    const isAuth = AuthStore.initFromStorage();
+    if (!isAuth && !AuthStore.getState().isAuthenticated) {
+      window.location.href = '/login';
+      return;
+    }
     loadMessages(activeFolderId);
   }, [activeFolderId, loadMessages]);
 

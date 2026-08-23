@@ -5,6 +5,7 @@ import { searchRouter } from './api/v1/search.js';
 import { filtersRouter } from './api/v1/filters.js';
 import { webhooksRouter } from './api/v1/webhooks.js';
 import { statsRouter } from './api/v1/stats.js';
+import { authRouter } from './api/v1/auth.js';
 import { cloudflareInboundRouter } from './api/v1/cloudflare-inbound.js';
 import { errorHandler } from './middleware/error-handler.js';
 
@@ -18,6 +19,7 @@ app.get('/health', (_req, res) => {
 });
 
 // API v1 routes
+app.use('/v1/auth', authRouter);
 app.use('/v1/mailboxes', mailboxRouter);
 app.use('/v1/messages/cloudflare-inbound', cloudflareInboundRouter);
 app.use('/v1/messages', messagesRouter);
@@ -27,6 +29,7 @@ app.use('/v1/webhooks', webhooksRouter);
 app.use('/v1/stats', statsRouter);
 
 // Support /api/v1 prefixes
+app.use('/api/v1/auth', authRouter);
 app.use('/api/v1/mailboxes', mailboxRouter);
 app.use('/api/v1/messages/cloudflare-inbound', cloudflareInboundRouter);
 app.use('/api/v1/messages', messagesRouter);

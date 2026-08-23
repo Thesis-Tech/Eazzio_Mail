@@ -4,72 +4,69 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
-  User,
-  Mail,
-  Lock,
+  KeyRound,
   ArrowRight,
   ArrowLeft,
   AlertCircle,
+  CheckCircle2,
+  Lock,
   Eye,
   EyeOff,
-  CheckCircle2,
   ChevronDown,
 } from 'lucide-react';
 import { AuthStore } from '../../lib/auth-store';
 
-type RegisterStep = 'name' | 'username' | 'password';
+type RecoveryStep = 'identifier' | 'code' | 'newPassword' | 'success';
 
-export default function RegisterPage() {
+export default function ForgotPasswordPage() {
   const router = useRouter();
 
-  const [step, setStep] = useState<RegisterStep>('name');
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
+  const [step, setStep] = useState<RecoveryStep>('identifier');
+  const [identifier, setIdentifier] = useState('');
+  const [resetToken, setResetToken] = useState('');
+  const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const fullName = `${firstName} ${lastName}`.trim();
-  const cleanUsername = username.toLowerCase().replace(/[^a-z0-9.]/g, '');
-  const emailAddress = cleanUsername ? `${cleanUsername}@eazzio.com` : '';
-
-  // Step 1: Name
-  const handleNameSubmit = (e: React.FormEvent) => {
+  const handleIdentifierSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!firstName.trim()) {
-      setErrorMessage('Enter your first name');
+    if (!identifier.trim()) {
+      setErrorMessage('Enter your email or username');
+      return;
+    }
+
+    setIsLoading(true);
+    setErrorMessage(null);
+
+    try {
+      await AuthStore.forgotPassword(identifier);
+      setStep('code');
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Could not initiate recovery. Please check your email.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCodeSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetToken.trim()) {
+      setErrorMessage('Enter the reset token or verification code');
       return;
     }
     setErrorMessage(null);
-    setStep('username');
+    setStep('newPassword');
   };
 
-  // Step 2: Username
-  const handleUsernameSubmit = (e: React.FormEvent) => {
+  const handlePasswordResetSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!cleanUsername) {
-      setErrorMessage('Choose an email address');
+    if (newPassword.length < 8) {
+      setErrorMessage('Password must be at least 8 characters long');
       return;
     }
-    if (cleanUsername.length < 3) {
-      setErrorMessage('Username must be at least 3 characters long');
-      return;
-    }
-    setErrorMessage(null);
-    setStep('password');
-  };
-
-  // Step 3: Password & Account Creation
-  const handlePasswordSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (password.length < 8) {
-      setErrorMessage('Use 8 characters or more for your password');
-      return;
-    }
-    if (password !== confirmPassword) {
+    if (newPassword !== confirmPassword) {
       setErrorMessage('Passwords do not match');
       return;
     }
@@ -78,10 +75,10 @@ export default function RegisterPage() {
     setErrorMessage(null);
 
     try {
-      await AuthStore.register(emailAddress, password, fullName || cleanUsername);
-      router.push('/mail');
+      await AuthStore.resetPassword(identifier, resetToken, newPassword);
+      setStep('success');
     } catch (err: any) {
-      setErrorMessage(err.message || 'Could not create account. Please try a different username.');
+      setErrorMessage(err.message || 'Failed to reset password. Please request a new recovery link.');
     } finally {
       setIsLoading(false);
     }
@@ -99,19 +96,20 @@ export default function RegisterPage() {
         </div>
       </div>
 
-      {/* Main Card */}
+      {/* Main Recovery Card */}
       <div className="w-full max-w-[460px] my-auto bg-[#14161B] border border-[#262A33] p-8 sm:p-10 rounded-3xl shadow-2xl shadow-black/60 relative overflow-hidden transition-all">
+        {/* Subtle Ambient Glow */}
         <div className="absolute -top-24 -right-24 w-48 h-48 bg-[#2D5BFF]/10 rounded-full blur-3xl pointer-events-none" />
 
-        {/* Step 1: Name */}
-        {step === 'name' && (
+        {/* Step 1: Identifier */}
+        {step === 'identifier' && (
           <div className="space-y-6 animate-in fade-in zoom-in-95 duration-200">
             <div className="space-y-2">
               <div className="w-10 h-10 rounded-xl bg-[#2D5BFF] flex items-center justify-center font-bold text-lg text-white shadow-lg shadow-blue-500/25 mb-4">
-                E
+                <KeyRound className="w-5 h-5" />
               </div>
-              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">Create an Account</h1>
-              <p className="text-sm text-slate-400">Enter your name</p>
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">Account recovery</h1>
+              <p className="text-sm text-slate-400">Enter your email or username to recover your account</p>
             </div>
 
             {errorMessage && (
@@ -121,115 +119,50 @@ export default function RegisterPage() {
               </div>
             )}
 
-            <form onSubmit={handleNameSubmit} className="space-y-4">
+            <form onSubmit={handleIdentifierSubmit} className="space-y-6">
               <div>
                 <input
                   type="text"
-                  value={firstName}
-                  onChange={(e) => { setFirstName(e.target.value); setErrorMessage(null); }}
-                  placeholder="First name"
+                  value={identifier}
+                  onChange={(e) => { setIdentifier(e.target.value); setErrorMessage(null); }}
+                  placeholder="Email or username"
                   className="w-full bg-[#0E1015] border border-[#2B303C] hover:border-[#3E4556] focus:border-[#2D5BFF] focus:ring-2 focus:ring-[#2D5BFF]/20 rounded-xl px-4 py-3.5 text-base text-white placeholder-slate-500 outline-none transition-all"
                   required
-                />
-              </div>
-
-              <div>
-                <input
-                  type="text"
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
-                  placeholder="Last name (optional)"
-                  className="w-full bg-[#0E1015] border border-[#2B303C] hover:border-[#3E4556] focus:border-[#2D5BFF] focus:ring-2 focus:ring-[#2D5BFF]/20 rounded-xl px-4 py-3.5 text-base text-white placeholder-slate-500 outline-none transition-all"
                 />
               </div>
 
               <div className="pt-4 flex items-center justify-between">
                 <Link
                   href="/login"
-                  className="text-sm font-medium text-[#2D5BFF] hover:text-[#527AFF] hover:underline transition-colors"
+                  className="text-sm font-medium text-slate-400 hover:text-white transition-colors flex items-center gap-1.5"
                 >
-                  Sign in instead
+                  <ArrowLeft className="w-4 h-4" />
+                  Back to sign in
                 </Link>
 
                 <button
                   type="submit"
-                  className="px-6 py-2.5 rounded-full bg-[#2D5BFF] hover:bg-[#1E48E0] active:scale-[0.98] text-white font-medium text-sm shadow-md shadow-blue-500/20 transition-all flex items-center gap-1.5"
+                  disabled={isLoading}
+                  className="px-6 py-2.5 rounded-full bg-[#2D5BFF] hover:bg-[#1E48E0] active:scale-[0.98] disabled:opacity-50 text-white font-medium text-sm shadow-md shadow-blue-500/20 transition-all flex items-center gap-1.5"
                 >
-                  <span>Next</span>
-                  <ArrowRight className="w-4 h-4" />
+                  <span>{isLoading ? 'Searching...' : 'Next'}</span>
+                  {!isLoading && <ArrowRight className="w-4 h-4" />}
                 </button>
               </div>
             </form>
           </div>
         )}
 
-        {/* Step 2: Username */}
-        {step === 'username' && (
+        {/* Step 2: Code Verification */}
+        {step === 'code' && (
           <div className="space-y-6 animate-in fade-in zoom-in-95 duration-200">
             <div className="space-y-2">
               <div className="w-10 h-10 rounded-xl bg-[#2D5BFF] flex items-center justify-center font-bold text-lg text-white shadow-lg shadow-blue-500/25 mb-4">
-                E
+                <KeyRound className="w-5 h-5" />
               </div>
-              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">Choose your address</h1>
-              <p className="text-sm text-slate-400">Pick an @eazzio.com email address</p>
-            </div>
-
-            {errorMessage && (
-              <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-center gap-2.5">
-                <AlertCircle className="w-4 h-4 shrink-0" />
-                <span>{errorMessage}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleUsernameSubmit} className="space-y-4">
-              <div className="relative flex items-center">
-                <input
-                  type="text"
-                  value={username}
-                  onChange={(e) => { setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9.]/g, '')); setErrorMessage(null); }}
-                  placeholder="username"
-                  className="w-full bg-[#0E1015] border border-[#2B303C] hover:border-[#3E4556] focus:border-[#2D5BFF] focus:ring-2 focus:ring-[#2D5BFF]/20 rounded-xl pl-4 pr-28 py-3.5 text-base text-white placeholder-slate-500 outline-none transition-all"
-                  required
-                />
-                <span className="absolute right-4 text-sm font-semibold text-slate-400 select-none pointer-events-none">
-                  @eazzio.com
-                </span>
-              </div>
-
-              <p className="text-xs text-slate-500">You can use letters, numbers, and periods</p>
-
-              <div className="pt-4 flex items-center justify-between">
-                <button
-                  type="button"
-                  onClick={() => setStep('name')}
-                  className="text-sm font-medium text-slate-400 hover:text-white transition-colors flex items-center gap-1.5"
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                  Back
-                </button>
-
-                <button
-                  type="submit"
-                  className="px-6 py-2.5 rounded-full bg-[#2D5BFF] hover:bg-[#1E48E0] active:scale-[0.98] text-white font-medium text-sm shadow-md shadow-blue-500/20 transition-all flex items-center gap-1.5"
-                >
-                  <span>Next</span>
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-              </div>
-            </form>
-          </div>
-        )}
-
-        {/* Step 3: Password */}
-        {step === 'password' && (
-          <div className="space-y-6 animate-in fade-in zoom-in-95 duration-200">
-            <div className="space-y-2">
-              <div className="w-10 h-10 rounded-xl bg-[#2D5BFF] flex items-center justify-center font-bold text-lg text-white shadow-lg shadow-blue-500/25 mb-4">
-                E
-              </div>
-              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">Create a password</h1>
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">Enter recovery code</h1>
               <p className="text-sm text-slate-400">
-                Create a strong password with a mix of letters, numbers, and symbols
+                A password reset token was sent to <span className="text-slate-200 font-medium">{identifier}</span>
               </p>
             </div>
 
@@ -240,13 +173,65 @@ export default function RegisterPage() {
               </div>
             )}
 
-            <form onSubmit={handlePasswordSubmit} className="space-y-4">
+            <form onSubmit={handleCodeSubmit} className="space-y-6">
+              <div>
+                <input
+                  type="text"
+                  value={resetToken}
+                  onChange={(e) => { setResetToken(e.target.value); setErrorMessage(null); }}
+                  placeholder="Paste reset token / code"
+                  className="w-full bg-[#0E1015] border border-[#2B303C] hover:border-[#3E4556] focus:border-[#2D5BFF] focus:ring-2 focus:ring-[#2D5BFF]/20 rounded-xl px-4 py-3.5 text-sm font-mono text-white placeholder-slate-500 outline-none transition-all"
+                  required
+                />
+              </div>
+
+              <div className="pt-4 flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => setStep('identifier')}
+                  className="text-sm font-medium text-slate-400 hover:text-white transition-colors flex items-center gap-1.5"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  Back
+                </button>
+
+                <button
+                  type="submit"
+                  className="px-6 py-2.5 rounded-full bg-[#2D5BFF] hover:bg-[#1E48E0] active:scale-[0.98] text-white font-medium text-sm shadow-md shadow-blue-500/20 transition-all flex items-center gap-1.5"
+                >
+                  <span>Continue</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* Step 3: Set New Password */}
+        {step === 'newPassword' && (
+          <div className="space-y-6 animate-in fade-in zoom-in-95 duration-200">
+            <div className="space-y-2">
+              <div className="w-10 h-10 rounded-xl bg-[#2D5BFF] flex items-center justify-center font-bold text-lg text-white shadow-lg shadow-blue-500/25 mb-4">
+                <Lock className="w-5 h-5" />
+              </div>
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">Create new password</h1>
+              <p className="text-sm text-slate-400">Choose a strong password that you don't use for other websites</p>
+            </div>
+
+            {errorMessage && (
+              <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-center gap-2.5">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{errorMessage}</span>
+              </div>
+            )}
+
+            <form onSubmit={handlePasswordResetSubmit} className="space-y-4">
               <div className="relative group">
                 <input
                   type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => { setPassword(e.target.value); setErrorMessage(null); }}
-                  placeholder="Password"
+                  value={newPassword}
+                  onChange={(e) => { setNewPassword(e.target.value); setErrorMessage(null); }}
+                  placeholder="New password (min 8 characters)"
                   className="w-full bg-[#0E1015] border border-[#2B303C] hover:border-[#3E4556] focus:border-[#2D5BFF] focus:ring-2 focus:ring-[#2D5BFF]/20 rounded-xl px-4 py-3.5 pr-11 text-base text-white placeholder-slate-500 outline-none transition-all"
                   required
                   minLength={8}
@@ -265,26 +250,16 @@ export default function RegisterPage() {
                   type={showPassword ? 'text' : 'password'}
                   value={confirmPassword}
                   onChange={(e) => { setConfirmPassword(e.target.value); setErrorMessage(null); }}
-                  placeholder="Confirm password"
+                  placeholder="Confirm new password"
                   className="w-full bg-[#0E1015] border border-[#2B303C] hover:border-[#3E4556] focus:border-[#2D5BFF] focus:ring-2 focus:ring-[#2D5BFF]/20 rounded-xl px-4 py-3.5 text-base text-white placeholder-slate-500 outline-none transition-all"
                   required
                 />
               </div>
 
-              <div className="flex items-center gap-2 text-xs text-slate-400 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={showPassword}
-                  onChange={(e) => setShowPassword(e.target.checked)}
-                  className="rounded border-[#2B303C] bg-[#0E1015] text-[#2D5BFF] focus:ring-0 w-3.5 h-3.5"
-                />
-                <span>Show password</span>
-              </div>
-
               <div className="pt-4 flex items-center justify-between">
                 <button
                   type="button"
-                  onClick={() => setStep('username')}
+                  onClick={() => setStep('code')}
                   className="text-sm font-medium text-slate-400 hover:text-white transition-colors flex items-center gap-1.5"
                 >
                   <ArrowLeft className="w-4 h-4" />
@@ -296,15 +271,41 @@ export default function RegisterPage() {
                   disabled={isLoading}
                   className="px-6 py-2.5 rounded-full bg-[#2D5BFF] hover:bg-[#1E48E0] active:scale-[0.98] disabled:opacity-50 text-white font-medium text-sm shadow-md shadow-blue-500/20 transition-all flex items-center gap-1.5"
                 >
-                  <span>{isLoading ? 'Creating account...' : 'Create account'}</span>
+                  <span>{isLoading ? 'Saving...' : 'Save password'}</span>
                 </button>
               </div>
             </form>
           </div>
         )}
+
+        {/* Step 4: Success */}
+        {step === 'success' && (
+          <div className="space-y-6 text-center animate-in fade-in zoom-in-95 duration-200">
+            <div className="w-16 h-16 rounded-full bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 mx-auto">
+              <CheckCircle2 className="w-9 h-9" />
+            </div>
+
+            <div className="space-y-2">
+              <h1 className="text-2xl font-bold tracking-tight text-white">Password changed!</h1>
+              <p className="text-sm text-slate-400">
+                Your password has been successfully updated. You can now sign in with your new credentials.
+              </p>
+            </div>
+
+            <div className="pt-4">
+              <Link
+                href="/login"
+                className="w-full inline-flex items-center justify-center gap-2 py-3 px-6 rounded-full bg-[#2D5BFF] hover:bg-[#1E48E0] active:scale-[0.98] text-white font-medium text-sm shadow-lg shadow-blue-500/20 transition-all"
+              >
+                Sign in to your account
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Footer */}
+      {/* Footer Language & Privacy Links */}
       <div className="w-full max-w-[460px] py-4 flex items-center justify-between text-xs text-slate-500">
         <div className="flex items-center gap-1 cursor-pointer hover:text-slate-400 transition-colors">
           <span>English (United States)</span>

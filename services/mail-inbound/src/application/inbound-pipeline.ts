@@ -173,10 +173,10 @@ export class InboundPipeline {
       let existingThread: Thread | null = null;
 
       // 1. Match by RFC 5322 In-Reply-To or References
-      const inReplyToHeader = parsed.headers['in-reply-to'] || parsed.headers['references'];
-      if (inReplyToHeader && this.messageRepo) {
+      const inReplyToHeader = (parsed.headers ? (parsed.headers['in-reply-to'] || parsed.headers['references']) : undefined) as string | undefined;
+      if (inReplyToHeader && this.messageRepo && effectiveMailboxId) {
         try {
-          const parentMsg = await this.messageRepo.findByMessageIdHeader(inReplyToHeader.trim());
+          const parentMsg = await this.messageRepo.findByMessageIdHeader(effectiveMailboxId, String(inReplyToHeader).trim());
           if (parentMsg && parentMsg.threadId) {
             existingThread = await this.threadRepo.findById(parentMsg.threadId);
           }
@@ -276,12 +276,12 @@ export class InboundPipeline {
     const dsnReport = DsnParser.parse(parsed.bodyText, parsed.headers);
     if (dsnReport.isBounce && this.messageRepo) {
       isImportant = true;
-      if (dsnReport.originalMessageId) {
+      if (dsnReport.originalMessageId && effectiveMailboxId) {
         try {
-          const originalMsg = await this.messageRepo.findByMessageIdHeader(dsnReport.originalMessageId);
+          const originalMsg = await this.messageRepo.findByMessageIdHeader(effectiveMailboxId, dsnReport.originalMessageId);
           if (originalMsg) {
             await this.messageRepo.updateDeliveryState(originalMsg.id, 'bounced');
-            threadId = originalMsg.threadId; // Thread bounce directly into the same conversation
+            threadId = originalMsg.threadId || threadId; // Thread bounce directly into the same conversation
           }
         } catch {
           // Continue without failing delivery
