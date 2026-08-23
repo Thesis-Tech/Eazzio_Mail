@@ -92,6 +92,68 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                 </p>
               </div>
 
+              {/* Identity Mode Switcher (Personal Dev vs Business) */}
+              <div className="p-2 border-b border-[#2A2E37] space-y-1">
+                <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider px-2 block">
+                  Active Identity Mode
+                </span>
+                <button
+                  onClick={() => {
+                    AuthStore.setSession(
+                      {
+                        id: 'usr-dev-101',
+                        email: 'rahulkumar@eazzio.com',
+                        displayName: 'Rahul Kumar (Personal/Dev)',
+                        role: 'Developer',
+                      },
+                      'dev-token-personal'
+                    );
+                    setIsProfileOpen(false);
+                  }}
+                  className={`w-full px-2.5 py-1.5 rounded-lg text-left text-xs flex items-center justify-between transition-colors ${
+                    !user?.email?.includes('thesistech')
+                      ? 'bg-[#2D5BFF]/15 text-[#2D5BFF] font-semibold border border-[#2D5BFF]/30'
+                      : 'text-slate-300 hover:bg-[#1C1F26]'
+                  }`}
+                >
+                  <div className="truncate">
+                    <p className="truncate">Rahul (Personal / Dev)</p>
+                    <p className="text-[10px] text-slate-400 font-mono truncate">rahulkumar@eazzio.com</p>
+                  </div>
+                  {!user?.email?.includes('thesistech') && (
+                    <CheckCircle2 className="w-3.5 h-3.5 text-[#2D5BFF] shrink-0" />
+                  )}
+                </button>
+
+                <button
+                  onClick={() => {
+                    AuthStore.setSession(
+                      {
+                        id: 'usr-biz-202',
+                        email: 'rahul@thesistech.io',
+                        displayName: 'Rahul Kumar (Thesis Tech)',
+                        role: 'BusinessAdmin',
+                      },
+                      'biz-token-thesistech'
+                    );
+                    setIsProfileOpen(false);
+                  }}
+                  className={`w-full px-2.5 py-1.5 rounded-lg text-left text-xs flex items-center justify-between transition-colors ${
+                    user?.email?.includes('thesistech')
+                      ? 'bg-purple-500/15 text-purple-400 font-semibold border border-purple-500/30'
+                      : 'text-slate-300 hover:bg-[#1C1F26]'
+                  }`}
+                >
+                  <div className="truncate">
+                    <p className="truncate">Rahul (Business / Org)</p>
+                    <p className="text-[10px] text-slate-400 font-mono truncate">rahul@thesistech.io</p>
+                  </div>
+                  {user?.email?.includes('thesistech') && (
+                    <CheckCircle2 className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                  )}
+                </button>
+              </div>
+
               <div className="py-1">
                 <button
                   className="w-full px-4 py-2 text-left text-sm text-slate-300 hover:bg-[#1C1F26] hover:text-white flex items-center gap-2.5 transition-colors"

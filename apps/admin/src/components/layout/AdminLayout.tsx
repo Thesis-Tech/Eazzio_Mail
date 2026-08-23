@@ -13,14 +13,18 @@ interface AdminLayoutProps {
   allowedRoles?: AdminRole[];
 }
 
+const DEFAULT_ALLOWED_ROLES: AdminRole[] = ['PlatformAdmin', 'OrgAdmin'];
+
 export const AdminLayout: React.FC<AdminLayoutProps> = ({
   children,
-  allowedRoles = ['PlatformAdmin', 'OrgAdmin'],
+  allowedRoles = DEFAULT_ALLOWED_ROLES,
 }) => {
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState<AdminUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthorized, setIsAuthorized] = useState(false);
+
+  const rolesKey = allowedRoles.join(',');
 
   useEffect(() => {
     AdminAuthStore.initFromStorage();
@@ -63,7 +67,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
     });
 
     return () => unsubscribe();
-  }, [allowedRoles]);
+  }, [rolesKey]);
 
   const handleLogout = () => {
     AdminAuthStore.clearSession();
