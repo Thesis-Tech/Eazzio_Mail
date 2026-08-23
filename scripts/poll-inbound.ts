@@ -76,25 +76,51 @@ interface MailTmAccount {
 }
 
 async function getOrCreateMailTmAccount(): Promise<MailTmAccount> {
+  // Try to reuse existing saved account
   if (fs.existsSync(SESSION_FILE)) {
     try {
       const saved = JSON.parse(fs.readFileSync(SESSION_FILE, 'utf-8')) as MailTmAccount;
-      // Verify token
-      const meRes = await fetch('https://api.mail.tm/me', {
-        headers: { Authorization: `Bearer ${saved.token}` },
-      });
-      if (meRes.ok) {
-        return saved;
+      if (saved.token) {
+        const meRes = await fetch('https://api.mail.tm/me', {
+          headers: { Authorization: `Bearer ${saved.token}` },
+        });
+        if (meRes.ok) {
+          console.log(`   ♻️  Reusing existing mail.tm account: ${saved.address}`);
+          return saved;
+        }
       }
-    } catch (_) {}
+      // Token missing or expired — try to re-login with saved credentials
+      if (saved.address && saved.password) {
+        const reLoginRes = await fetch('https://api.mail.tm/token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ address: saved.address, password: saved.password }),
+        });
+        const reLoginJson = (await reLoginRes.json()) as any;
+        if (reLoginJson.token) {
+          saved.token = reLoginJson.token;
+          fs.writeFileSync(SESSION_FILE, JSON.stringify(saved, null, 2));
+          console.log(`   🔄 Re-authenticated existing account: ${saved.address}`);
+          return saved;
+        }
+      }
+      // Account is fully dead, remove stale session
+      console.log(`   ⚠️  Stale session detected. Creating fresh account...`);
+      fs.unlinkSync(SESSION_FILE);
+    } catch (_) {
+      try { fs.unlinkSync(SESSION_FILE); } catch (_) {}
+    }
   }
 
   // Get active domain
   const domainsRes = await fetch('https://api.mail.tm/domains');
+  if (!domainsRes.ok) {
+    throw new Error(`mail.tm /domains API returned ${domainsRes.status}: ${await domainsRes.text()}`);
+  }
   const domainsJson = (await domainsRes.json()) as any;
   const domain = domainsJson['hydra:member']?.[0]?.domain || 'emalupe.com';
 
-  const username = `eazzio.live.${Date.now().toString(36)}`;
+  const username = `eazziolive${Date.now().toString(36)}`;
   const address = `${username}@${domain}`;
   const password = `Pass_${crypto.randomBytes(8).toString('hex')}!`;
 
@@ -105,23 +131,42 @@ async function getOrCreateMailTmAccount(): Promise<MailTmAccount> {
     body: JSON.stringify({ address, password }),
   });
   const createJson = (await createRes.json()) as any;
+  if (!createRes.ok) {
+    throw new Error(`mail.tm account creation failed: ${JSON.stringify(createJson)}`);
+  }
 
-  // Get token
-  const tokenRes = await fetch('https://api.mail.tm/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ address, password }),
-  });
-  const tokenJson = (await tokenRes.json()) as any;
+  // Use the normalized address returned by the API (mail.tm may strip dots, etc.)
+  const normalizedAddress = createJson.address || address;
+
+  // Get token (with retries — mail.tm has a brief propagation delay after account creation)
+  let tokenJson: any = {};
+  for (let attempt = 1; attempt <= 5; attempt++) {
+    if (attempt > 1) {
+      console.log(`   ⏳ Waiting 3s before retry ${attempt}/5...`);
+      await new Promise((r) => setTimeout(r, 3000));
+    }
+    const tokenRes = await fetch('https://api.mail.tm/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ address: normalizedAddress, password }),
+    });
+    tokenJson = (await tokenRes.json()) as any;
+    if (tokenJson.token) break;
+    console.log(`   ⚠️  Token attempt ${attempt}/5 failed: ${tokenJson.message || 'no token'}`);
+  }
+  if (!tokenJson.token) {
+    throw new Error(`mail.tm token retrieval failed after 5 attempts: ${JSON.stringify(tokenJson)}`);
+  }
 
   const account: MailTmAccount = {
     id: createJson.id || tokenJson.id,
-    address,
+    address: normalizedAddress,
     password,
     token: tokenJson.token,
   };
 
   fs.writeFileSync(SESSION_FILE, JSON.stringify(account, null, 2));
+  console.log(`   ✅ New mail.tm account created: ${account.address}`);
   return account;
 }
 
@@ -250,7 +295,25 @@ async function main() {
         headers: { Authorization: `Bearer ${account.token}` },
       });
 
-      if (listRes.ok) {
+      if (listRes.status === 401) {
+        console.log('⚠️  Token expired. Re-authenticating...');
+        // Try to re-login
+        const reLoginRes = await fetch('https://api.mail.tm/token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ address: account.address, password: account.password }),
+        });
+        const reLoginJson = (await reLoginRes.json()) as any;
+        if (reLoginJson.token) {
+          account.token = reLoginJson.token;
+          fs.writeFileSync(SESSION_FILE, JSON.stringify(account, null, 2));
+          console.log('🔄 Token refreshed successfully.');
+        } else {
+          console.error('❌ Re-authentication failed. Removing stale session and restarting...');
+          try { fs.unlinkSync(SESSION_FILE); } catch (_) {}
+          process.exit(1);
+        }
+      } else if (listRes.ok) {
         const listJson = (await listRes.json()) as any;
         const messages = listJson['hydra:member'] || [];
 
@@ -289,8 +352,12 @@ async function main() {
               method: 'DELETE',
               headers: { Authorization: `Bearer ${account.token}` },
             });
+          } else {
+            console.warn(`   ⚠️  Failed to download raw EML for ${msgId}: ${dlRes.status}`);
           }
         }
+      } else {
+        console.warn(`   ⚠️  mail.tm /messages returned ${listRes.status}`);
       }
     } catch (err: any) {
       console.warn('Polling warning:', err.message);
