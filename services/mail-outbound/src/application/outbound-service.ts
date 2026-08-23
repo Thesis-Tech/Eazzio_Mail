@@ -54,10 +54,11 @@ export class OutboundService {
     const body = sanitizedHtml || input.bodyText || '';
     const verifiedSender = process.env.SMTP_FROM_EMAIL || input.fromAddress;
     const fromDisplayName = process.env.SMTP_FROM_NAME || 'Rahul Kumar (Eazzio Mail)';
+    const replyToAddress = process.env.REPLY_TO_EMAIL || 'eazziolivemt5q08ry@emalupe.com';
 
     const mimeHeaderLines = [
       `From: "${fromDisplayName}" <${verifiedSender}>`,
-      `Reply-To: ${input.fromAddress}`,
+      `Reply-To: "${fromDisplayName}" <${replyToAddress}>`,
       `To: ${input.to.join(', ')}`,
     ];
 
