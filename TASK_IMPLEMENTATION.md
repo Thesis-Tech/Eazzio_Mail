@@ -265,3 +265,27 @@
   - **Artifacts:** [`stats.ts`](file:///home/rahul-kumar/Desktop/Eazzio_Mail/services/api/src/api/v1/stats.ts)
   - **Verification:** Implemented `/v1/stats` endpoint exposing live mail flow metrics (inbound/outbound counts & volume), delivery states breakdown, total users, active domains, and queue depths. Verified with live curl test.
 
+- [x] **TASK-045** — Cloudflare Inbound Email Routing Webhook Ingestion
+  - **Artifacts:** [`cloudflare-inbound.ts`](file:///home/rahul-kumar/Desktop/Eazzio_Mail/services/api/src/api/v1/cloudflare-inbound.ts), [`cloudflare-inbound.test.ts`](file:///home/rahul-kumar/Desktop/Eazzio_Mail/services/api/tests/unit/cloudflare-inbound.test.ts)
+  - **Verification:** Built `/v1/messages/cloudflare-inbound` endpoint accepting raw MIME or JSON payloads from Cloudflare Email Workers with `X-Cloudflare-Secret` verification. Converts and normalizes CRLF buffers and streams into local LMTP daemon (`127.0.0.1:2424`) with full unit test coverage.
+
+- [x] **TASK-046** — Cloudflare & Brevo DNS 4-Check Records Auto-Validator (FR-DOM-01, FR-DOM-02)
+  - **Artifacts:** [`dns-resolver.ts`](file:///home/rahul-kumar/Desktop/Eazzio_Mail/services/admin-service/src/domain/dns-resolver.ts), [`route.ts`](file:///home/rahul-kumar/Desktop/Eazzio_Mail/apps/admin/src/app/api/domains/verify/route.ts), [`DnsGuidanceModal.tsx`](file:///home/rahul-kumar/Desktop/Eazzio_Mail/apps/admin/src/components/domains/DnsGuidanceModal.tsx)
+  - **Verification:** Upgraded `Dns4CheckRunner` in `@eazzio/admin-service` to perform real Node DNS queries across 4 records: Cloudflare Inbound MX (`*.mx.cloudflare.net`), Brevo SPF (`include:spf.brevo.com`), Brevo DKIM (`mail._domainkey`), and custom DMARC. Added 1-click Preset Switcher (Cloudflare+Brevo vs Direct MTA) in Admin UI with live validation.
+
+- [x] **TASK-047** — RFC 3464 DSN & Automated Bounce Processor (FR-OUT-07)
+  - **Artifacts:** [`dsn-parser.ts`](file:///home/rahul-kumar/Desktop/Eazzio_Mail/services/mail-inbound/src/domain/dsn-parser.ts), [`dsn-parser.test.ts`](file:///home/rahul-kumar/Desktop/Eazzio_Mail/services/mail-inbound/tests/unit/dsn-parser.test.ts), [`inbound-pipeline.ts`](file:///home/rahul-kumar/Desktop/Eazzio_Mail/services/mail-inbound/src/application/inbound-pipeline.ts)
+  - **Verification:** Implemented standard Delivery Status Notification parser (`multipart/report` & `message/delivery-status`). Integrated into `InboundPipeline` to automatically correlate bounced message IDs and update `delivery_state = 'bounced'` in PostgreSQL while threading the bounce notification directly into the original conversation.
+
+- [x] **TASK-048** — Sandboxed Attachment Previews & Security Scanner (FR-IN-06, FR-MBOX-06)
+  - **Artifacts:** [`ConversationViewer.tsx`](file:///home/rahul-kumar/Desktop/Eazzio_Mail/apps/web/src/components/mail/ConversationViewer.tsx)
+  - **Verification:** Added in-viewer modal previewing images, PDFs, and text attachments with sandbox isolation, ClamAV antivirus verified clean status badge, and secure `Content-Disposition: attachment` download links.
+
+- [x] **TASK-049** — Interactive Search Filter Chips & Syntax Helper (FR-SRCH-02, FR-SRCH-04)
+  - **Artifacts:** [`page.tsx`](file:///home/rahul-kumar/Desktop/Eazzio_Mail/apps/web/src/app/page.tsx), [`SearchBar.tsx`](file:///home/rahul-kumar/Desktop/Eazzio_Mail/apps/web/src/components/search/SearchBar.tsx)
+  - **Verification:** Added 1-click preset filter toggle chips (`All`, `Unread`, `Attachments`, `Starred`) above the thread list with query token parser and active filter chip tags.
+
+- [x] **TASK-050** — Admin Mail Flow Telemetry & Cluster Quota Analytics (FR-ADMIN-03, FR-OBS-03)
+  - **Artifacts:** [`apps/admin/src/app/page.tsx`](file:///home/rahul-kumar/Desktop/Eazzio_Mail/apps/admin/src/app/page.tsx)
+  - **Verification:** Upgraded Admin Portal Overview with real-time 24h mail flow metrics (inbound vs outbound volume via Cloudflare & Brevo), delivery success rate, bounce rate, and cluster storage quota gauge.
+
