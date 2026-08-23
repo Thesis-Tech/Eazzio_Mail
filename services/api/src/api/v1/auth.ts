@@ -413,37 +413,23 @@ authRouter.post('/reset-password', async (req: Request, res: Response, next: Nex
       throw new AppError('VALIDATION_ERROR', 'Password must be at least 8 characters long', 400);
     }
 
-    const cleanToken = token.trim();
-    const tokenHashUpper = crypto.createHash('sha256').update(cleanToken.toUpperCase()).digest('hex');
-    const tokenHashRaw = crypto.createHash('sha256').update(cleanToken).digest('hex');
-
-    let entry = resetTokenStore.get(email) || resetTokenStore.get(getDeliveryTarget(email));
-    if (!entry) {
-      for (const [, storedEntry] of resetTokenStore.entries()) {
-        if (storedEntry.tokenHash === tokenHashUpper || storedEntry.tokenHash === tokenHashRaw) {
-          entry = storedEntry;
-          break;
-        }
-      }
-    }
-
+    const entry = resetTokenStore.get(email);
     if (!entry || Date.now() > entry.expiresAt) {
       resetTokenStore.delete(email);
-      throw new AppError('INVALID_TOKEN', 'Reset token is invalid or has expired. Please request a new code.', 400);
+      throw new AppError('INVALID_TOKEN', 'Reset token is invalid or has expired. Please request a new one.', 400);
     }
 
-    if (entry.tokenHash !== tokenHashUpper && entry.tokenHash !== tokenHashRaw) {
-      throw new AppError('INVALID_TOKEN', 'Invalid reset code provided. Please check the code in your email.', 400);
+    const cleanToken = token.trim().toUpperCase();
+    const tokenHashUpper = crypto.createHash('sha256').update(cleanToken).digest('hex');
+    const tokenHashRaw = crypto.createHash('sha256').update(token.trim()).digest('hex');
+
+    if (tokenHashUpper !== entry.tokenHash && tokenHashRaw !== entry.tokenHash) {
+      throw new AppError('INVALID_TOKEN', 'Invalid reset token provided. Please check the code in your email.', 400);
     }
-
-    // Invalidate reset token once used
-    resetTokenStore.delete(email);
-    resetTokenStore.delete(entry.email);
-
-    // Hash new password with Argon2
-    const passwordHash = await PasswordService.hash(newPassword);
 
     let user = await userRepo.findByEmail(email);
+    const passwordHash = await PasswordService.hash(newPassword);
+
     if (!user) {
       user = new User({
         id: crypto.randomUUID(),
@@ -471,10 +457,12 @@ authRouter.post('/reset-password', async (req: Request, res: Response, next: Nex
       await sessionRepo.revokeAllForUser(user.id);
     }
 
+    resetTokenStore.delete(email);
+
     res.json({
       success: true,
       data: {
-        message: 'Your password has been successfully reset. You can now sign in with your new password.',
+        message: 'Your password has been successfully reset. You can now sign in.',
       },
     });
   } catch (err) {

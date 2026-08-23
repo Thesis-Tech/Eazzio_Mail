@@ -12,11 +12,15 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@better-auth/cli": "^1.4.21",
     "@eazzio/contracts": "workspace:*",
     "@eazzio/identity": "workspace:*",
     "@eazzio/ui-kit": "workspace:*",
+    "@types/pg": "^8.23.1",
+    "better-auth": "^1.7.1",
     "lucide-react": "^0.475.0",
     "next": "15.1.7",
+    "pg": "^8.23.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
