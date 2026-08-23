@@ -9,7 +9,8 @@
     "typecheck": "pnpm --recursive run typecheck",
     "dev": "pnpm --filter @eazzio/api start & pnpm --filter @eazzio/web dev",
     "mail:inject": "npx tsx scripts/inject-eml.ts",
-    "mail:inject:batch": "npx tsx scripts/batch-inject-eml.ts"
+    "mail:inject:batch": "npx tsx scripts/batch-inject-eml.ts",
+    "mail:poller": "npx tsx scripts/poll-inbound.ts"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",
