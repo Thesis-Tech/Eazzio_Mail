@@ -22,16 +22,93 @@ import {
 } from 'lucide-react';
 import { MessageDetail } from '../../types/mail';
 
-export interface ConversationViewerProps {
-  threadId: string;
-  subject: string;
-  messages: MessageDetail[];
-  onArchive?: (threadId: string) => void;
-  onDelete?: (threadId: string) => void;
-  onToggleStar?: (threadId: string) => void;
-  onSendReply?: (threadId: string, replyText: string) => void;
-  onClose?: () => void;
+interface TrimmedMessageProps {
+  bodyHtml?: string;
+  bodyText?: string;
+  snippet?: string;
 }
+
+const TrimmedMessageContent: React.FC<TrimmedMessageProps> = ({ bodyHtml, bodyText, snippet }) => {
+  const [showQuoted, setShowQuoted] = useState(false);
+
+  // 1. Check HTML for quote containers (e.g. gmail_quote, blockquote)
+  if (bodyHtml && bodyHtml.includes('<') && bodyHtml.includes('>') && bodyHtml !== '<p></p>' && bodyHtml !== '<p><br></p>') {
+    const quoteIndex = bodyHtml.search(/(<div\s+class="gmail_quote"|<blockquote|<div\s+class="gmail_attr")/i);
+    if (quoteIndex !== -1) {
+      const primaryHtml = bodyHtml.slice(0, quoteIndex);
+      const quotedHtml = bodyHtml.slice(quoteIndex);
+
+      return (
+        <div className="space-y-2">
+          <div
+            className="text-sm text-slate-200 leading-relaxed font-sans prose prose-invert max-w-none [&_a]:text-[#2D5BFF] [&_a]:underline"
+            dangerouslySetInnerHTML={{ __html: primaryHtml }}
+          />
+          <div>
+            <button
+              onClick={() => setShowQuoted(!showQuoted)}
+              className="px-2 py-0.5 rounded bg-[#1C1F26] hover:bg-[#2A2E37] text-slate-400 hover:text-slate-200 text-xs font-mono transition-colors tracking-widest"
+              title={showQuoted ? 'Hide trimmed content' : 'Show trimmed content'}
+            >
+              •••
+            </button>
+            {showQuoted && (
+              <div
+                className="mt-3 pl-3 border-l-2 border-[#2A2E37] text-sm text-slate-400 leading-relaxed font-sans prose prose-invert max-w-none [&_a]:text-[#2D5BFF] animate-in fade-in"
+                dangerouslySetInnerHTML={{ __html: quotedHtml }}
+              />
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div
+        className="text-sm text-slate-200 leading-relaxed font-sans prose prose-invert max-w-none [&_a]:text-[#2D5BFF] [&_a]:underline"
+        dangerouslySetInnerHTML={{ __html: bodyHtml }}
+      />
+    );
+  }
+
+  // 2. Check Plain Text for quote headers
+  const rawText = bodyText || snippet || '(No content)';
+  const quoteRegex = /(?:\r?\n)(?:On\s+[A-Za-z]+,\s+[A-Za-z]+\s+\d+.*?(?:wrote|wrote:)|-----Original Message-----|---------- Forwarded message ---------)[\s\S]*/i;
+  const match = rawText.match(quoteRegex);
+
+  if (match && match.index !== undefined) {
+    const primaryText = rawText.slice(0, match.index).trim();
+    const quotedText = rawText.slice(match.index).trim();
+
+    return (
+      <div className="space-y-2">
+        <div className="text-sm text-slate-200 leading-relaxed whitespace-pre-wrap font-sans">
+          {primaryText || '(No text content)'}
+        </div>
+        <div>
+          <button
+            onClick={() => setShowQuoted(!showQuoted)}
+            className="px-2 py-0.5 rounded bg-[#1C1F26] hover:bg-[#2A2E37] text-slate-400 hover:text-slate-200 text-xs font-mono transition-colors tracking-widest inline-flex items-center gap-1"
+            title={showQuoted ? 'Hide trimmed content' : 'Show trimmed content'}
+          >
+            •••
+          </button>
+          {showQuoted && (
+            <div className="mt-3 pl-3 border-l-2 border-[#2A2E37] text-sm text-slate-400 leading-relaxed whitespace-pre-wrap font-sans animate-in fade-in">
+              {quotedText}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="text-sm text-slate-200 leading-relaxed whitespace-pre-wrap font-sans">
+      {rawText}
+    </div>
+  );
+};
 
 export const ConversationViewer: React.FC<ConversationViewerProps> = ({
   threadId,
@@ -253,17 +330,12 @@ export const ConversationViewer: React.FC<ConversationViewerProps> = ({
                     </span>
                   </div>
 
-                  {/* Body Text / HTML */}
-                  {msg.bodyHtml && msg.bodyHtml.includes('<') && msg.bodyHtml.includes('>') && msg.bodyHtml !== '<p></p>' && msg.bodyHtml !== '<p><br></p>' ? (
-                    <div
-                      className="text-sm text-slate-200 leading-relaxed font-sans prose prose-invert max-w-none [&_a]:text-[#2D5BFF] [&_a]:underline"
-                      dangerouslySetInnerHTML={{ __html: msg.bodyHtml }}
-                    />
-                  ) : (
-                    <div className="text-sm text-slate-200 leading-relaxed whitespace-pre-wrap font-sans">
-                      {msg.bodyText || msg.snippet || '(No content)'}
-                    </div>
-                  )}
+                  {/* Body Text / HTML with Trimmed Quoted Content */}
+                  <TrimmedMessageContent
+                    bodyHtml={msg.bodyHtml}
+                    bodyText={msg.bodyText}
+                    snippet={msg.snippet}
+                  />
 
                   {/* Attachments Section */}
                   {msg.attachments && msg.attachments.length > 0 && (
