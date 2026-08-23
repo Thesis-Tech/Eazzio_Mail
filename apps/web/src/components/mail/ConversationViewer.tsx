@@ -17,6 +17,8 @@ import {
   ChevronDown,
   ChevronUp,
   Send,
+  X,
+  FileText,
 } from 'lucide-react';
 import { MessageDetail } from '../../types/mail';
 

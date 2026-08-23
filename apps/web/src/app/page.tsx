@@ -7,7 +7,7 @@ import { ConversationViewer } from '../components/mail/ConversationViewer';
 import { MailComposer, ComposeEmailPayload } from '../components/mail/MailComposer';
 import { SettingsModal } from '../components/settings/SettingsModal';
 import { ThreadSummary, MessageDetail, FolderItem, LabelItem, FilterRule, UserPreferences } from '../types/mail';
-import { Mail, Sparkles, X, Search, RefreshCw } from 'lucide-react';
+import { Mail, Sparkles, X, Search, RefreshCw, Paperclip, Star } from 'lucide-react';
 import { parseSearchQuery } from '../components/search/SearchBar';
 import { realtimeClient, RealtimeMailEvent } from '../lib/websocket-client';
 import { ToastContainer, ToastNotification } from '../components/notification/ToastContainer';
