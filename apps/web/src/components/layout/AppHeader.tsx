@@ -10,7 +10,7 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import { PrivacyModeBadge } from '../PrivacyModeBadge';
-import { AuthUser } from '../../lib/auth-store';
+import { AuthUser, AuthStore } from '../../lib/auth-store';
 import { SearchBar } from '../search/SearchBar';
 import { ThreadSummary } from '../../types/mail';
 

@@ -113,6 +113,17 @@ const TrimmedMessageContent: React.FC<TrimmedMessageProps> = ({ bodyHtml, bodyTe
   );
 };
 
+export interface ConversationViewerProps {
+  threadId: string;
+  subject: string;
+  messages: MessageDetail[];
+  onArchive?: (threadId: string) => void;
+  onDelete?: (threadId: string) => void;
+  onToggleStar?: (threadId: string) => void;
+  onSendReply?: (threadId: string, replyText: string) => void;
+  onClose?: () => void;
+}
+
 export const ConversationViewer: React.FC<ConversationViewerProps> = ({
   threadId,
   subject,
