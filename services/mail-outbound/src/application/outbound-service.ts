@@ -52,9 +52,12 @@ export class OutboundService {
     const messageId = `<${crypto.randomUUID()}@${domainName}>`;
     const sanitizedHtml = input.bodyHtml ? HtmlSanitizer.sanitize(input.bodyHtml) : undefined;
     const body = sanitizedHtml || input.bodyText || '';
+    const verifiedSender = process.env.SMTP_FROM_EMAIL || input.fromAddress;
+    const fromDisplayName = process.env.SMTP_FROM_NAME || 'Rahul Kumar (Eazzio Mail)';
 
     const mimeHeaderLines = [
-      `From: ${input.fromAddress}`,
+      `From: "${fromDisplayName}" <${verifiedSender}>`,
+      `Reply-To: ${input.fromAddress}`,
       `To: ${input.to.join(', ')}`,
     ];
 
