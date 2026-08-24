@@ -27,7 +27,16 @@ export class InboundRouter {
     }
 
     // 2. Verify destination mailbox exists
-    const mailbox = await this.mailboxRepo.findByAddress(normalized);
+    let mailbox = await this.mailboxRepo.findByAddress(normalized);
+    if (!mailbox) {
+      // Check alias mapping for rahul / rahulkumar
+      if (normalized === 'rahul@eazzio.com' || normalized === 'rahulkumar@eazzio.com') {
+        mailbox =
+          (await this.mailboxRepo.findByAddress('rahulkumar@eazzio.com')) ||
+          (await this.mailboxRepo.findByAddress('rahul@eazzio.com'));
+      }
+    }
+
     if (!mailbox) {
       return null;
     }
