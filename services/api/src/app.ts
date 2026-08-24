@@ -7,6 +7,7 @@ import { webhooksRouter } from './api/v1/webhooks.js';
 import { statsRouter } from './api/v1/stats.js';
 import { authRouter } from './api/v1/auth.js';
 import { cloudflareInboundRouter } from './api/v1/cloudflare-inbound.js';
+import { mailSyncRouter } from './api/v1/mail-sync.js';
 import { errorHandler } from './middleware/error-handler.js';
 
 export const app: Express = express();
@@ -21,6 +22,7 @@ app.get('/health', (_req, res) => {
 // API v1 routes
 app.use('/v1/auth', authRouter);
 app.use('/v1/mailboxes', mailboxRouter);
+app.use('/v1/mail/inbound', mailSyncRouter);
 app.use('/v1/messages/cloudflare-inbound', cloudflareInboundRouter);
 app.use('/v1/messages', messagesRouter);
 app.use('/v1/search', searchRouter);
@@ -31,6 +33,7 @@ app.use('/v1/stats', statsRouter);
 // Support /api/v1 prefixes
 app.use('/api/v1/auth', authRouter);
 app.use('/api/v1/mailboxes', mailboxRouter);
+app.use('/api/v1/mail/inbound', mailSyncRouter);
 app.use('/api/v1/messages/cloudflare-inbound', cloudflareInboundRouter);
 app.use('/api/v1/messages', messagesRouter);
 app.use('/api/v1/search', searchRouter);

@@ -17,9 +17,11 @@
     "@eazzio/domain": "workspace:*",
     "@eazzio/infra-adapters": "workspace:*",
     "@eazzio/security-pipeline": "workspace:*",
+    "imapflow": "^1.7.2",
     "mailparser": "^3.9.15"
   },
   "devDependencies": {
+    "@types/imapflow": "^1.0.189",
     "@types/mailparser": "^3.4.6",
     "typescript": "^5.7.3",
     "vitest": "^3.0.5"
