@@ -1,0 +1,6 @@
+name = "eazzio-email-inbound"
+main = "src/index.ts"
+compatibility_date = "2024-09-23"
+
+[vars]
+EAZZIO_API_URL = "http://127.0.0.1:8080"
