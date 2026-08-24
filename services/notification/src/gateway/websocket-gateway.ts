@@ -171,6 +171,18 @@ export class WebSocketGateway {
     return sentCount;
   }
 
+  public broadcastAll(message: any): number {
+    const payloadStr = JSON.stringify(message);
+    let sentCount = 0;
+    for (const [ws] of this.clients.entries()) {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(payloadStr);
+        sentCount++;
+      }
+    }
+    return sentCount;
+  }
+
   public async close(): Promise<void> {
     if (this.heartbeatInterval) {
       clearInterval(this.heartbeatInterval);

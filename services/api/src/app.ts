@@ -12,6 +12,8 @@ import { errorHandler } from './middleware/error-handler.js';
 
 export const app: Express = express();
 
+app.use(express.raw({ type: ['message/rfc822', 'application/octet-stream'], limit: '35mb' }));
+app.use(express.text({ type: ['text/plain', 'text/html'], limit: '25mb' }));
 app.use(express.json({ limit: '25mb' }));
 
 // Health check
