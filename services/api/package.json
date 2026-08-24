@@ -19,7 +19,9 @@
     "@eazzio/identity": "workspace:*",
     "@eazzio/mail-inbound": "workspace:*",
     "@eazzio/mail-outbound": "workspace:*",
+    "@eazzio/notification": "workspace:*",
     "express": "^4.21.2",
+    "ws": "^8.18.0",
     "zod": "^3.24.2"
   },
   "devDependencies": {

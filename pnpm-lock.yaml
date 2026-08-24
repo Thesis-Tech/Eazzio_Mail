@@ -288,9 +288,15 @@ importers:
       '@eazzio/mail-outbound':
         specifier: workspace:*
         version: link:../mail-outbound
+      '@eazzio/notification':
+        specifier: workspace:*
+        version: link:../notification
       express:
         specifier: ^4.21.2
         version: 4.22.2
+      ws:
+        specifier: ^8.18.0
+        version: 8.21.3
       zod:
         specifier: ^3.24.2
         version: 3.25.76

@@ -20,6 +20,7 @@ export interface AppHeaderProps {
   onSearch?: (query: string) => void;
   availableThreads?: ThreadSummary[];
   isRealtimeConnected?: boolean;
+  realtimeStatus?: 'connected' | 'connecting' | 'reconnecting' | 'disconnected';
 }
 
 export const AppHeader: React.FC<AppHeaderProps> = ({
@@ -28,8 +29,13 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   onSearch,
   availableThreads = [],
   isRealtimeConnected = true,
+  realtimeStatus,
 }) => {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+
+  const effectiveStatus = realtimeStatus || (isRealtimeConnected ? 'connected' : 'disconnected');
+  const isLive = effectiveStatus === 'connected';
+  const isTransitioning = effectiveStatus === 'connecting' || effectiveStatus === 'reconnecting';
 
   return (
     <header
@@ -46,15 +52,27 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
       <div className="flex items-center gap-3">
         {/* Realtime Connection Dot */}
         <div
-          className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#0F1115] border border-[#2A2E37] text-xs"
-          title={isRealtimeConnected ? 'Realtime WebSocket Connected' : 'Disconnected'}
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#0F1115] border border-[#2A2E37] text-xs cursor-default"
+          title={
+            isLive
+              ? 'Realtime WebSocket Connected (Live updates)'
+              : isTransitioning
+              ? 'Connecting to Realtime Service...'
+              : 'Realtime WebSocket Offline (Polling active)'
+          }
           data-testid="realtime-status"
         >
           <span
-            className={`w-2 h-2 rounded-full ${isRealtimeConnected ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`}
+            className={`w-2 h-2 rounded-full ${
+              isLive
+                ? 'bg-emerald-500 animate-pulse'
+                : isTransitioning
+                ? 'bg-amber-400 animate-ping'
+                : 'bg-red-500'
+            }`}
           />
-          <span className="text-slate-400 text-[11px] hidden sm:inline">
-            {isRealtimeConnected ? 'Live' : 'Offline'}
+          <span className="text-slate-400 text-[11px] hidden sm:inline capitalize">
+            {isLive ? 'Live' : isTransitioning ? 'Connecting' : 'Offline'}
           </span>
         </div>
 

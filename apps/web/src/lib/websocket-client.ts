@@ -1,8 +1,8 @@
 export interface RealtimeMailEvent {
-  type: 'mail.received' | 'mail.deleted' | 'mail.read' | 'mail.starred';
-  mailboxId: string;
-  data: {
-    threadId: string;
+  type: 'mail.received' | 'mail.deleted' | 'mail.read' | 'mail.starred' | 'reconnected';
+  mailboxId?: string;
+  data?: {
+    threadId?: string;
     messageId?: string;
     from?: { name: string; email: string };
     subject?: string;
@@ -14,27 +14,48 @@ export interface RealtimeMailEvent {
   };
 }
 
-export type ConnectionStatus = 'connected' | 'connecting' | 'disconnected';
+export type ConnectionStatus = 'connected' | 'connecting' | 'reconnecting' | 'disconnected';
 
 export class RealtimeClient {
   private ws: WebSocket | null = null;
-  private url: string;
   private token: string | null = null;
   private status: ConnectionStatus = 'disconnected';
   private reconnectAttempts = 0;
-  private maxReconnectAttempts = 10;
+  private maxReconnectAttempts = 20;
   private reconnectTimer: NodeJS.Timeout | null = null;
   private heartbeatTimer: NodeJS.Timeout | null = null;
+  private currentCandidateIndex = 0;
 
   private statusListeners = new Set<(status: ConnectionStatus) => void>();
   private eventListeners = new Map<string, Set<(event: RealtimeMailEvent) => void>>();
 
-  constructor(url = 'ws://localhost:8081') {
-    this.url = url;
+  constructor() {}
+
+  private getCandidateUrls(): string[] {
+    if (typeof window === 'undefined') return ['ws://localhost:8080/ws', 'ws://localhost:8081'];
+
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const hostname = window.location.hostname || 'localhost';
+
+    const urls: string[] = [];
+    if (process.env.NEXT_PUBLIC_WS_URL) {
+      urls.push(process.env.NEXT_PUBLIC_WS_URL);
+    }
+    // Main API server WebSocket endpoint
+    urls.push(`${protocol}//${hostname}:8080/ws`);
+    // Standalone notification service endpoint
+    urls.push(`${protocol}//${hostname}:8081`);
+    // Current host /ws (for reverse proxies)
+    urls.push(`${protocol}//${window.location.host}/ws`);
+
+    return Array.from(new Set(urls));
   }
 
   public setToken(token: string): void {
     this.token = token;
+    if (this.status === 'disconnected') {
+      this.connect();
+    }
   }
 
   public getStatus(): ConnectionStatus {
@@ -48,6 +69,7 @@ export class RealtimeClient {
   }
 
   private setStatus(newStatus: ConnectionStatus): void {
+    if (this.status === newStatus) return;
     this.status = newStatus;
     for (const listener of this.statusListeners) {
       listener(this.status);
@@ -60,39 +82,63 @@ export class RealtimeClient {
       return;
     }
 
-    this.setStatus('connecting');
+    const isReconnecting = this.reconnectAttempts > 0;
+    this.setStatus(isReconnecting ? 'reconnecting' : 'connecting');
+
+    const candidates = this.getCandidateUrls();
+    const targetUrl = candidates[this.currentCandidateIndex % candidates.length]!;
 
     try {
-      const wsUrl = this.token ? `${this.url}?token=${encodeURIComponent(this.token)}` : this.url;
-      this.ws = new WebSocket(wsUrl);
+      const wsUrl = this.token ? `${targetUrl}?token=${encodeURIComponent(this.token)}` : targetUrl;
+      const socket = new WebSocket(wsUrl);
+      this.ws = socket;
 
-      this.ws.onopen = () => {
+      socket.onopen = () => {
+        if (this.ws !== socket) return;
         this.setStatus('connected');
+        const wasReconnecting = this.reconnectAttempts > 0;
         this.reconnectAttempts = 0;
         this.startHeartbeat();
+
+        // Resubscribe active channels
+        for (const mailboxId of this.eventListeners.keys()) {
+          if (mailboxId !== '*') {
+            try {
+              socket.send(JSON.stringify({ action: 'subscribe', channel: `mailbox:${mailboxId}` }));
+            } catch {}
+          }
+        }
+
+        if (wasReconnecting) {
+          this.dispatchEvent({ type: 'reconnected' });
+        }
       };
 
-      this.ws.onmessage = (event) => {
+      socket.onmessage = (event) => {
         try {
-          const parsed = JSON.parse(event.data) as RealtimeMailEvent | { type: 'pong' };
-          if (parsed.type === 'pong') return;
+          const parsed = JSON.parse(event.data);
+          if (parsed.type === 'pong' || parsed.event === 'PONG') return;
           this.dispatchEvent(parsed as RealtimeMailEvent);
         } catch {
           // ignore malformed payloads
         }
       };
 
-      this.ws.onclose = () => {
+      socket.onclose = () => {
+        if (this.ws !== socket) return;
         this.setStatus('disconnected');
         this.stopHeartbeat();
+        this.currentCandidateIndex++;
         this.scheduleReconnect();
       };
 
-      this.ws.onerror = () => {
+      socket.onerror = () => {
+        if (this.ws !== socket) return;
         this.setStatus('disconnected');
       };
     } catch {
       this.setStatus('disconnected');
+      this.currentCandidateIndex++;
       this.scheduleReconnect();
     }
   }
@@ -115,7 +161,9 @@ export class RealtimeClient {
 
     // Send subscribe frame if connected
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify({ action: 'subscribe', channel: `mailbox:${mailboxId}` }));
+      try {
+        this.ws.send(JSON.stringify({ action: 'subscribe', channel: `mailbox:${mailboxId}` }));
+      } catch {}
     }
 
     return () => {
@@ -130,10 +178,12 @@ export class RealtimeClient {
   }
 
   public dispatchEvent(event: RealtimeMailEvent): void {
-    const listeners = this.eventListeners.get(event.mailboxId);
-    if (listeners) {
-      for (const listener of listeners) {
-        listener(event);
+    if (event.mailboxId) {
+      const listeners = this.eventListeners.get(event.mailboxId);
+      if (listeners) {
+        for (const listener of listeners) {
+          listener(event);
+        }
       }
     }
     // Also dispatch to global wildcard listeners
@@ -148,7 +198,9 @@ export class RealtimeClient {
   private scheduleReconnect(): void {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) return;
 
-    const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 15000);
+    const baseDelay = Math.min(1000 * Math.pow(1.5, this.reconnectAttempts), 15000);
+    const jitter = Math.random() * 500;
+    const delay = baseDelay + jitter;
     this.reconnectAttempts += 1;
 
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
@@ -161,9 +213,11 @@ export class RealtimeClient {
     this.stopHeartbeat();
     this.heartbeatTimer = setInterval(() => {
       if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-        this.ws.send(JSON.stringify({ action: 'ping' }));
+        try {
+          this.ws.send(JSON.stringify({ action: 'ping' }));
+        } catch {}
       }
-    }, 25000);
+    }, 20000);
   }
 
   private stopHeartbeat(): void {

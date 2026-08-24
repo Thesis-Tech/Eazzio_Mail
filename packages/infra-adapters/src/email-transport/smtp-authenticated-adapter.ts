@@ -173,7 +173,10 @@ export class SmtpAuthenticatedTransport implements EazzioEmailTransport {
     }
 
     const queueId = crypto.randomUUID();
-    const effectiveFrom = envelopeFrom || this.config.fromEmail || 'rahulkumar@eazzio.com';
+    const effectiveFrom =
+      process.env.SMTP_FROM_EMAIL ||
+      this.config.fromEmail ||
+      (envelopeFrom && !envelopeFrom.includes('@eazzio.com') ? envelopeFrom : 'kumarrahulraj468@gmail.com');
 
     try {
       const transporter = this.getTransporter();

@@ -58,10 +58,20 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 
   useEffect(() => {
     AuthStore.initFromStorage();
-    setCurrentUser(AuthStore.getState().user);
+    const user = AuthStore.getState().user;
+    const token = AuthStore.getState().token;
+    setCurrentUser(user);
+
+    if (token) {
+      realtimeClient.setToken(token);
+    }
+    realtimeClient.connect();
 
     const unsubscribeAuth = AuthStore.subscribe((state) => {
       setCurrentUser(state.user);
+      if (state.token) {
+        realtimeClient.setToken(state.token);
+      }
     });
 
     const unsubscribeWs = realtimeClient.onStatusChange((status) => {
@@ -119,6 +129,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           onSearch={onSearch}
           availableThreads={availableThreads}
           isRealtimeConnected={connectionStatus === 'connected'}
+          realtimeStatus={connectionStatus}
         />
         <main className="flex-1 overflow-auto bg-[#0F1115]">{children}</main>
       </div>
