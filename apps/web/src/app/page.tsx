@@ -123,25 +123,30 @@ export default function MailDashboardPage() {
         const newMap: Record<string, MessageDetail[]> = {};
         for (const msg of rawMessages) {
           const tId = msg.thread_id || msg.id;
+          const rawRecipients = (Array.isArray(msg.recipients) && msg.recipients.length > 0)
+            ? msg.recipients
+            : (Array.isArray(msg.to) && msg.to.length > 0)
+            ? msg.to
+            : null;
+
+          const toList = rawRecipients
+            ? rawRecipients.map((r: any) => ({
+                name: r.name || (r.email ? r.email.split('@')[0] : 'Recipient'),
+                email: r.email || r.address || senderEmail,
+              }))
+            : msg.recipient_address
+            ? [{ name: msg.recipient_address.split('@')[0], email: msg.recipient_address }]
+            : (msg.direction === 'inbound' || slug === 'inbox')
+            ? [{ name: 'You', email: senderEmail }]
+            : [{ name: 'Recipient', email: 'external@eazzio.com' }];
+
           const detail: MessageDetail = {
             id: msg.id,
             threadId: tId,
             mailboxId: msg.mailbox_id,
             folderId: folderId,
             from: { name: msg.from_address.split('@')[0], email: msg.from_address },
-            to: (Array.isArray(msg.recipients) && msg.recipients.length > 0)
-              ? msg.recipients.map((r: any) => ({
-                  name: r.name || (r.email ? r.email.split('@')[0] : 'Recipient'),
-                  email: r.email || r.address || senderEmail,
-                }))
-              : (Array.isArray(msg.to) && msg.to.length > 0)
-              ? msg.to.map((r: any) => ({
-                  name: r.name || (r.email ? r.email.split('@')[0] : 'Recipient'),
-                  email: r.email || r.address || senderEmail,
-                }))
-              : (msg.direction === 'outbound' || slug === 'sent')
-              ? [{ name: 'Recipient', email: 'recipient@external.com' }]
-              : [{ name: 'You', email: senderEmail }],
+            to: toList,
             subject: msg.subject || '(No Subject)',
             snippet: msg.snippet || '',
             bodyText: msg.body_text || msg.bodyText || msg.snippet || '',
@@ -177,7 +182,8 @@ export default function MailDashboardPage() {
 
         // Auto-select first thread if available
         if (fetchedThreads.length > 0) {
-          setSelectedThreadId((prev) => (prev && fetchedThreads.some((t) => t.id === prev) ? prev : fetchedThreads[0].id));
+          const firstId = fetchedThreads[0].id;
+          setSelectedThreadId((prev) => (prev && fetchedThreads.some((t) => t.id === prev) ? prev : firstId));
         } else {
           setSelectedThreadId(null);
         }
@@ -219,33 +225,34 @@ export default function MailDashboardPage() {
     const unsubscribe = realtimeClient.subscribe('*', (event: RealtimeMailEvent) => {
       if (event.type === 'mail.received') {
         const data = event.data;
-        const newThreadId = data.threadId || `th-live-${Date.now()}`;
+        const newThreadId = data?.threadId || `th-live-${Date.now()}`;
         const newThread: ThreadSummary = {
           id: newThreadId,
-          mailboxId: event.mailboxId,
-          subject: data.subject || 'Incoming Transmission',
-          snippet: data.snippet || 'You have received a new message.',
-          sender: data.from || { name: 'External Relay', email: 'relay@eazzio.com' },
-          lastMessageAt: data.receivedAt || 'Just now',
+          mailboxId: event.mailboxId || 'primary',
+          subject: data?.subject || 'Incoming Transmission',
+          snippet: data?.snippet || 'You have received a new message.',
+          sender: data?.from || { name: 'External Relay', email: 'relay@eazzio.com' },
+          lastMessageAt: data?.receivedAt || 'Just now',
           messageCount: 1,
           isUnread: true,
           isStarred: false,
-          hasAttachments: data.hasAttachments || false,
-          labels: data.labels || ['Inbox'],
+          isImportant: false,
+          hasAttachments: Boolean(data?.hasAttachments),
+          labels: data?.labels || ['Inbox'],
         };
 
         const newMsg: MessageDetail = {
-          id: data.messageId || `msg-live-${Date.now()}`,
+          id: data?.messageId || `msg-live-${Date.now()}`,
           threadId: newThreadId,
-          mailboxId: event.mailboxId,
+          mailboxId: event.mailboxId || 'primary',
           folderId: 'fld-inbox',
-          from: data.from || { name: 'External Relay', email: 'relay@eazzio.com' },
+          from: data?.from || { name: 'External Relay', email: 'relay@eazzio.com' },
           to: [{ name: 'You', email: AuthStore.getState().user?.email || 'rahulkumar@eazzio.com' }],
-          subject: data.subject || 'Incoming Transmission',
-          snippet: data.snippet || 'You have received a new message.',
-          bodyText: data.snippet || 'Message received via live WebSocket pipeline.',
-          bodyHtml: `<p>${data.snippet || 'Message received via live WebSocket pipeline.'}</p>`,
-          receivedAt: data.receivedAt || 'Just now',
+          subject: data?.subject || 'Incoming Transmission',
+          snippet: data?.snippet || '',
+          bodyText: data?.snippet || '',
+          bodyHtml: `<p>${data?.snippet || ''}</p>`,
+          receivedAt: 'Just now',
           isRead: false,
           isStarred: false,
           security: {
@@ -271,9 +278,9 @@ export default function MailDashboardPage() {
         setToasts((prev) => [
           {
             id: `toast-${Date.now()}`,
-            title: data.subject || 'New Incoming Email',
-            senderName: data.from?.name || 'Incoming Sender',
-            message: data.snippet || 'Click to view conversation.',
+            title: data?.subject || 'New Incoming Email',
+            senderName: data?.from?.name || 'Incoming Sender',
+            message: data?.snippet || 'Click to view conversation.',
             threadId: newThreadId,
             timestamp: 'Just now',
           },
@@ -348,6 +355,29 @@ export default function MailDashboardPage() {
     setThreads((prev) =>
       prev.map((t) => (t.id === threadId ? { ...t, isUnread: false } : t))
     );
+
+    // Fetch authoritative message detail and recipients from backend
+    const authState = AuthStore.getState();
+    const token = authState.token || 'default-token';
+    const senderEmail = authState.user?.email || 'rahulkumar@eazzio.com';
+
+    fetch(`/api/messages/${threadId}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'x-user-email': senderEmail,
+      },
+    })
+      .then((r) => r.json())
+      .then((res) => {
+        if (res.success && res.data) {
+          const detail: MessageDetail = res.data;
+          setConversationMap((prev) => ({
+            ...prev,
+            [threadId]: [detail],
+          }));
+        }
+      })
+      .catch((err) => console.warn('Failed to fetch full message detail:', err));
   };
 
   // Toggle Star / Mark Important in real backend
