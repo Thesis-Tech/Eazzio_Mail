@@ -129,7 +129,19 @@ export default function MailDashboardPage() {
             mailboxId: msg.mailbox_id,
             folderId: folderId,
             from: { name: msg.from_address.split('@')[0], email: msg.from_address },
-            to: [{ name: 'You', email: senderEmail }],
+            to: (Array.isArray(msg.recipients) && msg.recipients.length > 0)
+              ? msg.recipients.map((r: any) => ({
+                  name: r.name || (r.email ? r.email.split('@')[0] : 'Recipient'),
+                  email: r.email || r.address || senderEmail,
+                }))
+              : (Array.isArray(msg.to) && msg.to.length > 0)
+              ? msg.to.map((r: any) => ({
+                  name: r.name || (r.email ? r.email.split('@')[0] : 'Recipient'),
+                  email: r.email || r.address || senderEmail,
+                }))
+              : (msg.direction === 'outbound' || slug === 'sent')
+              ? [{ name: 'Recipient', email: 'recipient@external.com' }]
+              : [{ name: 'You', email: senderEmail }],
             subject: msg.subject || '(No Subject)',
             snippet: msg.snippet || '',
             bodyText: msg.body_text || msg.bodyText || msg.snippet || '',

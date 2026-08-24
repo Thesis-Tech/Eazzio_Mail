@@ -252,7 +252,14 @@ messagesRouter.get('/', async (req: AuthenticatedRequest, res: Response, next: N
       SELECT m.id, m.mailbox_id, m.folder_id, m.thread_id, m.message_id_header,
              m.from_address, m.subject, m.snippet, m.body_text, m.body_html, m.size_bytes, m.raw_object_key,
              m.is_read, m.is_starred, m.is_important, m.direction, m.delivery_state,
-             m.received_at
+             m.received_at,
+             COALESCE(
+               (SELECT json_agg(json_build_object('name', split_part(r.address::text, '@', 1), 'email', r.address::text, 'type', r.kind))
+                FROM message_recipients r WHERE r.message_id = m.id),
+               (SELECT json_agg(json_build_object('name', split_part(q.recipient_address, '@', 1), 'email', q.recipient_address, 'type', 'to'))
+                FROM outbound_queue q WHERE q.message_id = m.id),
+               '[]'::json
+             ) as recipients
       FROM messages m
       WHERE m.mailbox_id = $1
     `;
@@ -744,7 +751,18 @@ messagesRouter.post('/compose', async (req: AuthenticatedRequest, res: Response,
       folderId: sentFolderId,
     });
 
-    // 5. Trigger Queue Runner in the background for outbound SMTP delivery
+    // 5. Persist recipient records for UI lookup
+    for (const qId of queueIds) {
+      const qRows = (await defaultDb.query(`SELECT message_id, recipient_address FROM outbound_queue WHERE id = $1`, [qId])) as any[];
+      if (qRows.length > 0) {
+        await defaultDb.query(
+          `INSERT INTO message_recipients (id, message_id, kind, address) VALUES (gen_random_uuid(), $1, 'to', $2)`,
+          [qRows[0].message_id, qRows[0].recipient_address]
+        );
+      }
+    }
+
+    // 6. Trigger Queue Runner in the background for outbound SMTP delivery
     setImmediate(() => {
       getQueueRunner()
         .processNextBatch(10)
