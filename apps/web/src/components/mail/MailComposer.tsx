@@ -39,6 +39,7 @@ export interface ComposeEmailPayload {
   subject: string;
   body: string;
   attachments?: ComposerAttachment[];
+  scheduledAt?: string;
 }
 
 export interface MailComposerProps {
@@ -100,6 +101,7 @@ export const MailComposer: React.FC<MailComposerProps> = ({
 
   const [isSending, setIsSending] = useState(false);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
+  const [isScheduleOpen, setIsScheduleOpen] = useState(false);
   const [draftStatus, setDraftStatus] = useState<string>('Draft ready');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -117,6 +119,7 @@ export const MailComposer: React.FC<MailComposerProps> = ({
       setBody(initialBody || '');
       setAttachments(Array.isArray(initialAttachments) ? [...initialAttachments] : []);
       setErrorMessage(null);
+      setIsScheduleOpen(false);
       setDraftStatus('Draft ready');
     }
     prevOpenRef.current = isOpen;
@@ -127,10 +130,9 @@ export const MailComposer: React.FC<MailComposerProps> = ({
     if (!isOpen) return;
     const timer = setTimeout(() => {
       if (subject || body || toChips.length > 0) {
-        const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        setDraftStatus(`Saved at ${time}`);
+        setDraftStatus('All changes saved in Drafts');
       }
-    }, 3000);
+    }, 1500);
     return () => clearTimeout(timer);
   }, [subject, body, toChips, isOpen]);
 
@@ -140,6 +142,28 @@ export const MailComposer: React.FC<MailComposerProps> = ({
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
   };
 
+  const handleAddChip = (type: 'to' | 'cc' | 'bcc', value: string) => {
+    const trimmed = value.trim().replace(/,$/, '');
+    if (!trimmed) return;
+
+    if (!validateEmail(trimmed) && !trimmed.includes('@eazzio.com')) {
+      setErrorMessage(`Invalid email address: ${trimmed}`);
+      return;
+    }
+    setErrorMessage(null);
+
+    if (type === 'to') {
+      if (!toChips.includes(trimmed)) setToChips([...toChips, trimmed]);
+      setToInput('');
+    } else if (type === 'cc') {
+      if (!ccChips.includes(trimmed)) setCcChips([...ccChips, trimmed]);
+      setCcInput('');
+    } else if (type === 'bcc') {
+      if (!bccChips.includes(trimmed)) setBccChips([...bccChips, trimmed]);
+      setBccInput('');
+    }
+  };
+
   const handleAddRecipient = (
     type: 'to' | 'cc' | 'bcc',
     value: string,
@@ -147,32 +171,13 @@ export const MailComposer: React.FC<MailComposerProps> = ({
   ) => {
     if (e && e.key !== 'Enter' && e.key !== ',' && e.key !== ' ') return;
     if (e) e.preventDefault();
-
-    const trimmed = value.trim().replace(/,$/, '');
-    if (!trimmed) return;
-
-    if (!validateEmail(trimmed) && !trimmed.includes('@eazzio.com')) {
-      setErrorMessage(`Invalid email format: ${trimmed}`);
-      return;
-    }
-    setErrorMessage(null);
-
-    if (type === 'to' && !toChips.includes(trimmed)) {
-      setToChips([...toChips, trimmed]);
-      setToInput('');
-    } else if (type === 'cc' && !ccChips.includes(trimmed)) {
-      setCcChips([...ccChips, trimmed]);
-      setCcInput('');
-    } else if (type === 'bcc' && !bccChips.includes(trimmed)) {
-      setBccChips([...bccChips, trimmed]);
-      setBccInput('');
-    }
+    handleAddChip(type, value);
   };
 
-  const handleRemoveChip = (type: 'to' | 'cc' | 'bcc', emailToRemove: string) => {
-    if (type === 'to') setToChips(toChips.filter((c) => c !== emailToRemove));
-    if (type === 'cc') setCcChips(ccChips.filter((c) => c !== emailToRemove));
-    if (type === 'bcc') setBccChips(bccChips.filter((c) => c !== emailToRemove));
+  const handleRemoveChip = (type: 'to' | 'cc' | 'bcc', chip: string) => {
+    if (type === 'to') setToChips(toChips.filter((c) => c !== chip));
+    if (type === 'cc') setCcChips(ccChips.filter((c) => c !== chip));
+    if (type === 'bcc') setBccChips(bccChips.filter((c) => c !== chip));
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -180,22 +185,19 @@ export const MailComposer: React.FC<MailComposerProps> = ({
     if (!files || files.length === 0) return;
 
     const newAttachments: ComposerAttachment[] = [];
-    for (const f of Array.from(files)) {
-      try {
-        const b64 = await readFileAsBase64(f);
+    for (let i = 0; i < files.length; i++) {
+      const f = files[i];
+      if (f) {
+        let base64 = '';
+        try {
+          base64 = await readFileAsBase64(f);
+        } catch (_) {}
+
         newAttachments.push({
-          id: `att-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          id: `att-${Date.now()}-${i}`,
           name: f.name,
           sizeBytes: f.size,
-          type: f.type || 'application/octet-stream',
-          dataBase64: b64,
-          file: f,
-        });
-      } catch {
-        newAttachments.push({
-          id: `att-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          name: f.name,
-          sizeBytes: f.size,
+          dataBase64: base64,
           type: f.type || 'application/octet-stream',
           file: f,
         });
@@ -242,6 +244,44 @@ export const MailComposer: React.FC<MailComposerProps> = ({
       onClose();
     } catch (err: unknown) {
       setErrorMessage((err as Error).message || 'Failed to send message');
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const handleSendWithSchedule = async (scheduledDate: Date) => {
+    setIsScheduleOpen(false);
+    setErrorMessage(null);
+
+    let finalTo = [...toChips];
+    if (toInput.trim()) {
+      if (validateEmail(toInput.trim()) || toInput.trim().includes('@eazzio.com')) {
+        finalTo.push(toInput.trim());
+      } else {
+        setErrorMessage(`Invalid email address: ${toInput.trim()}`);
+        return;
+      }
+    }
+
+    if (finalTo.length === 0) {
+      setErrorMessage('Please add at least one recipient');
+      return;
+    }
+
+    setIsSending(true);
+    try {
+      await onSend({
+        to: finalTo,
+        cc: ccChips,
+        bcc: bccChips,
+        subject: subject.trim() || '(No Subject)',
+        body: body.trim(),
+        attachments,
+        scheduledAt: scheduledDate.toISOString(),
+      });
+      onClose();
+    } catch (err: unknown) {
+      setErrorMessage((err as Error).message || 'Failed to schedule message');
     } finally {
       setIsSending(false);
     }
@@ -490,16 +530,82 @@ export const MailComposer: React.FC<MailComposerProps> = ({
           <div className="h-14 px-4 bg-[#16181D] border-t border-[#2A2E37] flex items-center justify-between gap-3 shrink-0">
             {/* Left Action Buttons */}
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={handleSend}
-                disabled={isSending || isSavingDraft}
-                className="py-2 px-4 rounded-xl bg-[#2D5BFF] hover:bg-[#1E48E0] active:scale-[0.98] disabled:opacity-50 text-white font-semibold text-xs shadow-md shadow-blue-500/20 transition-all flex items-center gap-2"
-                data-testid="composer-send-btn"
-              >
-                <Send className="w-3.5 h-3.5" />
-                <span>{isSending ? 'Sending...' : 'Send'}</span>
-              </button>
+              {/* Split Send Button */}
+              <div className="relative inline-flex rounded-xl shadow-md shadow-blue-500/20">
+                <button
+                  type="button"
+                  onClick={handleSend}
+                  disabled={isSending || isSavingDraft}
+                  className="py-2 px-3.5 rounded-l-xl bg-[#2D5BFF] hover:bg-[#1E48E0] active:scale-[0.98] disabled:opacity-50 text-white font-semibold text-xs transition-all flex items-center gap-2"
+                  data-testid="composer-send-btn"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>{isSending ? 'Sending...' : 'Send'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsScheduleOpen(!isScheduleOpen)}
+                  disabled={isSending || isSavingDraft}
+                  className="py-2 px-2 rounded-r-xl bg-[#244ACC] hover:bg-[#1C3DB3] disabled:opacity-50 text-white border-l border-white/20 transition-all flex items-center justify-center"
+                  title="Schedule send"
+                >
+                  <ChevronDown className="w-3.5 h-3.5" />
+                </button>
+
+                {isScheduleOpen && (
+                  <div className="absolute left-0 bottom-12 w-56 rounded-xl bg-[#181B22] border border-[#2E3440] shadow-2xl py-1.5 z-50 animate-in fade-in divide-y divide-[#22262E]">
+                    <div className="px-3 py-1.5 text-[11px] font-semibold text-slate-400">
+                      Schedule Send
+                    </div>
+                    <div className="py-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const d = new Date();
+                          d.setDate(d.getDate() + 1);
+                          d.setHours(8, 0, 0, 0);
+                          handleSendWithSchedule(d);
+                        }}
+                        className="w-full px-3 py-1.5 text-left text-xs text-slate-200 hover:bg-[#22262E] hover:text-white flex items-center justify-between"
+                      >
+                        <span>Tomorrow morning</span>
+                        <span className="text-[10px] text-slate-400 font-mono">8:00 AM</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const d = new Date();
+                          d.setDate(d.getDate() + 1);
+                          d.setHours(13, 0, 0, 0);
+                          handleSendWithSchedule(d);
+                        }}
+                        className="w-full px-3 py-1.5 text-left text-xs text-slate-200 hover:bg-[#22262E] hover:text-white flex items-center justify-between"
+                      >
+                        <span>Tomorrow afternoon</span>
+                        <span className="text-[10px] text-slate-400 font-mono">1:00 PM</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const d = new Date();
+                          const day = d.getDay();
+                          const diff = (1 - day + 7) % 7 || 7;
+                          d.setDate(d.getDate() + diff);
+                          d.setHours(8, 0, 0, 0);
+                          handleSendWithSchedule(d);
+                        }}
+                        className="w-full px-3 py-1.5 text-left text-xs text-slate-200 hover:bg-[#22262E] hover:text-white flex items-center justify-between"
+                      >
+                        <span>Monday morning</span>
+                        <span className="text-[10px] text-slate-400 font-mono">8:00 AM</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
 
               <button
                 type="button"

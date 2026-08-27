@@ -6,6 +6,7 @@ import { SplitSlider } from '../../components/layout/SplitSlider';
 import { ThreadList } from '../../components/mail/ThreadList';
 import { ConversationViewer } from '../../components/mail/ConversationViewer';
 import { MailComposer, ComposeEmailPayload, ComposerAttachment } from '../../components/mail/MailComposer';
+import { SnoozeModal } from '../../components/mail/SnoozeModal';
 import { SettingsModal } from '../../components/settings/SettingsModal';
 import { ThreadSummary, MessageDetail, FolderItem, LabelItem, FilterRule, UserPreferences } from '../../types/mail';
 import { Mail, Search, RefreshCw, ChevronDown, X } from 'lucide-react';
@@ -17,7 +18,9 @@ import { AuthStore } from '../../lib/auth-store';
 const initialFolders: FolderItem[] = [
   { id: 'fld-inbox', name: 'Inbox', slug: 'inbox', type: 'system', unreadCount: 0, totalCount: 0 },
   { id: 'fld-starred', name: 'Starred', slug: 'starred', type: 'system', unreadCount: 0, totalCount: 0 },
+  { id: 'fld-snoozed', name: 'Snoozed', slug: 'snoozed', type: 'system', unreadCount: 0, totalCount: 0 },
   { id: 'fld-sent', name: 'Sent', slug: 'sent', type: 'system', unreadCount: 0, totalCount: 0 },
+  { id: 'fld-scheduled', name: 'Scheduled', slug: 'scheduled', type: 'system', unreadCount: 0, totalCount: 0 },
   { id: 'fld-drafts', name: 'Drafts', slug: 'drafts', type: 'system', unreadCount: 0, totalCount: 0 },
   { id: 'fld-spam', name: 'Spam', slug: 'spam', type: 'system', unreadCount: 0, totalCount: 0 },
   { id: 'fld-trash', name: 'Trash', slug: 'trash', type: 'system', unreadCount: 0, totalCount: 0 },
@@ -70,6 +73,8 @@ export default function MailDashboardPage() {
     attachments?: ComposerAttachment[];
   }>({});
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isSnoozeModalOpen, setIsSnoozeModalOpen] = useState(false);
+  const [snoozeTargetThreadIds, setSnoozeTargetThreadIds] = useState<string[]>([]);
   const [folders, setFolders] = useState<FolderItem[]>(initialFolders);
   const [labels, setLabels] = useState<LabelItem[]>(initialLabels);
   const [filterRules, setFilterRules] = useState<FilterRule[]>(initialFilters);
@@ -761,6 +766,92 @@ export default function MailDashboardPage() {
     }
   };
 
+  const handleOpenSnooze = (threadIds: string[]) => {
+    if (threadIds.length === 0) return;
+    setSnoozeTargetThreadIds(threadIds);
+    setIsSnoozeModalOpen(true);
+  };
+
+  const handleConfirmSnooze = async (snoozeDate: Date) => {
+    const threadIds = snoozeTargetThreadIds;
+    if (threadIds.length === 0) return;
+
+    const idSet = new Set(threadIds);
+    setThreads((prev) => prev.filter((t) => !idSet.has(t.id)));
+
+    if (selectedThreadId && idSet.has(selectedThreadId)) {
+      setSelectedThreadId(null);
+    }
+
+    try {
+      const authState = AuthStore.getState();
+      const token = authState.token || '';
+      const senderEmail = authState.user?.email || '';
+
+      for (const tId of threadIds) {
+        await fetch(`/api/messages/${tId}/snooze`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+            'x-user-email': senderEmail,
+          },
+          body: JSON.stringify({ snoozeUntil: snoozeDate.toISOString() }),
+        });
+      }
+
+      setToasts((prev) => [
+        {
+          id: `toast-${Date.now()}`,
+          title: 'Conversation Snoozed',
+          senderName: 'Eazzio Mailbox',
+          message: `${threadIds.length} conversation(s) snoozed until ${snoozeDate.toLocaleDateString([], { weekday: 'short' })} ${snoozeDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.`,
+          timestamp: 'Just now',
+        },
+        ...prev,
+      ]);
+
+      syncOtherFolderCounts();
+    } catch (err) {
+      console.error('Failed to snooze conversation:', err);
+    }
+  };
+
+  const handleUnsnooze = async (threadId: string) => {
+    try {
+      const authState = AuthStore.getState();
+      const token = authState.token || '';
+      const senderEmail = authState.user?.email || '';
+
+      await fetch(`/api/messages/${threadId}/unsnooze`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+          'x-user-email': senderEmail,
+        },
+      });
+
+      setThreads((prev) => prev.filter((t) => t.id !== threadId));
+      if (selectedThreadId === threadId) setSelectedThreadId(null);
+
+      setToasts((prev) => [
+        {
+          id: `toast-${Date.now()}`,
+          title: 'Unsnoozed',
+          senderName: 'Eazzio Mailbox',
+          message: 'Conversation restored to Inbox.',
+          timestamp: 'Just now',
+        },
+        ...prev,
+      ]);
+
+      syncOtherFolderCounts();
+    } catch (err) {
+      console.error('Failed to unsnooze conversation:', err);
+    }
+  };
+
   const handleSendReply = (threadId: string, replyText: string) => {
     const activeMessages = conversationMap[threadId] || [];
     const newMsg: MessageDetail = {
@@ -1187,6 +1278,7 @@ export default function MailDashboardPage() {
                 onBulkDelete={handleBulkDelete}
                 onBulkArchive={handleBulkArchive}
                 onBulkMarkRead={handleBulkMarkRead}
+                onSnooze={handleOpenSnooze}
                 folderName={getFolderSlug(activeFolderId).toUpperCase()}
                 totalThreadsCount={displayedThreads.length}
                 onRefresh={() => loadMessages(activeFolderId)}
@@ -1223,11 +1315,20 @@ export default function MailDashboardPage() {
               onArchive={(threadId) => handleBulkArchive([threadId])}
               onDelete={(threadId) => handleBulkDelete([threadId])}
               onToggleStar={(threadId) => handleToggleStar(threadId)}
+              onSnooze={(threadId) => handleOpenSnooze([threadId])}
               onClose={() => setSelectedThreadId(null)}
             />
           </div>
         )}
       </div>
+
+      {/* Snooze Picker Modal */}
+      <SnoozeModal
+        isOpen={isSnoozeModalOpen}
+        onClose={() => setIsSnoozeModalOpen(false)}
+        onSnooze={handleConfirmSnooze}
+        targetCount={snoozeTargetThreadIds.length}
+      />
 
       {/* Floating Realtime Toasts */}
       <ToastContainer

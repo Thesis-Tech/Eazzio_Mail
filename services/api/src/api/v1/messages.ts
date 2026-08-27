@@ -273,17 +273,22 @@ messagesRouter.get('/', async (req: AuthenticatedRequest, res: Response, next: N
     `;
     const params: any[] = [activeMailboxId];
 
-    if (folderSlug === 'starred' || folderSlug === 'important') {
-      sql += ` AND (m.is_starred = true OR m.is_important = true)`;
+    if (folderSlug === 'snoozed') {
+      sql += ` AND m.is_snoozed = true AND (m.snoozed_until IS NULL OR m.snoozed_until > now())`;
+    } else if (folderSlug === 'scheduled') {
+      sql += ` AND m.scheduled_at IS NOT NULL AND m.scheduled_at > now() AND m.delivery_state = 'scheduled'`;
+    } else if (folderSlug === 'starred' || folderSlug === 'important') {
+      sql += ` AND (m.is_starred = true OR m.is_important = true) AND (m.is_snoozed = false OR m.is_snoozed IS NULL OR m.snoozed_until <= now())`;
     } else if (folderSlug === 'sent') {
-      sql += ` AND (m.folder_id = $2 OR m.direction = 'outbound') AND (m.delivery_state != 'draft' OR m.delivery_state IS NULL)`;
+      sql += ` AND (m.folder_id = $2 OR m.direction = 'outbound') AND (m.delivery_state != 'draft' AND m.delivery_state != 'scheduled' OR m.delivery_state IS NULL)`;
       params.push(activeFolderId);
     } else if (folderSlug === 'drafts') {
       sql += ` AND (m.folder_id = $2 OR m.delivery_state = 'draft')`;
       params.push(activeFolderId);
     } else if (folderSlug === 'inbox') {
       sql += ` AND (m.folder_id = $2 OR m.direction = 'inbound') 
-               AND (m.delivery_state != 'draft' OR m.delivery_state IS NULL)
+               AND (m.delivery_state != 'draft' AND m.delivery_state != 'scheduled' OR m.delivery_state IS NULL)
+               AND (m.is_snoozed = false OR m.is_snoozed IS NULL OR m.snoozed_until <= now())
                AND m.folder_id NOT IN (SELECT id FROM folders WHERE mailbox_id = $1 AND kind IN ('trash', 'spam', 'archive'))`;
       params.push(activeFolderId);
     } else {
@@ -580,6 +585,81 @@ messagesRouter.delete('/:id', async (req: AuthenticatedRequest, res: Response, n
   }
 });
 
+// POST /v1/messages/:id/snooze - Snooze message/thread until timestamp
+messagesRouter.post('/:id/snooze', async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const { snoozeUntil } = req.body;
+    const userId = req.user!.userId;
+    const userEmail = req.user!.email;
+
+    if (!snoozeUntil) {
+      throw new AppError('VALIDATION_ERROR', 'snoozeUntil timestamp is required', 400);
+    }
+
+    const snoozeDate = new Date(snoozeUntil);
+    if (isNaN(snoozeDate.getTime()) || snoozeDate.getTime() <= Date.now()) {
+      throw new AppError('VALIDATION_ERROR', 'snoozeUntil must be a valid future ISO timestamp', 400);
+    }
+
+    const { mailboxId } = await getOrCreateUserMailbox(userId, userEmail);
+
+    await defaultDb.query(
+      `UPDATE messages 
+       SET is_snoozed = true, snoozed_until = $2 
+       WHERE (id = $1 OR thread_id = $1) AND mailbox_id = $3`,
+      [id, snoozeDate, mailboxId]
+    );
+
+    await defaultDb.query(
+      `UPDATE threads 
+       SET is_snoozed = true, snoozed_until = $2 
+       WHERE (id = $1 OR id = (SELECT thread_id FROM messages WHERE id = $1 LIMIT 1)) AND mailbox_id = $3`,
+      [id, snoozeDate, mailboxId]
+    );
+
+    res.json({
+      success: true,
+      message: 'Conversation snoozed',
+      snoozedUntil: snoozeDate.toISOString(),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /v1/messages/:id/unsnooze - Restore snoozed message to Inbox immediately
+messagesRouter.post('/:id/unsnooze', async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user!.userId;
+    const userEmail = req.user!.email;
+
+    const { mailboxId } = await getOrCreateUserMailbox(userId, userEmail);
+
+    await defaultDb.query(
+      `UPDATE messages 
+       SET is_snoozed = false, snoozed_until = NULL 
+       WHERE (id = $1 OR thread_id = $1) AND mailbox_id = $2`,
+      [id, mailboxId]
+    );
+
+    await defaultDb.query(
+      `UPDATE threads 
+       SET is_snoozed = false, snoozed_until = NULL 
+       WHERE (id = $1 OR id = (SELECT thread_id FROM messages WHERE id = $1 LIMIT 1)) AND mailbox_id = $2`,
+      [id, mailboxId]
+    );
+
+    res.json({
+      success: true,
+      message: 'Conversation restored to Inbox',
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // GET /v1/messages/:id - Get full message detail with body
 messagesRouter.get('/:id', async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
@@ -832,22 +912,49 @@ messagesRouter.post('/compose', async (req: AuthenticatedRequest, res: Response,
       }
     }
 
-    // 6. Trigger Queue Runner in the background for outbound SMTP delivery
-    setImmediate(() => {
-      getQueueRunner()
-        .processNextBatch(10)
-        .catch((runnerErr) => {
-          console.error('Background outbound queue runner error:', runnerErr);
-        });
-    });
+    // 6. Check if scheduled for future delivery
+    let isScheduled = false;
+    let scheduledDate: Date | null = null;
+    if (req.body.scheduledAt) {
+      const parsedDate = new Date(req.body.scheduledAt);
+      if (!isNaN(parsedDate.getTime()) && parsedDate.getTime() > Date.now()) {
+        isScheduled = true;
+        scheduledDate = parsedDate;
+      }
+    }
+
+    if (isScheduled && scheduledDate) {
+      if (actualMsgUuid) {
+        await defaultDb.query(
+          `UPDATE messages SET scheduled_at = $1, delivery_state = 'scheduled' WHERE id = $2`,
+          [scheduledDate, actualMsgUuid]
+        );
+      }
+      if (queueIds.length > 0) {
+        await defaultDb.query(
+          `UPDATE outbound_queue SET scheduled_at = $1, state = 'scheduled' WHERE id = ANY($2)`,
+          [scheduledDate, queueIds]
+        );
+      }
+    } else {
+      // Trigger Queue Runner immediately for standard delivery
+      setImmediate(() => {
+        getQueueRunner()
+          .processNextBatch(10)
+          .catch((runnerErr) => {
+            console.error('Background outbound queue runner error:', runnerErr);
+          });
+      });
+    }
 
     res.status(202).json({
       success: true,
       id: actualMsgUuid,
       messageId,
       queueIds,
-      deliveryState: 'queued',
-      status: 'accepted_for_delivery',
+      deliveryState: isScheduled ? 'scheduled' : 'queued',
+      scheduledAt: isScheduled ? scheduledDate?.toISOString() : undefined,
+      status: isScheduled ? 'scheduled_for_delivery' : 'accepted_for_delivery',
     });
   } catch (err) {
     next(err);

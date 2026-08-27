@@ -23,6 +23,7 @@ import {
   ExternalLink,
   Smile,
   ArrowLeft,
+  Clock,
 } from 'lucide-react';
 import { MessageDetail } from '../../types/mail';
 
@@ -123,6 +124,7 @@ export interface ConversationViewerProps {
   onArchive?: (threadId: string) => void;
   onDelete?: (threadId: string) => void;
   onToggleStar?: (threadId: string) => void;
+  onSnooze?: (threadId: string) => void;
   onSendReply?: (threadId: string, replyText: string) => void;
   onReply?: (message: MessageDetail) => void;
   onReplyAll?: (message: MessageDetail) => void;
@@ -139,6 +141,7 @@ export const ConversationViewer: React.FC<ConversationViewerProps> = ({
   onArchive,
   onDelete,
   onToggleStar,
+  onSnooze,
   onSendReply,
   onReply,
   onReplyAll,
@@ -278,6 +281,17 @@ export const ConversationViewer: React.FC<ConversationViewerProps> = ({
           >
             <Archive className="w-4 h-4" />
           </button>
+
+          {onSnooze && (
+            <button
+              onClick={() => onSnooze(threadId)}
+              className="p-1.5 rounded-lg hover:text-orange-400 hover:bg-[#22262E] transition-colors"
+              title="Snooze conversation"
+              data-testid="thread-snooze-btn"
+            >
+              <Clock className="w-4 h-4" />
+            </button>
+          )}
 
           <button
             onClick={() => onDelete && onDelete(threadId)}

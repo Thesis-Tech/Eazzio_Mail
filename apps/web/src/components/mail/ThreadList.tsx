@@ -33,6 +33,7 @@ export interface ThreadListProps {
   onBulkDelete?: (threadIds: string[]) => void;
   onBulkArchive?: (threadIds: string[]) => void;
   onBulkMarkRead?: (threadIds: string[], isRead: boolean) => void;
+  onSnooze?: (threadIds: string[]) => void;
   onRefresh?: () => void;
   folderName?: string;
   totalThreadsCount?: number;
@@ -50,6 +51,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
   onBulkDelete,
   onBulkArchive,
   onBulkMarkRead,
+  onSnooze,
   onRefresh,
   folderName = 'Inbox',
   totalThreadsCount = 0,
@@ -219,6 +221,15 @@ export const ThreadList: React.FC<ThreadListProps> = ({
               >
                 <Mail className="w-4 h-4" />
               </button>
+              <button
+                onClick={() => {
+                  if (onSnooze) onSnooze(Array.from(selectedIds));
+                }}
+                className="p-1.5 rounded text-slate-400 hover:text-orange-400 hover:bg-[#22262E] transition-colors"
+                title="Snooze selected"
+              >
+                <Clock className="w-4 h-4" />
+              </button>
             </div>
           ) : null}
 
@@ -246,10 +257,13 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                     <span>Mark as unread</span>
                   </button>
                   <button
-                    onClick={() => setIsMoreMenuOpen(false)}
+                    onClick={() => {
+                      setIsMoreMenuOpen(false);
+                      if (onSnooze) onSnooze(selectedIds.size > 0 ? Array.from(selectedIds) : selectedThreadId ? [selectedThreadId] : []);
+                    }}
                     className="w-full px-3.5 py-1.5 text-left text-xs text-slate-300 hover:bg-[#22262E] hover:text-white flex items-center gap-2.5"
                   >
-                    <Clock className="w-3.5 h-3.5 text-slate-400" />
+                    <Clock className="w-3.5 h-3.5 text-orange-400" />
                     <span>Snooze</span>
                   </button>
                 </div>
