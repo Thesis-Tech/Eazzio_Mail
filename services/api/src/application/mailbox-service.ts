@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import {
   Folder,
   Mailbox,
@@ -38,7 +39,7 @@ export class MailboxService {
     return kinds.map(
       (kind) =>
         new Folder({
-          id: `fld-${kind}-${mailboxId}`,
+          id: crypto.randomUUID(),
           mailboxId,
           name: kind.charAt(0).toUpperCase() + kind.slice(1),
           kind,

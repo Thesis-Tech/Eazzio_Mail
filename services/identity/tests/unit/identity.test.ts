@@ -6,9 +6,9 @@ import { IdentityService } from '../../src/application/identity-service.js';
 import { SessionManager, Session } from '../../src/domain/session-state.js';
 
 describe('Identity Service Core Modules', () => {
-  it('should enforce 12-char minimum password policy with Argon2id', async () => {
+  it('should enforce 8-char minimum password policy with Argon2id', async () => {
     await expect(PasswordService.hash('short')).rejects.toThrow(
-      'Password must be at least 12 characters long',
+      'Password must be at least 8 characters long',
     );
     const hash = await PasswordService.hash('valid_long_secure_password_123');
     expect(hash).toContain('$argon2id$');

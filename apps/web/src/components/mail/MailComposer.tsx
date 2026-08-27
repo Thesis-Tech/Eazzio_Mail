@@ -27,6 +27,8 @@ export interface ComposerAttachment {
   id: string;
   name: string;
   sizeBytes: number;
+  type?: string;
+  dataBase64?: string;
   file?: File;
 }
 
@@ -45,11 +47,27 @@ export interface MailComposerProps {
   onSend: (email: ComposeEmailPayload) => Promise<void> | void;
   onSaveDraft?: (email: ComposeEmailPayload) => Promise<void> | void;
   initialTo?: string[];
+  initialCc?: string[];
+  initialBcc?: string[];
   initialSubject?: string;
   initialBody?: string;
+  initialAttachments?: ComposerAttachment[];
 }
 
 const DEFAULT_TO: string[] = [];
+
+const readFileAsBase64 = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const res = reader.result as string;
+      const base64 = res.includes(',') ? res.split(',')[1] : res;
+      resolve(base64 || '');
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+};
 
 export const MailComposer: React.FC<MailComposerProps> = ({
   isOpen,
@@ -57,8 +75,11 @@ export const MailComposer: React.FC<MailComposerProps> = ({
   onSend,
   onSaveDraft,
   initialTo = DEFAULT_TO,
+  initialCc = [],
+  initialBcc = [],
   initialSubject = '',
   initialBody = '',
+  initialAttachments = [],
 }) => {
   const [isMinimized, setIsMinimized] = useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
@@ -88,14 +109,18 @@ export const MailComposer: React.FC<MailComposerProps> = ({
   useEffect(() => {
     if (isOpen && !prevOpenRef.current) {
       setToChips(Array.isArray(initialTo) ? [...initialTo] : []);
+      setCcChips(Array.isArray(initialCc) ? [...initialCc] : []);
+      setShowCc(Array.isArray(initialCc) && initialCc.length > 0);
+      setBccChips(Array.isArray(initialBcc) ? [...initialBcc] : []);
+      setShowBcc(Array.isArray(initialBcc) && initialBcc.length > 0);
       setSubject(initialSubject || '');
       setBody(initialBody || '');
-      setAttachments([]);
+      setAttachments(Array.isArray(initialAttachments) ? [...initialAttachments] : []);
       setErrorMessage(null);
       setDraftStatus('Draft ready');
     }
     prevOpenRef.current = isOpen;
-  }, [isOpen, initialTo, initialSubject, initialBody]);
+  }, [isOpen, initialTo, initialCc, initialBcc, initialSubject, initialBody, initialAttachments]);
 
   // Autosave simulation every 3 seconds
   useEffect(() => {
@@ -150,22 +175,38 @@ export const MailComposer: React.FC<MailComposerProps> = ({
     if (type === 'bcc') setBccChips(bccChips.filter((c) => c !== emailToRemove));
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    const newAttachments: ComposerAttachment[] = Array.from(files).map((f) => ({
-      id: `att-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      name: f.name,
-      sizeBytes: f.size,
-      file: f,
-    }));
+    const newAttachments: ComposerAttachment[] = [];
+    for (const f of Array.from(files)) {
+      try {
+        const b64 = await readFileAsBase64(f);
+        newAttachments.push({
+          id: `att-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          name: f.name,
+          sizeBytes: f.size,
+          type: f.type || 'application/octet-stream',
+          dataBase64: b64,
+          file: f,
+        });
+      } catch {
+        newAttachments.push({
+          id: `att-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          name: f.name,
+          sizeBytes: f.size,
+          type: f.type || 'application/octet-stream',
+          file: f,
+        });
+      }
+    }
 
-    setAttachments([...attachments, ...newAttachments]);
+    setAttachments((prev) => [...prev, ...newAttachments]);
   };
 
   const handleRemoveAttachment = (id: string) => {
-    setAttachments(attachments.filter((a) => a.id !== id));
+    setAttachments((prev) => prev.filter((a) => a.id !== id));
   };
 
   const handleSend = async (e?: React.FormEvent) => {
@@ -234,12 +275,12 @@ export const MailComposer: React.FC<MailComposerProps> = ({
 
   return (
     <div
-      className={`fixed z-50 transition-all duration-200 shadow-2xl flex flex-col bg-[#16181D] border border-[#2A2E37] rounded-t-2xl md:rounded-2xl overflow-hidden ${
+      className={`fixed z-50 transition-all duration-200 shadow-2xl flex flex-col bg-[#16181D] border border-[#2A2E37] overflow-hidden ${
         isMinimized
-          ? 'bottom-0 right-6 w-72 h-12'
+          ? 'bottom-0 right-4 sm:right-6 w-64 sm:w-72 h-12 rounded-t-xl sm:rounded-xl'
           : isMaximized
-          ? 'inset-4 md:inset-10 w-auto h-auto'
-          : 'bottom-0 right-4 md:right-10 w-full md:w-[600px] h-[520px]'
+          ? 'inset-0 sm:inset-4 md:inset-10 w-auto h-auto rounded-none sm:rounded-2xl'
+          : 'bottom-0 right-0 sm:right-4 md:right-10 w-full sm:w-[calc(100%-2rem)] md:w-[600px] h-[100dvh] sm:h-[520px] rounded-none sm:rounded-2xl'
       }`}
       data-testid="mail-composer-modal"
     >

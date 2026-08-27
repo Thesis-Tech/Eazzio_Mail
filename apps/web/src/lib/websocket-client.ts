@@ -28,10 +28,18 @@ export class RealtimeClient {
 
   private statusListeners = new Set<(status: ConnectionStatus) => void>();
   private eventListeners = new Map<string, Set<(event: RealtimeMailEvent) => void>>();
+  private explicitUrl: string | null = null;
 
-  constructor() {}
+  constructor(explicitUrl?: string) {
+    if (explicitUrl) {
+      this.explicitUrl = explicitUrl;
+    }
+  }
 
   private getCandidateUrls(): string[] {
+    if (this.explicitUrl) {
+      return [this.explicitUrl];
+    }
     if (typeof window === 'undefined') return ['ws://localhost:8080/ws', 'ws://localhost:8081'];
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';

@@ -5,8 +5,14 @@ import {
   TokenService,
   PostgresSessionRepository,
 } from '@eazzio/identity';
-import { PostgresUserRepository, SmtpAuthenticatedTransport } from '@eazzio/infra-adapters';
-import { User } from '@eazzio/domain';
+import {
+  PostgresUserRepository,
+  PostgresMailboxRepository,
+  PostgresFolderRepository,
+  SmtpAuthenticatedTransport,
+} from '@eazzio/infra-adapters';
+import { User, Mailbox } from '@eazzio/domain';
+import { MailboxService } from '../../application/mailbox-service.js';
 import { defaultDb } from '../../config/index.js';
 import { AppError } from '../../middleware/error-handler.js';
 import { AuthenticatedRequest, requireAuth } from '../../middleware/auth.js';
@@ -15,6 +21,8 @@ export const authRouter: Router = Router();
 
 const userRepo = new PostgresUserRepository(defaultDb);
 const sessionRepo = new PostgresSessionRepository(defaultDb);
+const mailboxRepo = new PostgresMailboxRepository(defaultDb);
+const folderRepo = new PostgresFolderRepository(defaultDb);
 
 // In-memory store for timed OTPs & Password Reset Tokens (backed by Valkey when available)
 interface OtpEntry {
@@ -34,8 +42,36 @@ const otpStore = new Map<string, OtpEntry>();
 const resetTokenStore = new Map<string, ResetTokenEntry>();
 const failedLoginAttempts = new Map<string, { count: number; lastAttempt: number }>();
 
+function validateIdentifierInput(raw: any): string {
+  if (!raw || typeof raw !== 'string' || !raw.trim()) {
+    throw new AppError('VALIDATION_ERROR', 'Enter an email, username, or phone number', 400, [
+      { field: 'identifier', issue: 'Identifier is required' },
+    ]);
+  }
+  const trimmed = raw.trim();
+  if (trimmed.length > 254) {
+    throw new AppError('VALIDATION_ERROR', 'Identifier exceeds maximum allowed length of 254 characters', 400);
+  }
+  if (/[\x00-\x1F\x7F]/.test(trimmed)) {
+    throw new AppError('VALIDATION_ERROR', 'Identifier contains invalid control characters', 400);
+  }
+  return trimmed;
+}
+
+function validatePasswordInput(raw: any): string {
+  if (!raw || typeof raw !== 'string') {
+    throw new AppError('VALIDATION_ERROR', 'Enter your password', 400, [
+      { field: 'password', issue: 'Password is required' },
+    ]);
+  }
+  if (raw.length > 1024) {
+    throw new AppError('VALIDATION_ERROR', 'Password exceeds maximum length', 400);
+  }
+  return raw;
+}
+
 function normalizeIdentifier(rawIdentifier: string): string {
-  const trimmed = rawIdentifier.trim().toLowerCase();
+  const trimmed = validateIdentifierInput(rawIdentifier).toLowerCase();
   if (trimmed.includes('@')) {
     return trimmed;
   }
@@ -48,13 +84,8 @@ function normalizeIdentifier(rawIdentifier: string): string {
 authRouter.post('/identify', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { identifier } = req.body;
-    if (!identifier || typeof identifier !== 'string' || !identifier.trim()) {
-      throw new AppError('VALIDATION_ERROR', 'Enter an email, username, or phone number', 400, [
-        { field: 'identifier', issue: 'Identifier is required' },
-      ]);
-    }
-
-    const email = normalizeIdentifier(identifier);
+    const cleanId = validateIdentifierInput(identifier);
+    const email = normalizeIdentifier(cleanId);
     const user = await userRepo.findByEmail(email);
 
     // Check rate-limiting / failed attempts for risk challenge
@@ -207,7 +238,8 @@ function getDeliveryTarget(email: string): string {
 authRouter.post('/otp/send', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { identifier, email: directEmail } = req.body;
-    const email = normalizeIdentifier(directEmail || identifier || '');
+    const cleanId = validateIdentifierInput(directEmail || identifier || '');
+    const email = normalizeIdentifier(cleanId);
 
     if (!email) {
       throw new AppError('VALIDATION_ERROR', 'Email address is required', 400);
@@ -272,14 +304,18 @@ authRouter.post('/otp/send', async (req: Request, res: Response, next: NextFunct
 authRouter.post('/otp/verify', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { identifier, email: directEmail, code } = req.body;
-    const email = normalizeIdentifier(directEmail || identifier || '');
+    const cleanId = validateIdentifierInput(directEmail || identifier || '');
+    const email = normalizeIdentifier(cleanId);
 
-    if (!email || !code) {
-      throw new AppError('VALIDATION_ERROR', 'Email and 6-digit verification code are required', 400);
+    if (!code || typeof code !== 'string' || !code.trim()) {
+      throw new AppError('VALIDATION_ERROR', 'Verification code is required', 400);
+    }
+    const cleanCode = code.trim();
+    if (cleanCode.length > 32) {
+      throw new AppError('VALIDATION_ERROR', 'Invalid verification code format', 400);
     }
 
     let entry = otpStore.get(email);
-    const cleanCode = code.trim();
     const codeHash = crypto.createHash('sha256').update(cleanCode).digest('hex');
 
     if (!entry) {
@@ -363,7 +399,8 @@ authRouter.post('/otp/verify', async (req: Request, res: Response, next: NextFun
 authRouter.post('/forgot-password', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { identifier, email: directEmail } = req.body;
-    const email = normalizeIdentifier(directEmail || identifier || '');
+    const cleanId = validateIdentifierInput(directEmail || identifier || '');
+    const email = normalizeIdentifier(cleanId);
 
     if (!email) {
       throw new AppError('VALIDATION_ERROR', 'Enter your email or username', 400);
@@ -418,13 +455,15 @@ authRouter.post('/forgot-password', async (req: Request, res: Response, next: Ne
 authRouter.post('/reset-password', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { email: directEmail, identifier, token, newPassword } = req.body;
-    const email = normalizeIdentifier(directEmail || identifier || '');
+    const cleanId = validateIdentifierInput(directEmail || identifier || '');
+    const email = normalizeIdentifier(cleanId);
+    const validatedPass = validatePasswordInput(newPassword);
 
-    if (!email || !token || !newPassword) {
-      throw new AppError('VALIDATION_ERROR', 'Email, reset token, and new password are required', 400);
+    if (!token || typeof token !== 'string' || !token.trim()) {
+      throw new AppError('VALIDATION_ERROR', 'Reset token is required', 400);
     }
 
-    if (newPassword.length < 8) {
+    if (validatedPass.length < 8) {
       throw new AppError('VALIDATION_ERROR', 'Password must be at least 8 characters long', 400);
     }
 
@@ -455,7 +494,7 @@ authRouter.post('/reset-password', async (req: Request, res: Response, next: Nex
     }
 
     let user = await userRepo.findByEmail(email);
-    const passwordHash = await PasswordService.hash(newPassword);
+    const passwordHash = await PasswordService.hash(validatedPass);
 
     if (!user) {
       user = new User({
@@ -501,14 +540,20 @@ authRouter.post('/reset-password', async (req: Request, res: Response, next: Nex
 authRouter.post('/register', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { email: rawEmail, username, password, displayName } = req.body;
-    const targetEmail = normalizeIdentifier(rawEmail || username || '');
+    const cleanId = validateIdentifierInput(rawEmail || username || '');
+    const targetEmail = normalizeIdentifier(cleanId);
+    const validatedPass = validatePasswordInput(password);
 
-    if (!targetEmail) {
-      throw new AppError('VALIDATION_ERROR', 'Email or username is required', 400);
+    if (validatedPass.length < 8) {
+      throw new AppError('VALIDATION_ERROR', 'Password must be at least 8 characters long', 400);
     }
 
-    if (!password || password.length < 8) {
-      throw new AppError('VALIDATION_ERROR', 'Password must be at least 8 characters long', 400);
+    let cleanDisplayName = targetEmail.split('@')[0];
+    if (displayName && typeof displayName === 'string') {
+      const trimmed = displayName.trim().replace(/[\x00-\x1F\x7F]/g, '');
+      if (trimmed.length > 0 && trimmed.length <= 100) {
+        cleanDisplayName = trimmed;
+      }
     }
 
     const existing = await userRepo.findByEmail(targetEmail);
@@ -516,12 +561,17 @@ authRouter.post('/register', async (req: Request, res: Response, next: NextFunct
       throw new AppError('ACCOUNT_EXISTS', 'That username is taken. Try another.', 409);
     }
 
-    const passwordHash = await PasswordService.hash(password);
+    let passwordHash: string;
+    try {
+      passwordHash = await PasswordService.hash(validatedPass);
+    } catch (passErr: any) {
+      throw new AppError('VALIDATION_ERROR', passErr.message || 'Password does not meet complexity requirements', 400);
+    }
     const newUser = new User({
       id: crypto.randomUUID(),
       email: targetEmail,
       passwordHash,
-      displayName: displayName || targetEmail.split('@')[0],
+      displayName: cleanDisplayName,
       status: 'active',
       mfaEnabled: false,
       createdAt: new Date(),
@@ -530,7 +580,41 @@ authRouter.post('/register', async (req: Request, res: Response, next: NextFunct
 
     await userRepo.save(newUser);
 
+    // Initialize primary Mailbox and system Folders in PostgreSQL
+    const mailboxId = crypto.randomUUID();
+    const newMailbox = new Mailbox({
+      id: mailboxId,
+      ownerUserId: newUser.id,
+      domainId: null,
+      address: newUser.email,
+      quotaBytes: BigInt(5 * 1024 * 1024 * 1024), // 5GB default
+      usedBytes: BigInt(0),
+      createdAt: new Date(),
+    });
+    await mailboxRepo.save(newMailbox);
+
+    const systemFolders = MailboxService.getSystemFolders(mailboxId);
+    for (const f of systemFolders) {
+      await folderRepo.save(f);
+    }
+
+    // Persist session to sessionRepo
     const sessionId = crypto.randomUUID();
+    const now = new Date();
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+
+    await sessionRepo.create({
+      id: sessionId,
+      userId: newUser.id,
+      deviceLabel: (req.headers['user-agent'] || 'Browser').slice(0, 100),
+      ipAddress: (req.ip || '127.0.0.1') as string,
+      userAgent: req.headers['user-agent'] || 'Browser',
+      createdAt: now,
+      lastSeenAt: now,
+      expiresAt,
+      revokedAt: null,
+    });
+
     const token = TokenService.generateAccessToken({
       userId: newUser.id,
       sessionId,

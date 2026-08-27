@@ -34,28 +34,36 @@ function getQueueRunner(): QueueRunner {
 
 // Helper to resolve user's primary mailbox and ensure folders exist
 async function getOrCreateUserMailbox(userId: string, userEmail: string): Promise<{ mailboxId: string; address: string }> {
-  const userMailboxes = await mailboxRepo.findByOwnerId(userId);
-  if (userMailboxes.length > 0) {
-    return { mailboxId: userMailboxes[0]!.id, address: userMailboxes[0]!.address };
+  const normalizedEmail = userEmail.trim().toLowerCase();
+
+  // 1. Check mailbox by exact address (highest priority for personal data isolation)
+  const existingMailboxByAddress = (await defaultDb.query(
+    'SELECT id, owner_user_id, address FROM mailboxes WHERE LOWER(address) = $1 LIMIT 1',
+    [normalizedEmail]
+  )) as any[];
+  if (existingMailboxByAddress.length > 0) {
+    return { mailboxId: existingMailboxByAddress[0].id, address: existingMailboxByAddress[0].address };
   }
 
-  // Ensure user exists in users table
-  const existingUserByEmail = (await defaultDb.query('SELECT id FROM users WHERE email = $1', [userEmail])) as any[];
+  // 2. Resolve or create user in users table
+  const existingUserByEmail = (await defaultDb.query(
+    'SELECT id FROM users WHERE LOWER(email) = $1 LIMIT 1',
+    [normalizedEmail]
+  )) as any[];
   let effectiveUserId = userId;
   if (existingUserByEmail.length > 0) {
     effectiveUserId = existingUserByEmail[0].id;
+    const userMailboxes = await mailboxRepo.findByOwnerId(effectiveUserId);
+    if (userMailboxes.length > 0) {
+      return { mailboxId: userMailboxes[0]!.id, address: userMailboxes[0]!.address };
+    }
   } else {
     await defaultDb.query(
       `INSERT INTO users (id, email, password_hash, display_name) 
        VALUES ($1, $2, 'hash_auto', 'Eazzio User') 
        ON CONFLICT (email) DO NOTHING`,
-      [userId, userEmail]
+      [userId, normalizedEmail]
     );
-  }
-
-  const existingMailboxByAddress = (await defaultDb.query('SELECT id, owner_user_id, address FROM mailboxes WHERE address = $1', [userEmail])) as any[];
-  if (existingMailboxByAddress.length > 0) {
-    return { mailboxId: existingMailboxByAddress[0].id, address: existingMailboxByAddress[0].address };
   }
 
   // Ensure a domain exists
@@ -241,10 +249,10 @@ messagesRouter.get('/', async (req: AuthenticatedRequest, res: Response, next: N
   try {
     const userId = req.user!.userId;
     const userEmail = req.user!.email;
-    const { mailboxId: requestedMailboxId, folder = 'inbox', limit = 50 } = req.query;
+    const { folder = 'inbox', limit = 50 } = req.query;
 
     const { mailboxId } = await getOrCreateUserMailbox(userId, userEmail);
-    const activeMailboxId = (requestedMailboxId as string) || mailboxId;
+    const activeMailboxId = mailboxId;
     const activeFolderId = await getFolderId(activeMailboxId, folder as string);
     const folderSlug = (folder as string).toLowerCase().replace('fld-', '');
 
@@ -650,7 +658,18 @@ messagesRouter.get('/:id', async (req: AuthenticatedRequest, res: Response, next
           clamavStatus: 'clean',
           spamScore: Number(first.spam_score || 0.0),
         },
-        attachments: [],
+        attachments: (
+          (await defaultDb.query(
+            `SELECT id, filename, mime_type, size_bytes, object_key FROM attachments WHERE message_id = $1`,
+            [first.id]
+          )) as any[]
+        ).map((att) => ({
+          id: att.id,
+          filename: att.filename,
+          contentType: att.mime_type,
+          sizeBytes: Number(att.size_bytes),
+          url: `/v1/attachments/${att.id}/download`,
+        })),
       },
     });
   } catch (err) {
@@ -762,6 +781,57 @@ messagesRouter.post('/compose', async (req: AuthenticatedRequest, res: Response,
       }
     }
 
+    // 5b. Persist message attachments if present
+    const rawAttachments = req.body.attachments;
+    let actualMsgUuid: string | undefined;
+    if (queueIds.length > 0) {
+      const qCheck = (await defaultDb.query(`SELECT message_id FROM outbound_queue WHERE id = $1`, [queueIds[0]])) as any[];
+      if (qCheck.length > 0) {
+        actualMsgUuid = qCheck[0].message_id;
+      }
+    }
+    if (!actualMsgUuid) {
+      const mCheck = (await defaultDb.query(`SELECT id FROM messages WHERE message_id_header = $1 OR id::text = $2 LIMIT 1`, [
+        messageId,
+        messageId.replace(/[<>]/g, '').split('@')[0],
+      ])) as any[];
+      if (mCheck.length > 0) {
+        actualMsgUuid = mCheck[0].id;
+      }
+    }
+
+    if (actualMsgUuid && rawAttachments && Array.isArray(rawAttachments)) {
+      for (const att of rawAttachments) {
+        const attId = crypto.randomUUID();
+        const objectKey = `att_${actualMsgUuid}_${attId}_${att.name || att.filename || 'attachment.dat'}`;
+        let fileBuffer: Buffer;
+        if (att.dataBase64) {
+          fileBuffer = Buffer.from(att.dataBase64, 'base64');
+        } else if (att.content) {
+          fileBuffer = Buffer.from(att.content, 'utf-8');
+        } else {
+          fileBuffer = Buffer.from(att.name || 'Sample attachment content', 'utf-8');
+        }
+
+        await storage.put(objectKey, fileBuffer, att.type || att.contentType || 'application/octet-stream');
+        const hash = crypto.createHash('sha256').update(fileBuffer).digest('hex');
+
+        await defaultDb.query(
+          `INSERT INTO attachments (id, message_id, filename, mime_type, size_bytes, sha256_hash, object_key, scan_status)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, 'clean')`,
+          [
+            attId,
+            actualMsgUuid,
+            att.name || att.filename || 'attachment.dat',
+            att.type || att.contentType || 'application/octet-stream',
+            fileBuffer.length,
+            hash,
+            objectKey,
+          ]
+        );
+      }
+    }
+
     // 6. Trigger Queue Runner in the background for outbound SMTP delivery
     setImmediate(() => {
       getQueueRunner()
@@ -773,11 +843,35 @@ messagesRouter.post('/compose', async (req: AuthenticatedRequest, res: Response,
 
     res.status(202).json({
       success: true,
+      id: actualMsgUuid,
       messageId,
       queueIds,
       deliveryState: 'queued',
       status: 'accepted_for_delivery',
     });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /v1/attachments/:id/download
+messagesRouter.get('/attachments/:id/download', async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const rows = (await defaultDb.query(
+      `SELECT a.* FROM attachments a WHERE a.id = $1`,
+      [id]
+    )) as any[];
+
+    if (rows.length === 0) {
+      throw new AppError('NOT_FOUND', 'Attachment not found', 404);
+    }
+
+    const att = rows[0];
+    const data = await storage.get(att.object_key);
+    res.setHeader('Content-Type', att.mime_type || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(att.filename)}"`);
+    res.send(data);
   } catch (err) {
     next(err);
   }

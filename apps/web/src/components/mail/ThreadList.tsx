@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Star,
   Paperclip,
@@ -22,7 +22,6 @@ import {
   Bookmark,
   VolumeX,
   SlidersHorizontal,
-  Check,
 } from 'lucide-react';
 import { ThreadSummary } from '../../types/mail';
 
@@ -40,6 +39,7 @@ export interface ThreadListProps {
   currentPage?: number;
   pageSize?: number;
   onPageChange?: (newPage: number) => void;
+  isSplitView?: boolean;
 }
 
 export const ThreadList: React.FC<ThreadListProps> = ({
@@ -56,10 +56,27 @@ export const ThreadList: React.FC<ThreadListProps> = ({
   currentPage = 1,
   pageSize = 50,
   onPageChange,
+  isSplitView = true,
 }) => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isSelectMenuOpen, setIsSelectMenuOpen] = useState(false);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
+  const selectMenuRef = useRef<HTMLDivElement>(null);
+  const moreMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close menus on click outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (selectMenuRef.current && !selectMenuRef.current.contains(e.target as Node)) {
+        setIsSelectMenuOpen(false);
+      }
+      if (moreMenuRef.current && !moreMenuRef.current.contains(e.target as Node)) {
+        setIsMoreMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const isAllSelected = threads.length > 0 && selectedIds.size === threads.length;
   const isPartiallySelected = selectedIds.size > 0 && selectedIds.size < threads.length;
@@ -105,17 +122,17 @@ export const ThreadList: React.FC<ThreadListProps> = ({
     setSelectedIds(new Set());
   };
 
-  const totalCount = totalThreadsCount || (threads.length > 0 ? 516 : 0);
-  const startIdx = totalCount > 0 ? (currentPage - 1) * pageSize + 1 : 0;
+  const totalCount = totalThreadsCount || threads.length;
+  const startIdx = totalCount === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const endIdx = Math.min(currentPage * pageSize, totalCount);
 
   return (
-    <div className="flex flex-col h-full bg-[#111317] border-r border-[#22262E] select-none" data-testid="thread-list">
-      {/* Gmail-Style Top Action & Bulk Toolbar */}
+    <div className="flex flex-col h-full bg-[#111317] select-none min-w-0" data-testid="thread-list">
+      {/* Top Action & Bulk Toolbar */}
       <div className="h-12 px-3 border-b border-[#22262E] flex items-center justify-between gap-2 shrink-0 bg-[#16181D]">
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 min-w-0">
           {/* Select All Checkbox + Dropdown Arrow */}
-          <div className="relative flex items-center">
+          <div className="relative flex items-center shrink-0" ref={selectMenuRef}>
             <button
               onClick={handleSelectAll}
               className="p-1.5 rounded text-slate-400 hover:text-white hover:bg-[#22262E] transition-colors"
@@ -138,7 +155,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
             </button>
 
             {isSelectMenuOpen && (
-              <div className="absolute left-0 top-8 w-36 rounded-lg bg-[#16181D] border border-[#2A2E37] shadow-xl py-1 z-50 animate-in fade-in">
+              <div className="absolute left-0 top-8 w-36 rounded-lg bg-[#16181D] border border-[#2A2E37] shadow-2xl py-1 z-50 animate-in fade-in">
                 {(['all', 'none', 'read', 'unread', 'starred', 'unstarred'] as const).map((mode) => (
                   <button
                     key={mode}
@@ -156,7 +173,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
           {onRefresh && (
             <button
               onClick={onRefresh}
-              className="p-1.5 rounded text-slate-400 hover:text-white hover:bg-[#22262E] transition-colors"
+              className="p-1.5 rounded text-slate-400 hover:text-white hover:bg-[#22262E] transition-colors shrink-0"
               title="Refresh"
               data-testid="refresh-threads-btn"
             >
@@ -164,9 +181,9 @@ export const ThreadList: React.FC<ThreadListProps> = ({
             </button>
           )}
 
-          {/* Bulk Action Buttons (visible when items selected) or Top Action Icons */}
+          {/* Bulk Action Buttons (visible when items selected) */}
           {selectedIds.size > 0 ? (
-            <div className="flex items-center gap-0.5 animate-in fade-in pl-1 border-l border-[#22262E]">
+            <div className="flex items-center gap-0.5 animate-in fade-in pl-1 border-l border-[#22262E] shrink-0">
               <button
                 onClick={() => handleBulkAction('archive')}
                 className="p-1.5 rounded text-slate-400 hover:text-white hover:bg-[#22262E] transition-colors"
@@ -202,17 +219,11 @@ export const ThreadList: React.FC<ThreadListProps> = ({
               >
                 <Mail className="w-4 h-4" />
               </button>
-              <button
-                className="p-1.5 rounded text-slate-400 hover:text-white hover:bg-[#22262E] transition-colors"
-                title="Snooze"
-              >
-                <Clock className="w-4 h-4" />
-              </button>
             </div>
           ) : null}
 
-          {/* More (⋮) Options Dropdown Menu */}
-          <div className="relative">
+          {/* More Options Dropdown Menu */}
+          <div className="relative shrink-0" ref={moreMenuRef}>
             <button
               onClick={() => setIsMoreMenuOpen(!isMoreMenuOpen)}
               className="p-1.5 rounded text-slate-400 hover:text-white hover:bg-[#22262E] transition-colors"
@@ -222,7 +233,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
             </button>
 
             {isMoreMenuOpen && (
-              <div className="absolute left-0 top-8 w-56 rounded-xl bg-[#16181D] border border-[#2A2E37] shadow-2xl py-1.5 z-50 animate-in fade-in divide-y divide-[#22262E]">
+              <div className="absolute left-0 top-8 w-52 rounded-xl bg-[#181B22] border border-[#2E3440] shadow-2xl py-1.5 z-50 animate-in fade-in divide-y divide-[#22262E]">
                 <div className="py-1">
                   <button
                     onClick={() => {
@@ -296,8 +307,8 @@ export const ThreadList: React.FC<ThreadListProps> = ({
         </div>
 
         {/* Pagination Controls */}
-        <div className="flex items-center gap-2 text-xs text-slate-400">
-          <span>
+        <div className="flex items-center gap-1 text-xs text-slate-400 shrink-0">
+          <span className="font-mono text-[11px]">
             {startIdx}–{endIdx} of {totalCount}
           </span>
           <div className="flex items-center gap-0.5">
@@ -307,7 +318,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
               className="p-1 rounded hover:bg-[#22262E] hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
               title="Previous Page"
             >
-              <ChevronLeft className="w-4 h-4" />
+              <ChevronLeft className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={() => onPageChange && onPageChange(currentPage + 1)}
@@ -315,7 +326,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
               className="p-1 rounded hover:bg-[#22262E] hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
               title="Next Page"
             >
-              <ChevronRight className="w-4 h-4" />
+              <ChevronRight className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
@@ -323,13 +334,13 @@ export const ThreadList: React.FC<ThreadListProps> = ({
 
       {/* Selected Items Notice Bar */}
       {selectedIds.size > 0 && (
-        <div className="px-4 py-2 bg-[#1C2028] border-b border-[#22262E] text-xs text-slate-300 flex items-center justify-between animate-in fade-in">
-          <span>All {selectedIds.size} conversations on this page are selected.</span>
+        <div className="px-3 py-1.5 bg-[#1C2028] border-b border-[#22262E] text-xs text-slate-300 flex items-center justify-between animate-in fade-in">
+          <span>{selectedIds.size} selected</span>
           <button
             onClick={() => setSelectedIds(new Set(threads.map((t) => t.id)))}
-            className="text-[#2D5BFF] hover:underline font-semibold"
+            className="text-[#2D5BFF] hover:underline font-semibold text-[11px]"
           >
-            Select all {totalCount} conversations in {folderName}
+            Select all {totalCount} in {folderName}
           </button>
         </div>
       )}
@@ -355,7 +366,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
               <div
                 key={thread.id}
                 onClick={() => onSelectThread(thread.id)}
-                className={`group flex items-center gap-3 px-4 py-2.5 text-xs transition-colors cursor-pointer border-l-4 ${
+                className={`group flex flex-col justify-center gap-1 px-3.5 py-2.5 text-xs transition-colors cursor-pointer border-l-4 ${
                   isSelected
                     ? 'bg-[#1C2230] border-[#2D5BFF]'
                     : isChecked
@@ -366,64 +377,81 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                 }`}
                 data-testid={`thread-row-${thread.id}`}
               >
-                {/* Checkbox */}
-                <button
-                  onClick={(e) => handleToggleSelectOne(thread.id, e)}
-                  className="text-slate-500 hover:text-slate-200 transition-colors shrink-0"
-                >
-                  {isChecked ? (
-                    <CheckSquare className="w-4 h-4 text-[#2D5BFF]" />
-                  ) : (
-                    <Square className="w-4 h-4" />
-                  )}
-                </button>
+                {/* Row 1: Checkbox, Star, Sender Name, Badges, Date */}
+                <div className="flex items-center gap-2 w-full min-w-0">
+                  {/* Checkbox */}
+                  <button
+                    onClick={(e) => handleToggleSelectOne(thread.id, e)}
+                    className="text-slate-500 hover:text-slate-200 transition-colors shrink-0"
+                  >
+                    {isChecked ? (
+                      <CheckSquare className="w-4 h-4 text-[#2D5BFF]" />
+                    ) : (
+                      <Square className="w-4 h-4" />
+                    )}
+                  </button>
 
-                {/* Star Icon */}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (onToggleStar) onToggleStar(thread.id);
-                  }}
-                  className={`shrink-0 transition-colors ${
-                    thread.isStarred ? 'text-amber-400 fill-amber-400' : 'text-slate-600 hover:text-slate-300'
-                  }`}
-                  title={thread.isStarred ? 'Starred' : 'Not starred'}
-                >
-                  <Star className={`w-4 h-4 ${thread.isStarred ? 'fill-amber-400' : ''}`} />
-                </button>
+                  {/* Star Icon */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (onToggleStar) onToggleStar(thread.id);
+                    }}
+                    className={`shrink-0 transition-colors ${
+                      thread.isStarred ? 'text-amber-400 fill-amber-400' : 'text-slate-600 hover:text-slate-300'
+                    }`}
+                    title={thread.isStarred ? 'Starred' : 'Not starred'}
+                  >
+                    <Star className={`w-4 h-4 ${thread.isStarred ? 'fill-amber-400' : ''}`} />
+                  </button>
 
-                {/* Sender Name */}
-                <div className="w-36 shrink-0 truncate">
-                  <span className={`truncate ${thread.isUnread ? 'font-bold text-white' : 'text-slate-300'}`}>
-                    {thread.sender.name || thread.sender.email}
-                  </span>
-                  {thread.messageCount && thread.messageCount > 1 && (
-                    <span className="text-[10px] text-slate-500 ml-1 font-mono">
-                      {thread.messageCount}
+                  {/* Sender Name */}
+                  <div className="flex-1 min-w-0 truncate">
+                    <span className={`truncate ${thread.isUnread ? 'font-bold text-white' : 'font-medium text-slate-300'}`}>
+                      {thread.sender.name || thread.sender.email}
                     </span>
-                  )}
+                    {thread.messageCount && thread.messageCount > 1 && (
+                      <span className="text-[10px] text-slate-500 ml-1 font-mono">
+                        ({thread.messageCount})
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Attachment indicator & Date */}
+                  <div className="flex items-center gap-1.5 shrink-0 text-right">
+                    {thread.hasAttachments && (
+                      <Paperclip className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                    )}
+                    <span className={`text-[11px] font-mono shrink-0 ${thread.isUnread ? 'font-bold text-white' : 'text-slate-400'}`}>
+                      {thread.lastMessageAt}
+                    </span>
+                  </div>
                 </div>
 
-                {/* Subject & Snippet Preview */}
-                <div className="flex-1 min-w-0 flex items-center gap-1.5 truncate">
-                  <span className={`truncate shrink-0 ${thread.isUnread ? 'font-bold text-white' : 'font-medium text-slate-200'}`}>
-                    {thread.subject}
+                {/* Row 2: Subject & Snippet Preview */}
+                <div className="flex items-baseline gap-1.5 min-w-0 pl-6 text-xs">
+                  <span className={`truncate shrink-0 max-w-[65%] ${thread.isUnread ? 'font-semibold text-slate-100' : 'text-slate-300 font-normal'}`}>
+                    {thread.subject || '(No Subject)'}
                   </span>
-                  <span className="text-slate-500 shrink-0">-</span>
+                  <span className="text-slate-600 shrink-0">—</span>
                   <span className="text-slate-400 truncate font-normal">
                     {thread.snippet}
                   </span>
                 </div>
 
-                {/* Badges / Attachment / Date */}
-                <div className="flex items-center gap-2 shrink-0 text-right">
-                  {thread.hasAttachments && (
-                    <Paperclip className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                  )}
-                  <span className={`text-[11px] font-mono shrink-0 ${thread.isUnread ? 'font-bold text-white' : 'text-slate-400'}`}>
-                    {thread.lastMessageAt}
-                  </span>
-                </div>
+                {/* Row 3: Label Badges if present */}
+                {thread.labels && thread.labels.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-0.5 pl-6">
+                    {thread.labels.map((lbl) => (
+                      <span
+                        key={lbl}
+                        className="text-[10px] px-1.5 py-0.2 rounded bg-[#1A202C] text-slate-300 border border-[#2D3748]"
+                      >
+                        {lbl}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             );
           })

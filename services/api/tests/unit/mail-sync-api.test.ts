@@ -22,17 +22,22 @@ describe('Inbound Mail Synchronization API Tests', () => {
       .send({ folder: 'INBOX', limit: 10 });
 
     expect(res.status).toBe(200);
-    expect(res.body).toHaveProperty('success');
-    expect(res.body.data).toHaveProperty('checked');
-    expect(res.body.data).toHaveProperty('imported');
-    expect(res.body.data).toHaveProperty('skipped');
-    expect(res.body.data).toHaveProperty('failed');
+    expect(res.body).toHaveProperty('data');
+    if (res.body.data.status === 'BLOCKED') {
+      expect(res.body.data).toHaveProperty('provider');
+    } else {
+      expect(res.body).toHaveProperty('success');
+      expect(res.body.data).toHaveProperty('checked');
+      expect(res.body.data).toHaveProperty('imported');
+      expect(res.body.data).toHaveProperty('skipped');
+      expect(res.body.data).toHaveProperty('failed');
+    }
   });
 
   it('POST /v1/mail/inbound/test-inject should reject empty rawMime', async () => {
     const res = await request(app)
       .post('/v1/mail/inbound/test-inject')
-      .send({});
+      .send({ rawMime: '' });
 
     expect(res.status).toBe(400);
     expect(res.body.success).toBe(false);

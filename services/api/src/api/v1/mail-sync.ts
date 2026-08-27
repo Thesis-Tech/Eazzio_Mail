@@ -437,7 +437,11 @@ mailSyncRouter.post('/test', async (req: Request, res: Response, next: NextFunct
 
 // Alias: POST /v1/mail/inbound/test-inject
 mailSyncRouter.post('/test-inject', (req, res, next) => {
-  if (req.body?.rawMime) {
+  if (req.body?.rawMime !== undefined) {
+    if (!req.body.rawMime || (typeof req.body.rawMime === 'string' && req.body.rawMime.trim() === '')) {
+      res.status(400).json({ success: false, error: 'Empty rawMime' });
+      return;
+    }
     // Forward to webhook handler
     return (mailSyncRouter.stack.find((s) => s.route?.path === '/webhook')?.route?.stack[0]?.handle as any)(req, res, next);
   }

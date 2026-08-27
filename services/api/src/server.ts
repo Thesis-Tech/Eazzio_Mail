@@ -14,7 +14,9 @@ export const wsGateway = new WebSocketGateway({
   },
 });
 
-server.listen(port, () => {
-  console.log(`🚀 Eazzio Mail Backend API Server listening on port ${port} (Transport: ${process.env.MAIL_TRANSPORT || 'relay'})`);
-  console.log(`📡 Realtime WebSocket Gateway mounted at ws://0.0.0.0:${port}/ws`);
-});
+if (process.env.NODE_ENV !== 'test' && !process.env.VITEST) {
+  server.listen(port, () => {
+    console.log(`🚀 Eazzio Mail Backend API Server listening on port ${port} (Transport: ${process.env.MAIL_TRANSPORT || 'relay'})`);
+    console.log(`📡 Realtime WebSocket Gateway mounted at ws://0.0.0.0:${port}/ws`);
+  });
+}

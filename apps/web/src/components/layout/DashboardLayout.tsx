@@ -6,6 +6,7 @@ import { AppHeader } from './AppHeader';
 import { FolderItem, LabelItem, ThreadSummary } from '../../types/mail';
 import { AuthStore, AuthUser } from '../../lib/auth-store';
 import { realtimeClient, ConnectionStatus } from '../../lib/websocket-client';
+import { X } from 'lucide-react';
 
 export interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -51,9 +52,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   customLabels = defaultLabels,
 }) => {
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
-  const [currentFolder, setCurrentFolder] = useState<string>(activeFolderId);
-  const [currentLabel, setCurrentLabel] = useState<string | undefined>(activeLabelId);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
+  const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState<boolean>(false);
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('connected');
 
   useEffect(() => {
@@ -84,14 +84,24 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
     };
   }, []);
 
+  // Close drawer on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isMobileDrawerOpen) {
+        setIsMobileDrawerOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isMobileDrawerOpen]);
+
   const handleFolderSelect = (folderId: string) => {
-    setCurrentFolder(folderId);
-    setCurrentLabel(undefined);
+    setIsMobileDrawerOpen(false);
     if (onSelectFolder) onSelectFolder(folderId);
   };
 
   const handleLabelSelect = (labelId: string) => {
-    setCurrentLabel(labelId);
+    setIsMobileDrawerOpen(false);
     if (onSelectLabel) onSelectLabel(labelId);
   };
 
@@ -104,34 +114,80 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 
   return (
     <div
-      className="flex h-screen w-screen overflow-hidden bg-[#0F1115] text-[#EDEEF0]"
+      className="flex h-screen w-screen overflow-hidden bg-[#0F1115] text-[#EDEEF0] relative"
       data-testid="dashboard-layout"
     >
-      {/* Left Sidebar */}
-      <NavigationSidebar
-        folders={customFolders}
-        labels={customLabels}
-        activeFolderId={currentFolder}
-        activeLabelId={currentLabel}
-        onSelectFolder={handleFolderSelect}
-        onSelectLabel={handleLabelSelect}
-        onOpenCompose={onOpenCompose || (() => {})}
-        onOpenSettings={onOpenSettings}
-        isCollapsed={isSidebarCollapsed}
-        onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-      />
+      {/* Desktop Left Sidebar (>= md) */}
+      <div className="hidden md:flex h-full">
+        <NavigationSidebar
+          folders={customFolders}
+          labels={customLabels}
+          activeFolderId={activeFolderId}
+          activeLabelId={activeLabelId}
+          onSelectFolder={handleFolderSelect}
+          onSelectLabel={handleLabelSelect}
+          onOpenCompose={onOpenCompose || (() => {})}
+          onOpenSettings={onOpenSettings}
+          isCollapsed={isSidebarCollapsed}
+          onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+        />
+      </div>
+
+      {/* Mobile Slide-Out Drawer (< md) */}
+      {isMobileDrawerOpen && (
+        <div className="fixed inset-0 z-50 md:hidden flex animate-fade-in">
+          {/* Backdrop Overlay */}
+          <div
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm transition-opacity"
+            onClick={() => setIsMobileDrawerOpen(false)}
+            aria-hidden="true"
+          />
+
+          {/* Drawer Sidebar Content */}
+          <div className="relative w-72 max-w-[80vw] h-full bg-[#111317] border-r border-[#22262E] shadow-2xl z-10 flex flex-col animate-in slide-in-from-left duration-200">
+            <div className="absolute top-4 right-3 z-20">
+              <button
+                onClick={() => setIsMobileDrawerOpen(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[#1E232B] transition-colors"
+                aria-label="Close navigation drawer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <NavigationSidebar
+              folders={customFolders}
+              labels={customLabels}
+              activeFolderId={activeFolderId}
+              activeLabelId={activeLabelId}
+              onSelectFolder={handleFolderSelect}
+              onSelectLabel={handleLabelSelect}
+              onOpenCompose={() => {
+                setIsMobileDrawerOpen(false);
+                if (onOpenCompose) onOpenCompose();
+              }}
+              onOpenSettings={() => {
+                setIsMobileDrawerOpen(false);
+                if (onOpenSettings) onOpenSettings();
+              }}
+              isCollapsed={false}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <AppHeader
           user={currentUser}
           onLogout={handleLogout}
+          onOpenSettings={onOpenSettings}
           onSearch={onSearch}
           availableThreads={availableThreads}
           isRealtimeConnected={connectionStatus === 'connected'}
           realtimeStatus={connectionStatus}
+          onToggleMobileMenu={() => setIsMobileDrawerOpen(true)}
         />
-        <main className="flex-1 overflow-auto bg-[#0F1115]">{children}</main>
+        <main className="flex-1 overflow-hidden flex flex-col bg-[#0F1115]">{children}</main>
       </div>
     </div>
   );

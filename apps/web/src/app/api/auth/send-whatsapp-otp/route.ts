@@ -16,7 +16,7 @@ export async function POST(req: Request) {
 
     // Generate random 6-digit OTP
     const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
-    OtpStore.setOtp(cleanPhone, generatedOtp, 300);
+    OtpStore.setOtp(cleanPhone, generatedOtp, 'whatsapp', 300);
 
     const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
     const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;

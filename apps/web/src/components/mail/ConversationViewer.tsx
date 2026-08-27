@@ -22,6 +22,7 @@ import {
   Printer,
   ExternalLink,
   Smile,
+  ArrowLeft,
 } from 'lucide-react';
 import { MessageDetail } from '../../types/mail';
 
@@ -117,10 +118,15 @@ export interface ConversationViewerProps {
   threadId: string;
   subject: string;
   messages: MessageDetail[];
+  folderName?: string;
+  labels?: string[];
   onArchive?: (threadId: string) => void;
   onDelete?: (threadId: string) => void;
   onToggleStar?: (threadId: string) => void;
   onSendReply?: (threadId: string, replyText: string) => void;
+  onReply?: (message: MessageDetail) => void;
+  onReplyAll?: (message: MessageDetail) => void;
+  onForward?: (message: MessageDetail) => void;
   onClose?: () => void;
 }
 
@@ -128,10 +134,15 @@ export const ConversationViewer: React.FC<ConversationViewerProps> = ({
   threadId,
   subject,
   messages,
+  folderName,
+  labels = [],
   onArchive,
   onDelete,
   onToggleStar,
   onSendReply,
+  onReply,
+  onReplyAll,
+  onForward,
   onClose,
 }) => {
   const [expandedMessageIds, setExpandedMessageIds] = useState<Set<string>>(
@@ -183,22 +194,44 @@ export const ConversationViewer: React.FC<ConversationViewerProps> = ({
     setReplyText('');
   };
 
+  const displayBadges = labels && labels.length > 0
+    ? labels
+    : folderName
+    ? [folderName.charAt(0).toUpperCase() + folderName.slice(1).toLowerCase()]
+    : [];
+
   return (
     <div className="flex flex-col h-full bg-[#0F1115] text-[#EDEEF0] overflow-hidden" data-testid="conversation-viewer">
       {/* Top Header & Actions */}
-      <div className="h-14 px-6 border-b border-[#22262E] flex items-center justify-between gap-4 shrink-0 bg-[#16181D]">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <h1 className="text-base font-bold text-white tracking-tight truncate">
+      <div className="h-14 px-3 sm:px-6 border-b border-[#22262E] flex items-center justify-between gap-2.5 sm:gap-4 shrink-0 bg-[#16181D]">
+        <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="md:hidden p-1.5 -ml-1 rounded-lg text-slate-400 hover:text-white hover:bg-[#22262E] transition-colors flex items-center gap-1 text-xs font-semibold text-[#14B8A6] shrink-0"
+              aria-label="Back to thread list"
+              data-testid="conversation-back-btn"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Back</span>
+            </button>
+          )}
+          <h1 className="text-sm sm:text-base font-bold text-white tracking-tight truncate">
             {subject || '(No Subject)'}
           </h1>
-          <span className="text-[11px] px-2 py-0.5 rounded bg-[#1E293B] text-slate-300 font-medium flex items-center gap-1 shrink-0">
-            <span>Inbox</span>
-            <X className="w-2.5 h-2.5 text-slate-400 hover:text-white cursor-pointer" />
-          </span>
+          {displayBadges.map((badge) => (
+            <span
+              key={badge}
+              className="hidden sm:flex text-[11px] px-2 py-0.5 rounded bg-[#1E293B] text-slate-300 font-medium items-center gap-1 shrink-0"
+            >
+              <span>{badge}</span>
+            </span>
+          ))}
           <span className="text-xs px-2 py-0.5 rounded-full bg-[#22262E] text-slate-400 font-mono shrink-0">
             {messages.length}
           </span>
         </div>
+
 
         {/* Action Buttons */}
         <div className="flex items-center gap-1 text-slate-400">
@@ -254,6 +287,17 @@ export const ConversationViewer: React.FC<ConversationViewerProps> = ({
           >
             <Trash2 className="w-4 h-4" />
           </button>
+
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-lg hover:text-white hover:bg-[#22262E] transition-colors ml-1"
+              title="Close conversation (Esc)"
+              data-testid="conversation-close-btn"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -415,20 +459,57 @@ export const ConversationViewer: React.FC<ConversationViewerProps> = ({
                       </div>
                     </div>
                   )}
+
+                  {/* Message Actions Bar (Reply / Reply All / Forward) */}
+                  <div className="pt-2 flex items-center gap-2">
+                    <button
+                      onClick={() => onReply?.(msg)}
+                      className="px-3 py-1.5 rounded-lg bg-[#1C1F26] hover:bg-[#2A2E37] border border-[#2A2E37] text-slate-300 hover:text-white text-xs font-medium flex items-center gap-1.5 transition-all"
+                      title="Reply to sender"
+                      data-testid={`msg-reply-btn-${msg.id}`}
+                    >
+                      <Reply className="w-3.5 h-3.5" />
+                      <span>Reply</span>
+                    </button>
+                    <button
+                      onClick={() => onReplyAll?.(msg)}
+                      className="px-3 py-1.5 rounded-lg bg-[#1C1F26] hover:bg-[#2A2E37] border border-[#2A2E37] text-slate-300 hover:text-white text-xs font-medium flex items-center gap-1.5 transition-all"
+                      title="Reply to all recipients"
+                      data-testid={`msg-reply-all-btn-${msg.id}`}
+                    >
+                      <Reply className="w-3.5 h-3.5" />
+                      <span>Reply all</span>
+                    </button>
+                    <button
+                      onClick={() => onForward?.(msg)}
+                      className="px-3 py-1.5 rounded-lg bg-[#1C1F26] hover:bg-[#2A2E37] border border-[#2A2E37] text-slate-300 hover:text-white text-xs font-medium flex items-center gap-1.5 transition-all"
+                      title="Forward message"
+                      data-testid={`msg-forward-btn-${msg.id}`}
+                    >
+                      <Forward className="w-3.5 h-3.5" />
+                      <span>Forward</span>
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
           );
         })}
 
-        {/* Gmail-Style Action Button Pills */}
+        {/* Bottom Conversation Action Button Pills */}
         <div className="flex items-center gap-2 pt-2">
           <button
             onClick={() => {
-              const textarea = document.querySelector('textarea');
-              textarea?.focus();
+              const latestMsg = messages[messages.length - 1];
+              if (latestMsg && onReply) {
+                onReply(latestMsg);
+              } else {
+                const textarea = document.querySelector('textarea');
+                textarea?.focus();
+              }
             }}
             className="px-4 py-2 rounded-full bg-[#16181D] hover:bg-[#1E232B] border border-[#2A2E37] text-slate-300 hover:text-white text-xs font-semibold flex items-center gap-2 transition-all"
+            data-testid="bottom-reply-btn"
           >
             <Reply className="w-3.5 h-3.5" />
             <span>Reply</span>
@@ -436,10 +517,27 @@ export const ConversationViewer: React.FC<ConversationViewerProps> = ({
 
           <button
             onClick={() => {
-              const textarea = document.querySelector('textarea');
-              textarea?.focus();
+              const latestMsg = messages[messages.length - 1];
+              if (latestMsg && onReplyAll) {
+                onReplyAll(latestMsg);
+              }
             }}
             className="px-4 py-2 rounded-full bg-[#16181D] hover:bg-[#1E232B] border border-[#2A2E37] text-slate-300 hover:text-white text-xs font-semibold flex items-center gap-2 transition-all"
+            data-testid="bottom-reply-all-btn"
+          >
+            <Reply className="w-3.5 h-3.5" />
+            <span>Reply all</span>
+          </button>
+
+          <button
+            onClick={() => {
+              const latestMsg = messages[messages.length - 1];
+              if (latestMsg && onForward) {
+                onForward(latestMsg);
+              }
+            }}
+            className="px-4 py-2 rounded-full bg-[#16181D] hover:bg-[#1E232B] border border-[#2A2E37] text-slate-300 hover:text-white text-xs font-semibold flex items-center gap-2 transition-all"
+            data-testid="bottom-forward-btn"
           >
             <Forward className="w-3.5 h-3.5" />
             <span>Forward</span>

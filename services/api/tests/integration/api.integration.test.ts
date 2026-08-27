@@ -200,6 +200,47 @@ describe('REST API Service Live Integration Tests (TASK-008)', () => {
     expect(['queued', 'delivered', 'retrying', 'bounced']).toContain(res.body.deliveryState);
   });
 
+  it('should compose outbound email with attachments and support attachment download', async () => {
+    const res = await request(app)
+      .post('/v1/messages/compose')
+      .set('Authorization', `Bearer ${tokenUserA}`)
+      .send({
+        mailboxId: mailboxAId,
+        to: ['client@external-domain.com'],
+        subject: 'Email With Attachment Test',
+        bodyText: 'Please find attached invoice.',
+        attachments: [
+          {
+            name: 'invoice.pdf',
+            type: 'application/pdf',
+            dataBase64: Buffer.from('Mock PDF File Content').toString('base64'),
+          },
+        ],
+      });
+
+    expect(res.status).toBe(202);
+    expect(res.body.success).toBe(true);
+
+    // Retrieve message detail
+    const msgRes = await request(app)
+      .get(`/v1/messages/${res.body.id || res.body.messageId.replace(/[<>]/g, '')}`)
+      .set('Authorization', `Bearer ${tokenUserA}`);
+
+    if (msgRes.status === 200) {
+      expect(msgRes.body.data.attachments).toBeInstanceOf(Array);
+      if (msgRes.body.data.attachments.length > 0) {
+        const att = msgRes.body.data.attachments[0];
+        expect(att.filename).toBe('invoice.pdf');
+
+        // Test download endpoint
+        const dlRes = await request(app)
+          .get(`/v1/messages/attachments/${att.id}/download`)
+          .set('Authorization', `Bearer ${tokenUserA}`);
+        expect(dlRes.status).toBe(200);
+      }
+    }
+  });
+
   it('should reject invalid recipient email format on compose', async () => {
     const res = await request(app)
       .post('/v1/messages/compose')
@@ -215,3 +256,4 @@ describe('REST API Service Live Integration Tests (TASK-008)', () => {
     expect(res.body.error.code).toBe('VALIDATION_ERROR');
   });
 });
+

@@ -189,12 +189,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         </div>
 
         {/* Modal Body with Sidebar Tabs */}
-        <div className="flex-1 flex overflow-hidden">
+        <div className="flex-1 flex flex-col sm:flex-row overflow-hidden">
           {/* Navigation Tabs */}
-          <div className="w-48 bg-[#121418] border-r border-[#2A2E37] p-3 space-y-1">
+          <div className="w-full sm:w-48 bg-[#121418] border-b sm:border-b-0 sm:border-r border-[#2A2E37] p-2 sm:p-3 flex sm:flex-col gap-1 overflow-x-auto shrink-0 custom-scrollbar">
             <button
               onClick={() => setActiveTab('labels')}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
+              className={`flex items-center gap-2 sm:gap-2.5 px-3 py-2 rounded-xl text-xs font-medium shrink-0 transition-colors ${
                 activeTab === 'labels'
                   ? 'bg-[#2D5BFF]/15 text-[#2D5BFF] font-semibold'
                   : 'text-slate-400 hover:bg-[#1C1F26] hover:text-slate-200'
@@ -206,7 +206,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </button>
             <button
               onClick={() => setActiveTab('folders')}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
+              className={`flex items-center gap-2 sm:gap-2.5 px-3 py-2 rounded-xl text-xs font-medium shrink-0 transition-colors ${
                 activeTab === 'folders'
                   ? 'bg-[#2D5BFF]/15 text-[#2D5BFF] font-semibold'
                   : 'text-slate-400 hover:bg-[#1C1F26] hover:text-slate-200'
@@ -218,7 +218,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </button>
             <button
               onClick={() => setActiveTab('filters')}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
+              className={`flex items-center gap-2 sm:gap-2.5 px-3 py-2 rounded-xl text-xs font-medium shrink-0 transition-colors ${
                 activeTab === 'filters'
                   ? 'bg-[#2D5BFF]/15 text-[#2D5BFF] font-semibold'
                   : 'text-slate-400 hover:bg-[#1C1F26] hover:text-slate-200'
@@ -226,11 +226,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               data-testid="tab-filters"
             >
               <Sliders className="w-4 h-4" />
-              <span>Filters & Rules</span>
+              <span>Filters</span>
             </button>
             <button
               onClick={() => setActiveTab('preferences')}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
+              className={`flex items-center gap-2 sm:gap-2.5 px-3 py-2 rounded-xl text-xs font-medium shrink-0 transition-colors ${
                 activeTab === 'preferences'
                   ? 'bg-[#2D5BFF]/15 text-[#2D5BFF] font-semibold'
                   : 'text-slate-400 hover:bg-[#1C1F26] hover:text-slate-200'
@@ -243,7 +243,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </div>
 
           {/* Tab Content Panels */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar text-slate-200">
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 custom-scrollbar text-slate-200">
             {/* 1. LABELS TAB */}
             {activeTab === 'labels' && (
               <div className="space-y-5" data-testid="panel-labels">

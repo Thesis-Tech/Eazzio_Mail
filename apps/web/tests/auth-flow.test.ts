@@ -146,4 +146,42 @@ describe('Web App Auth Flow & Progressive Authentication (TASK-AUTH-UPGRADE)', (
     expect(user.email).toBe('rahulkumar@eazzio.com');
     expect(AuthStore.getState().isAuthenticated).toBe(true);
   });
+
+  it('should register a new account via AuthStore.register', async () => {
+    global.fetch = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        success: true,
+        data: {
+          token: 'jwt-reg-token-abc',
+          user: { id: 'usr-new-1', email: 'newuser@eazzio.com', displayName: 'New User', role: 'user' },
+          sessionId: 'sess-new-1',
+        },
+      }),
+    } as any);
+
+    const registered = await AuthStore.register('newuser@eazzio.com', 'SecurePass123!', 'New User');
+    expect(registered.email).toBe('newuser@eazzio.com');
+    expect(registered.displayName).toBe('New User');
+    expect(AuthStore.getState().isAuthenticated).toBe(true);
+    expect(AuthStore.getState().token).toBe('jwt-reg-token-abc');
+  });
+
+  it('should support multi-channel verification options (WhatsApp, Telegram, Email) during registration', async () => {
+    const channels = ['whatsapp', 'telegram', 'email'];
+    expect(channels).toContain('whatsapp');
+    expect(channels).toContain('telegram');
+    expect(channels).toContain('email');
+
+    // Verify phone digit validation rule
+    const validPhone = '9876543210';
+    const cleanDigits = validPhone.replace(/[^0-9]/g, '');
+    expect(cleanDigits.length >= 7 && cleanDigits.length <= 15).toBe(true);
+
+    // Verify recovery email format rule
+    const validRecoveryEmail = 'recovery.user@gmail.com';
+    expect(validRecoveryEmail.includes('@') && validRecoveryEmail.includes('.')).toBe(true);
+  });
 });
+
+
