@@ -157,4 +157,60 @@ describe('Deterministic SMTP State Machine Tests', () => {
 
     server.close();
   });
+
+  it('Test E: Dot-stuffing encoding integrity during DATA transmission', async () => {
+    let receivedPayload = '';
+    const { server, port } = await createMockSmtpServer((socket) => {
+      socket.write('220 mock.local ESMTP\r\n');
+      let dataMode = false;
+      socket.on('data', (d) => {
+        const str = d.toString();
+        if (dataMode) {
+          receivedPayload += str;
+          if (str.includes('\r\n.\r\n') || str.endsWith('.\r\n')) {
+            dataMode = false;
+            socket.write('250 2.0.0 Message accepted with dot stuffing\r\n');
+          }
+          return;
+        }
+        if (str.startsWith('EHLO')) {
+          socket.write('250-mock.local\r\n250 8BITMIME\r\n');
+        } else if (str.startsWith('MAIL FROM:')) {
+          socket.write('250 2.1.0 OK\r\n');
+        } else if (str.startsWith('RCPT TO:')) {
+          socket.write('250 2.1.5 OK\r\n');
+        } else if (str.startsWith('DATA')) {
+          dataMode = true;
+          socket.write('354 Start mail input\r\n');
+        } else if (str.startsWith('QUIT')) {
+          socket.write('221 Bye\r\n');
+          socket.end();
+        }
+      });
+    });
+
+    const transport = new DirectMtaEmailTransport({
+      defaultHost: '127.0.0.1',
+      defaultPort: port,
+      connectionTimeoutMs: 3000,
+    });
+
+    const rawMimeWithDotLines = Buffer.from(
+      'Subject: Dot Test\r\n\r\nLine 1\r\n.Line starting with dot\r\n..Line with two dots\r\nNormal line'
+    );
+
+    const result = await transport.submitOutbound(
+      rawMimeWithDotLines,
+      'sender@eazzio.com',
+      ['recipient@mock.local']
+    );
+
+    expect(result.queueId).toBeDefined();
+    // Verify dot-stuffing escaped the leading single dot to double dot
+    expect(receivedPayload).toContain('\r\n..Line starting with dot');
+    expect(receivedPayload).toContain('\r\n...Line with two dots');
+
+    server.close();
+  });
 });
+

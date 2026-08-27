@@ -21,8 +21,8 @@ export class DirectMtaEmailTransport implements EazzioEmailTransport {
 
   constructor(config?: SmtpTransportConfig) {
     this.heloHostname = config?.heloHostname || process.env.SMTP_HELO_NAME || 'mail.eazzio.com';
-    this.defaultHost = config?.defaultHost || process.env.SMTP_HOST;
-    this.defaultPort = config?.defaultPort || (process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : undefined);
+    this.defaultHost = config?.defaultHost || process.env.DIRECT_MTA_HOST;
+    this.defaultPort = config?.defaultPort || (process.env.DIRECT_MTA_PORT ? Number(process.env.DIRECT_MTA_PORT) : undefined);
     this.connectionTimeoutMs = config?.connectionTimeoutMs || 15000;
     this.rejectUnauthorizedTls = config?.rejectUnauthorizedTls ?? (process.env.NODE_ENV === 'production');
   }
