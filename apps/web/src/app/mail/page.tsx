@@ -852,6 +852,113 @@ export default function MailDashboardPage() {
     }
   };
 
+  const handleBulkSpam = async (threadIds: string[], isSpam: boolean) => {
+    const idSet = new Set(threadIds);
+    setThreads((prev) => {
+      const updated = prev.filter((t) => !idSet.has(t.id));
+      setFolders((fPrev) =>
+        fPrev.map((f) =>
+          f.id === activeFolderId
+            ? {
+                ...f,
+                totalCount: updated.length,
+                unreadCount: updated.filter((t) => t.isUnread).length,
+              }
+            : f
+        )
+      );
+      return updated;
+    });
+
+    if (selectedThreadId && idSet.has(selectedThreadId)) {
+      setSelectedThreadId(null);
+    }
+
+    try {
+      const authState = AuthStore.getState();
+      const token = authState.token || '';
+      const senderEmail = authState.user?.email || '';
+
+      await fetch('/api/messages/batch', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+          'x-user-email': senderEmail,
+        },
+        body: JSON.stringify({
+          action: isSpam ? 'spam' : 'not-spam',
+          threadIds,
+        }),
+      });
+
+      setToasts((prev) => [
+        {
+          id: `toast-${Date.now()}`,
+          title: isSpam ? 'Reported as Spam' : 'Restored to Inbox',
+          senderName: 'Eazzio Security',
+          message: `${threadIds.length} conversation(s) ${isSpam ? 'moved to Spam and sender reputation adjusted' : 'moved back to Inbox'}.`,
+          timestamp: 'Just now',
+        },
+        ...prev,
+      ]);
+
+      syncOtherFolderCounts();
+    } catch (err) {
+      console.error('Failed to update spam status:', err);
+    }
+  };
+
+  const handleEmptyFolder = async (folderSlug: string) => {
+    const confirmMessage =
+      folderSlug === 'trash'
+        ? 'Are you sure you want to permanently delete all messages in Trash? This action cannot be undone.'
+        : 'Are you sure you want to permanently delete all messages in Spam? This action cannot be undone.';
+
+    if (!window.confirm(confirmMessage)) return;
+
+    setThreads([]);
+    setSelectedThreadId(null);
+
+    setFolders((prev) =>
+      prev.map((f) =>
+        f.slug === folderSlug
+          ? { ...f, totalCount: 0, unreadCount: 0 }
+          : f
+      )
+    );
+
+    try {
+      const authState = AuthStore.getState();
+      const token = authState.token || '';
+      const senderEmail = authState.user?.email || '';
+
+      await fetch(`/api/messages/${folderSlug}/empty`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+          'x-user-email': senderEmail,
+        },
+      });
+
+      setToasts((prev) => [
+        {
+          id: `toast-${Date.now()}`,
+          title: `${folderSlug.toUpperCase()} Emptied`,
+          senderName: 'Eazzio Mailbox',
+          message: `All conversations in ${folderSlug} have been permanently deleted.`,
+          timestamp: 'Just now',
+        },
+        ...prev,
+      ]);
+
+      syncOtherFolderCounts();
+    } catch (err) {
+      console.error(`Failed to empty ${folderSlug}:`, err);
+    }
+  };
+
   const handleSendReply = (threadId: string, replyText: string) => {
     const activeMessages = conversationMap[threadId] || [];
     const newMsg: MessageDetail = {
@@ -1279,6 +1386,8 @@ export default function MailDashboardPage() {
                 onBulkArchive={handleBulkArchive}
                 onBulkMarkRead={handleBulkMarkRead}
                 onSnooze={handleOpenSnooze}
+                onBulkSpam={handleBulkSpam}
+                onEmptyFolder={handleEmptyFolder}
                 folderName={getFolderSlug(activeFolderId).toUpperCase()}
                 totalThreadsCount={displayedThreads.length}
                 onRefresh={() => loadMessages(activeFolderId)}
@@ -1316,6 +1425,7 @@ export default function MailDashboardPage() {
               onDelete={(threadId) => handleBulkDelete([threadId])}
               onToggleStar={(threadId) => handleToggleStar(threadId)}
               onSnooze={(threadId) => handleOpenSnooze([threadId])}
+              onSpam={(threadId, isSpam) => handleBulkSpam([threadId], isSpam)}
               onClose={() => setSelectedThreadId(null)}
             />
           </div>

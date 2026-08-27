@@ -22,6 +22,7 @@ import {
   Bookmark,
   VolumeX,
   SlidersHorizontal,
+  ShieldCheck,
 } from 'lucide-react';
 import { ThreadSummary } from '../../types/mail';
 
@@ -34,6 +35,8 @@ export interface ThreadListProps {
   onBulkArchive?: (threadIds: string[]) => void;
   onBulkMarkRead?: (threadIds: string[], isRead: boolean) => void;
   onSnooze?: (threadIds: string[]) => void;
+  onBulkSpam?: (threadIds: string[], isSpam: boolean) => void;
+  onEmptyFolder?: (folderSlug: string) => void;
   onRefresh?: () => void;
   folderName?: string;
   totalThreadsCount?: number;
@@ -52,6 +55,8 @@ export const ThreadList: React.FC<ThreadListProps> = ({
   onBulkArchive,
   onBulkMarkRead,
   onSnooze,
+  onBulkSpam,
+  onEmptyFolder,
   onRefresh,
   folderName = 'Inbox',
   totalThreadsCount = 0,
@@ -193,13 +198,29 @@ export const ThreadList: React.FC<ThreadListProps> = ({
               >
                 <Archive className="w-4 h-4" />
               </button>
-              <button
-                onClick={() => handleBulkAction('delete')}
-                className="p-1.5 rounded text-slate-400 hover:text-rose-400 hover:bg-[#22262E] transition-colors"
-                title="Report spam / Delete"
-              >
-                <AlertOctagon className="w-4 h-4" />
-              </button>
+
+              {folderName.toLowerCase() === 'spam' ? (
+                <button
+                  onClick={() => {
+                    if (onBulkSpam) onBulkSpam(Array.from(selectedIds), false);
+                  }}
+                  className="p-1.5 rounded text-slate-400 hover:text-emerald-400 hover:bg-[#22262E] transition-colors"
+                  title="Mark as not spam and restore to Inbox"
+                >
+                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                </button>
+              ) : (
+                <button
+                  onClick={() => {
+                    if (onBulkSpam) onBulkSpam(Array.from(selectedIds), true);
+                  }}
+                  className="p-1.5 rounded text-slate-400 hover:text-rose-400 hover:bg-[#22262E] transition-colors"
+                  title="Report spam"
+                >
+                  <AlertOctagon className="w-4 h-4 text-rose-400" />
+                </button>
+              )}
+
               <button
                 onClick={() => handleBulkAction('delete')}
                 className="p-1.5 rounded text-slate-400 hover:text-red-400 hover:bg-[#22262E] transition-colors"
@@ -345,6 +366,22 @@ export const ThreadList: React.FC<ThreadListProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Top Empty Folder Banner for Trash / Spam */}
+      {(folderName.toLowerCase() === 'trash' || folderName.toLowerCase() === 'spam') && totalThreadsCount > 0 && onEmptyFolder && (
+        <div className="px-4 py-2.5 bg-[#1C1F26] border-b border-[#22262E] flex items-center justify-between text-xs text-slate-400 animate-in fade-in">
+          <span>
+            Messages in <strong className="capitalize text-slate-300">{folderName}</strong> older than 30 days are automatically deleted.
+          </span>
+          <button
+            onClick={() => onEmptyFolder(folderName.toLowerCase())}
+            className="text-xs text-[#2D5BFF] hover:underline font-semibold ml-3 shrink-0"
+            data-testid="empty-folder-btn"
+          >
+            Empty {folderName} now
+          </button>
+        </div>
+      )}
 
       {/* Selected Items Notice Bar */}
       {selectedIds.size > 0 && (

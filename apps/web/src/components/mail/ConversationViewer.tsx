@@ -24,6 +24,7 @@ import {
   Smile,
   ArrowLeft,
   Clock,
+  AlertOctagon,
 } from 'lucide-react';
 import { MessageDetail } from '../../types/mail';
 
@@ -125,6 +126,7 @@ export interface ConversationViewerProps {
   onDelete?: (threadId: string) => void;
   onToggleStar?: (threadId: string) => void;
   onSnooze?: (threadId: string) => void;
+  onSpam?: (threadId: string, isSpam: boolean) => void;
   onSendReply?: (threadId: string, replyText: string) => void;
   onReply?: (message: MessageDetail) => void;
   onReplyAll?: (message: MessageDetail) => void;
@@ -142,6 +144,7 @@ export const ConversationViewer: React.FC<ConversationViewerProps> = ({
   onDelete,
   onToggleStar,
   onSnooze,
+  onSpam,
   onSendReply,
   onReply,
   onReplyAll,
@@ -291,6 +294,28 @@ export const ConversationViewer: React.FC<ConversationViewerProps> = ({
             >
               <Clock className="w-4 h-4" />
             </button>
+          )}
+
+          {onSpam && (
+            folderName?.toLowerCase() === 'spam' ? (
+              <button
+                onClick={() => onSpam(threadId, false)}
+                className="p-1.5 rounded-lg hover:text-emerald-400 hover:bg-[#22262E] transition-colors"
+                title="Not spam (move to Inbox)"
+                data-testid="thread-not-spam-btn"
+              >
+                <ShieldCheck className="w-4 h-4 text-emerald-400" />
+              </button>
+            ) : (
+              <button
+                onClick={() => onSpam(threadId, true)}
+                className="p-1.5 rounded-lg hover:text-rose-400 hover:bg-[#22262E] transition-colors"
+                title="Report spam"
+                data-testid="thread-report-spam-btn"
+              >
+                <AlertOctagon className="w-4 h-4" />
+              </button>
+            )
           )}
 
           <button

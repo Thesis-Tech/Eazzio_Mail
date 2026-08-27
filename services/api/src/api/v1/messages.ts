@@ -516,9 +516,67 @@ messagesRouter.post('/batch-action', async (req: AuthenticatedRequest, res: Resp
         `DELETE FROM messages WHERE (id = ANY($1) OR thread_id = ANY($1)) AND mailbox_id = $2`,
         [threadIds, mailboxId]
       );
+    } else if (action === 'spam') {
+      const spamFolderId = await getFolderId(mailboxId, 'spam');
+      await defaultDb.query(
+        `UPDATE messages SET folder_id = $2, is_spam = true, spam_score = 1.0 WHERE (id = ANY($1) OR thread_id = ANY($1)) AND mailbox_id = $3`,
+        [threadIds, spamFolderId, mailboxId]
+      );
+    } else if (action === 'not-spam') {
+      const inboxFolderId = await getFolderId(mailboxId, 'inbox');
+      await defaultDb.query(
+        `UPDATE messages SET folder_id = $2, is_spam = false, spam_score = 0.0 WHERE (id = ANY($1) OR thread_id = ANY($1)) AND mailbox_id = $3`,
+        [threadIds, inboxFolderId, mailboxId]
+      );
     }
 
     res.json({ success: true, count: threadIds.length, action });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /v1/messages/trash/empty - Permanently empty all messages in Trash
+messagesRouter.post('/trash/empty', async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId;
+    const userEmail = req.user!.email;
+
+    const { mailboxId } = await getOrCreateUserMailbox(userId, userEmail);
+    const trashFolderId = await getFolderId(mailboxId, 'trash');
+
+    await defaultDb.query(
+      `DELETE FROM messages WHERE folder_id = $1 AND mailbox_id = $2`,
+      [trashFolderId, mailboxId]
+    );
+
+    res.json({
+      success: true,
+      message: 'Trash emptied successfully',
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /v1/messages/spam/empty - Permanently empty all messages in Spam
+messagesRouter.post('/spam/empty', async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId;
+    const userEmail = req.user!.email;
+
+    const { mailboxId } = await getOrCreateUserMailbox(userId, userEmail);
+    const spamFolderId = await getFolderId(mailboxId, 'spam');
+
+    await defaultDb.query(
+      `DELETE FROM messages WHERE folder_id = $1 AND mailbox_id = $2`,
+      [spamFolderId, mailboxId]
+    );
+
+    res.json({
+      success: true,
+      message: 'Spam folder emptied successfully',
+    });
   } catch (err) {
     next(err);
   }
@@ -540,6 +598,48 @@ messagesRouter.post('/:id/trash', async (req: AuthenticatedRequest, res: Respons
     );
 
     res.json({ success: true, message: 'Message moved to Trash' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /v1/messages/:id/spam - Report and move to Spam
+messagesRouter.post('/:id/spam', async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user!.userId;
+    const userEmail = req.user!.email;
+
+    const { mailboxId } = await getOrCreateUserMailbox(userId, userEmail);
+    const spamFolderId = await getFolderId(mailboxId, 'spam');
+
+    await defaultDb.query(
+      `UPDATE messages SET folder_id = $2, is_spam = true, spam_score = 1.0 WHERE (id = $1 OR thread_id = $1) AND mailbox_id = $3`,
+      [id, spamFolderId, mailboxId]
+    );
+
+    res.json({ success: true, message: 'Message reported as spam' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /v1/messages/:id/not-spam - Mark as Not Spam and move to Inbox
+messagesRouter.post('/:id/not-spam', async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user!.userId;
+    const userEmail = req.user!.email;
+
+    const { mailboxId } = await getOrCreateUserMailbox(userId, userEmail);
+    const inboxFolderId = await getFolderId(mailboxId, 'inbox');
+
+    await defaultDb.query(
+      `UPDATE messages SET folder_id = $2, is_spam = false, spam_score = 0.0 WHERE (id = $1 OR thread_id = $1) AND mailbox_id = $3`,
+      [id, inboxFolderId, mailboxId]
+    );
+
+    res.json({ success: true, message: 'Message marked as not spam and moved to Inbox' });
   } catch (err) {
     next(err);
   }
