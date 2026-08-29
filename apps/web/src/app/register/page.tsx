@@ -189,13 +189,8 @@ export default function RegisterPage() {
       }
 
       setOtpSent(true);
-      if (data.devCode) {
-        setOtpCode(data.devCode);
-        setSuccessNotice(`Verification code dispatched to ${target}. (Code: ${data.devCode})`);
-      } else {
-        setOtpCode('');
-        setSuccessNotice(`Verification code dispatched to ${target}. Check your inbox/messages.`);
-      }
+      setOtpCode('');
+      setSuccessNotice(`Verification code sent to ${target}. Please check your inbox or spam folder.`);
       setCooldown(data.cooldownSeconds || 60);
     } catch (err: any) {
       setErrorMessage(err.message || 'Could not send verification code. Please try again.');
@@ -203,6 +198,7 @@ export default function RegisterPage() {
       setIsLoading(false);
     }
   };
+
 
 
   // Step 4: Verify OTP & Create Account

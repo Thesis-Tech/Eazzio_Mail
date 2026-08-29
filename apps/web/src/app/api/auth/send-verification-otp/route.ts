@@ -57,9 +57,9 @@ export async function POST(req: Request) {
         channel: 'email',
         target: cleanTarget,
         message: `6-digit verification code sent to ${cleanTarget}`,
-        devCode: emailDevCode,
         cooldownSeconds: 60,
       });
+
     }
 
     // Phone / WhatsApp / Telegram Channels
@@ -171,9 +171,9 @@ export async function POST(req: Request) {
       channel: activeChannel,
       target: cleanTarget,
       message: dispatchNotice,
-      devCode: generatedOtp,
       cooldownSeconds: 60,
     });
+
   } catch (err: unknown) {
     console.error('Failed to send verification OTP:', err);
     return NextResponse.json(

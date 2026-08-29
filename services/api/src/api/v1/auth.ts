@@ -285,9 +285,10 @@ authRouter.post('/otp/send', async (req: Request, res: Response, next: NextFunct
       data: {
         message: `Verification code sent to your email (${deliveryEmail})`,
         cooldownSeconds: 60,
-        devCode: (process.env.NODE_ENV !== 'production' || !process.env.SMTP_PASSWORD) ? rawOtp : undefined,
+        devCode: process.env.NODE_ENV === 'test' ? rawOtp : undefined,
       },
     });
+
 
   } catch (err) {
     next(err);
