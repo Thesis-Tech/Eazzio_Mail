@@ -13,6 +13,7 @@
     "mail:inject": "npx tsx scripts/inject-eml.ts",
     "mail:inject:batch": "npx tsx scripts/batch-inject-eml.ts",
     "mail:poller": "npx tsx scripts/poll-inbound.ts",
+    "mail:send": "npx tsx scripts/send-test-email.ts",
     "test:otp": "npx tsx scripts/test-otp-and-smtp.ts"
   },
   "devDependencies": {
