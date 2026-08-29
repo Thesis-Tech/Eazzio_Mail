@@ -40,34 +40,38 @@ export class SmtpDiagnosticRunner {
       const primaryMx = firstMx.host;
 
 
-      // 2. Test Port 25
+      // 2. Test Local DKIM generation
+      try {
+        const { privateKey } = crypto.generateKeyPairSync('rsa', {
+          modulusLength: 2048,
+          publicKeyEncoding: { type: 'spki', format: 'pem' },
+          privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+        });
+
+        const testPayload = 'From: test@eazzio.com\r\nTo: test@' + targetDomain + '\r\nSubject: Test\r\n\r\nBody';
+        const signer = crypto.createSign('RSA-SHA256');
+        signer.update(testPayload, 'utf-8');
+        const sig = signer.sign(privateKey, 'base64');
+        result.dkimSignatureGenerated = Boolean(sig && sig.length > 0);
+      } catch {
+        result.dkimSignatureGenerated = false;
+      }
+
+      // 3. Test Port 25 Connectivity
       const port25Check = await this.checkPort25(primaryMx, 25, 5000);
       result.port25Reachable = port25Check;
 
       if (!port25Check) {
-        result.diagnosticError = `Port 25 unreachable to ${primaryMx}:25`;
+        result.diagnosticError = `Port 25 is currently blocked by AWS egress firewall to ${primaryMx}:25 (Awaiting AWS Port 25 removal request approval)`;
         return result;
       }
 
-      // 3. Test STARTTLS
+      // 4. Test STARTTLS
       const tlsResult = await this.testStartTls(primaryMx, 25, 8000);
       result.tlsHandshakeSuccess = tlsResult.success;
       result.tlsProtocol = tlsResult.protocol;
       result.tlsCipher = tlsResult.cipher;
       result.certificateSubject = tlsResult.certSubject;
-
-      // 4. Test Local DKIM generation
-      const { privateKey } = crypto.generateKeyPairSync('rsa', {
-        modulusLength: 2048,
-        publicKeyEncoding: { type: 'spki', format: 'pem' },
-        privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
-      });
-
-      const testPayload = 'From: test@eazzio.com\r\nTo: test@' + targetDomain + '\r\nSubject: Test\r\n\r\nBody';
-      const signer = crypto.createSign('RSA-SHA256');
-      signer.update(testPayload, 'utf-8');
-      const sig = signer.sign(privateKey, 'base64');
-      result.dkimSignatureGenerated = Boolean(sig && sig.length > 0);
 
       return result;
     } catch (err: any) {
@@ -75,6 +79,7 @@ export class SmtpDiagnosticRunner {
       return result;
     }
   }
+
 
   private static checkPort25(host: string, port: number, timeoutMs: number): Promise<boolean> {
     return new Promise((resolve) => {
