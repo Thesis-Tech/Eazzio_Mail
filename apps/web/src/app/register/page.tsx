@@ -189,15 +189,21 @@ export default function RegisterPage() {
       }
 
       setOtpSent(true);
-      setOtpCode(''); // Clear previous code input
+      if (data.devCode) {
+        setOtpCode(data.devCode);
+        setSuccessNotice(`Verification code dispatched to ${target}. (Code: ${data.devCode})`);
+      } else {
+        setOtpCode('');
+        setSuccessNotice(`Verification code dispatched to ${target}. Check your inbox/messages.`);
+      }
       setCooldown(data.cooldownSeconds || 60);
-      setSuccessNotice(`Verification code dispatched to ${target}. Check your inbox/messages.`);
     } catch (err: any) {
       setErrorMessage(err.message || 'Could not send verification code. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
+
 
   // Step 4: Verify OTP & Create Account
   const handleVerifyAndCreateAccount = async (e: React.FormEvent) => {

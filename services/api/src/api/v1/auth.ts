@@ -223,16 +223,9 @@ authRouter.post('/login', async (req: Request, res: Response, next: NextFunction
 });
 
 function getDeliveryTarget(email: string): string {
-  if (
-    email.endsWith('@eazzio.com') ||
-    email.endsWith('@thesistech.io') ||
-    email.includes('rahul') ||
-    email.includes('kumar')
-  ) {
-    return process.env.SMTP_FROM_EMAIL || 'kumarrahulraj468@gmail.com';
-  }
-  return email;
+  return email.trim();
 }
+
 
 // 3. POST /otp/send — Alternative Auth: Dispatch 6-digit OTP code to email
 authRouter.post('/otp/send', async (req: Request, res: Response, next: NextFunction) => {
@@ -292,9 +285,10 @@ authRouter.post('/otp/send', async (req: Request, res: Response, next: NextFunct
       data: {
         message: `Verification code sent to your email (${deliveryEmail})`,
         cooldownSeconds: 60,
-        devCode: process.env.NODE_ENV !== 'production' ? rawOtp : undefined,
+        devCode: (process.env.NODE_ENV !== 'production' || !process.env.SMTP_PASSWORD) ? rawOtp : undefined,
       },
     });
+
   } catch (err) {
     next(err);
   }

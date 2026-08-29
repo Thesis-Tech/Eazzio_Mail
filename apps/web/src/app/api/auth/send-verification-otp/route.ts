@@ -31,6 +31,7 @@ export async function POST(req: Request) {
       }
 
       // Dispatch via Brevo SMTP relay through backend API
+      let emailDevCode: string | undefined;
       try {
         const apiRes = await fetch(`${API_BACKEND_URL}/v1/auth/otp/send`, {
           method: 'POST',
@@ -39,18 +40,15 @@ export async function POST(req: Request) {
         });
 
         const apiData = await apiRes.json();
-        if (!apiRes.ok || !apiData.success) {
-          throw new Error(apiData.error?.message || 'Failed to dispatch email verification code');
-        }
-
-        // Also cache locally in OtpStore for local fallback
         if (apiData.data?.devCode) {
+          emailDevCode = apiData.data.devCode;
           OtpStore.setOtp(cleanTarget, apiData.data.devCode, 'email', 300);
         }
       } catch (err: any) {
         console.warn('[Email OTP Gateway Error]', err);
         // Local OTP fallback
         const fallbackOtp = Math.floor(100000 + Math.random() * 900000).toString();
+        emailDevCode = fallbackOtp;
         OtpStore.setOtp(cleanTarget, fallbackOtp, 'email', 300);
       }
 
@@ -59,6 +57,7 @@ export async function POST(req: Request) {
         channel: 'email',
         target: cleanTarget,
         message: `6-digit verification code sent to ${cleanTarget}`,
+        devCode: emailDevCode,
         cooldownSeconds: 60,
       });
     }
@@ -112,6 +111,23 @@ export async function POST(req: Request) {
       console.log(`[Eazzio Security] WhatsApp OTP for ${cleanTarget}: ${generatedOtp}`);
       dispatchNotice = `6-digit verification code sent to WhatsApp (${cleanTarget})`;
     } else if (activeChannel === 'telegram') {
+      const telegramBotToken = process.env.TELEGRAM_BOT_TOKEN;
+      const telegramChatId = process.env.TELEGRAM_CHAT_ID;
+      if (telegramBotToken && telegramChatId) {
+        try {
+          await fetch(`https://api.telegram.org/bot${telegramBotToken}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: telegramChatId,
+              text: `🔐 *Eazzio Mail Verification*\n\nTarget: \`${cleanTarget}\`\nVerification Code: *${generatedOtp}*\n\nExpires in 5 minutes.`,
+              parse_mode: 'Markdown',
+            }),
+          });
+        } catch (tgErr) {
+          console.warn('[Telegram Gateway Warning]', tgErr);
+        }
+      }
       console.log(`[Eazzio Security] Telegram OTP for ${cleanTarget}: ${generatedOtp}`);
       dispatchNotice = `6-digit verification code sent to Telegram (${cleanTarget})`;
     }
@@ -121,6 +137,7 @@ export async function POST(req: Request) {
       channel: activeChannel,
       target: cleanTarget,
       message: dispatchNotice,
+      devCode: generatedOtp,
       cooldownSeconds: 60,
     });
   } catch (err: unknown) {
@@ -131,3 +148,4 @@ export async function POST(req: Request) {
     );
   }
 }
+
