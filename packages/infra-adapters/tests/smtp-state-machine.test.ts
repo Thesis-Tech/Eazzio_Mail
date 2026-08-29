@@ -5,13 +5,18 @@ import { DirectMtaEmailTransport } from '../src/email-transport/direct-mta-adapt
 describe('Deterministic SMTP State Machine Tests', () => {
   function createMockSmtpServer(handler: (socket: net.Socket) => void): Promise<{ server: net.Server; port: number }> {
     return new Promise((resolve) => {
-      const server = net.createServer(handler);
+      const server = net.createServer((socket) => {
+        socket.on('error', () => {});
+        handler(socket);
+      });
+      server.on('error', () => {});
       server.listen(0, '127.0.0.1', () => {
         const port = (server.address() as net.AddressInfo).port;
         resolve({ server, port });
       });
     });
   }
+
 
   it('Test A: Successful delivery acceptance (220, 250 EHLO, 250 MAIL, 250 RCPT, 354 DATA, 250 OK)', async () => {
     const { server, port } = await createMockSmtpServer((socket) => {
