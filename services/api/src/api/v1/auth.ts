@@ -258,7 +258,7 @@ authRouter.post('/otp/send', async (req: Request, res: Response, next: NextFunct
     const deliveryEmail = getDeliveryTarget(email);
     console.log(`[Eazzio Security] Sending 6-digit OTP ${rawOtp} for ${email} to ${deliveryEmail}`);
 
-    const fromAddress = process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER || 'kumarrahulraj468@11947139.brevosend.com';
+    const fromAddress = process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER || 'kumarrahulraj468@gmail.com';
 
     // Send email via Brevo / SMTP Relay
     try {

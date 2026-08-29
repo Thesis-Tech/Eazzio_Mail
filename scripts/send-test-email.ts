@@ -53,7 +53,7 @@ async function sendTestEmail() {
   const smtpPort = Number(process.env.SMTP_PORT) || 587;
   const smtpUser = process.env.SMTP_USERNAME || process.env.SMTP_USER || process.env.SMTP_AUTH_USER;
   const smtpPass = process.env.SMTP_PASSWORD || process.env.SMTP_PASS || process.env.SMTP_AUTH_PASS;
-  const fromEmail = process.env.SMTP_FROM_EMAIL || smtpUser || 'kumarrahulraj468@11947139.brevosend.com';
+  const fromEmail = process.env.SMTP_FROM_EMAIL || smtpUser || 'kumarrahulraj468@gmail.com';
 
   console.log('════════════════════════════════════════════════════════════════');
   console.log('📬 EAZZIO MAIL — LIVE EMAIL & OTP DISPATCH CLI');
