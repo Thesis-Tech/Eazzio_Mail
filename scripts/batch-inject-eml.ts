@@ -304,11 +304,13 @@ async function main() {
       tasks.push({ emlPath, recipientEmail });
     }
   } else {
-    const singleEml = cli.file || '/home/rahul-kumar/Downloads/Huhf.eml';
+    const defaultEml = path.resolve(process.cwd(), 'tests/fixtures/Huhf.eml');
+    const singleEml = cli.file || (fs.existsSync(defaultEml) ? defaultEml : '/home/rahul-kumar/Downloads/Huhf.eml');
     if (!fs.existsSync(singleEml)) {
       console.error(`❌ EML file not found: ${singleEml}`);
       process.exit(1);
     }
+
 
     const count = cli.count || (cli.mailboxes ? cli.mailboxes.length : 10);
     const mailboxList = cli.mailboxes || Array.from({ length: count }, (_, i) => `user${i + 1}@${targetDomain}`);

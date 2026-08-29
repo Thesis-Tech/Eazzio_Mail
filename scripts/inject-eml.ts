@@ -76,7 +76,13 @@ async function main() {
   console.log('📬 EAZZIO MAIL — REAL RAW EML INJECTION TEST TOOL');
   console.log('════════════════════════════════════════════════════════════════\n');
 
-  const emlPath = process.argv[2] || '/home/rahul-kumar/Downloads/Huhf.eml';
+  const defaultCandidatePaths = [
+    process.argv[2],
+    path.resolve(process.cwd(), 'tests/fixtures/Huhf.eml'),
+    '/home/rahul-kumar/Downloads/Huhf.eml',
+  ].filter(Boolean) as string[];
+
+  const emlPath = defaultCandidatePaths.find((p) => fs.existsSync(p)) || path.resolve(process.cwd(), 'tests/fixtures/Huhf.eml');
   const targetRecipientArg = process.argv[3];
   const targetPort = Number(process.argv[4] || DEFAULT_PORT);
 
@@ -84,6 +90,7 @@ async function main() {
     console.error(`❌ Error: EML file not found at path: ${emlPath}`);
     process.exit(1);
   }
+
 
   console.log(`[Step 1] Reading raw EML from: ${emlPath}`);
   const rawEmlBytes = fs.readFileSync(emlPath);
@@ -302,9 +309,11 @@ async function main() {
   console.log('\n════════════════════════════════════════════════════════════════');
   console.log('🎉 REAL EML INJECTION COMPLETED & VERIFIED 100% END-TO-END!');
   console.log('════════════════════════════════════════════════════════════════\n');
+  process.exit(0);
 }
 
 main().catch((err) => {
   console.error('Fatal injection error:', err);
   process.exit(1);
 });
+
