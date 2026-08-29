@@ -12,6 +12,8 @@ function ensureEnvLoaded() {
     path.resolve(process.cwd(), '../.env'),
     path.resolve(process.cwd(), '../../.env'),
   ];
+  // Collect all key-value pairs; last non-empty value wins for duplicates
+  const collected = new Map<string, string>();
   for (const envPath of possiblePaths) {
     if (fs.existsSync(envPath)) {
       try {
@@ -26,12 +28,17 @@ function ensureEnvLoaded() {
             if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
               val = val.slice(1, -1);
             }
-            if (val && !process.env[key]) {
-              process.env[key] = val;
+            if (val) {
+              collected.set(key, val);
             }
           }
         }
       } catch {}
+    }
+  }
+  for (const [key, val] of collected) {
+    if (!process.env[key]) {
+      process.env[key] = val;
     }
   }
 }

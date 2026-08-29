@@ -8,13 +8,14 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { SmtpAuthenticatedTransport } from '../packages/infra-adapters/src/email-transport/smtp-authenticated-adapter.js';
 
-// Automatically load .env from repository root
+// Automatically load .env from repository root (last non-empty value wins for duplicates)
 function loadEnvFile() {
   const possiblePaths = [
     path.resolve(process.cwd(), '.env'),
     path.resolve(process.cwd(), 'apps/web/.env.local'),
     path.resolve(process.cwd(), '../.env'),
   ];
+  const collected = new Map<string, string>();
   for (const envPath of possiblePaths) {
     if (fs.existsSync(envPath)) {
       const content = fs.readFileSync(envPath, 'utf8');
@@ -28,11 +29,16 @@ function loadEnvFile() {
           if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
             val = val.slice(1, -1);
           }
-          if (val && !process.env[key]) {
-            process.env[key] = val;
+          if (val) {
+            collected.set(key, val);
           }
         }
       }
+    }
+  }
+  for (const [key, val] of collected) {
+    if (!process.env[key]) {
+      process.env[key] = val;
     }
   }
 }
@@ -73,6 +79,11 @@ async function sendTestEmail() {
 
 
   const transport = new SmtpAuthenticatedTransport({
+    host: smtpHost,
+    port: smtpPort,
+    secure: process.env.SMTP_SECURE === 'true',
+    user: smtpUser,
+    pass: smtpPass,
     fromEmail,
   });
 
