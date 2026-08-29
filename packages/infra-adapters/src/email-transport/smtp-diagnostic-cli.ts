@@ -31,12 +31,14 @@ export class SmtpDiagnosticRunner {
       records.sort((a, b) => a.priority - b.priority);
       result.mxRecords = records.map((r) => ({ host: r.exchange, priority: r.priority }));
 
-      if (result.mxRecords.length === 0) {
+      const firstMx = result.mxRecords[0];
+      if (!firstMx) {
         result.diagnosticError = `No MX records found for ${targetDomain}`;
         return result;
       }
 
-      const primaryMx = result.mxRecords[0].host;
+      const primaryMx = firstMx.host;
+
 
       // 2. Test Port 25
       const port25Check = await this.checkPort25(primaryMx, 25, 5000);
@@ -129,15 +131,18 @@ export class SmtpDiagnosticRunner {
             const cipher = tlsSocket.getCipher();
             const cert = tlsSocket.getPeerCertificate();
             const protocol = tlsSocket.getProtocol() || 'TLS';
+            const cn = cert?.subject?.CN;
+            const certSubject = Array.isArray(cn) ? cn.join(', ') : cn;
             tlsSocket.write('QUIT\r\n');
             tlsSocket.end();
             resolve({
               success: true,
               protocol,
               cipher: cipher?.name,
-              certSubject: cert?.subject?.CN,
+              certSubject: certSubject || undefined,
             });
           });
+
 
           tlsSocket.on('error', () => {
             resolve({ success: false });
