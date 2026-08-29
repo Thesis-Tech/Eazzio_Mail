@@ -689,20 +689,12 @@ export default function RegisterPage() {
                   </div>
                   {verificationChannel === 'telegram' && (
                     <p className="text-[11px] text-[#64748B] pt-0.5">
-                      💡 Tip: Open{' '}
-                      <a
-                        href="https://t.me/eazzioMailOtp_bot"
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-[#229ED9] underline font-semibold"
-                      >
-                        @eazzioMailOtp_bot
-                      </a>{' '}
-                      in Telegram and click <b>Start</b> to receive your code directly.
+                      💡 Tip: Open your Telegram bot and click <b>Start</b> to receive your code directly.
                     </p>
                   )}
                 </div>
               )}
+
 
 
               {/* Send / Resend Code Action */}

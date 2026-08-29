@@ -111,7 +111,7 @@ export async function POST(req: Request) {
       console.log(`[Eazzio Security] WhatsApp OTP for ${cleanTarget}: ${generatedOtp}`);
       dispatchNotice = `6-digit verification code sent to WhatsApp (${cleanTarget})`;
     } else if (activeChannel === 'telegram') {
-      const telegramBotToken = process.env.TELEGRAM_BOT_TOKEN || '8829661356:AAEy9v5IqhyL1_QwEqyu3B8plYFWwRTjGqE';
+      const telegramBotToken = process.env.TELEGRAM_BOT_TOKEN;
       let targetChatId = process.env.TELEGRAM_CHAT_ID;
 
       // If user provided a numeric chat ID directly
@@ -161,8 +161,9 @@ export async function POST(req: Request) {
         }
       }
       console.log(`[Eazzio Security] Telegram OTP for ${cleanTarget}: ${generatedOtp}`);
-      dispatchNotice = `6-digit verification code sent via @eazzioMailOtp_bot (${cleanTarget})`;
+      dispatchNotice = `6-digit verification code sent via Telegram (${cleanTarget})`;
     }
+
 
 
     return NextResponse.json({
