@@ -109,7 +109,7 @@ export async function POST(req: Request) {
       dispatchNotice = `6-digit verification code sent to WhatsApp (${cleanTarget})`;
     } else if (activeChannel === 'telegram') {
       const telegramBotToken = process.env.TELEGRAM_BOT_TOKEN;
-      let targetChatId = process.env.TELEGRAM_CHAT_ID;
+      let targetChatId: string | number | undefined = process.env.TELEGRAM_CHAT_ID;
 
       // If user provided a numeric chat ID directly
       if (/^-?\d{5,15}$/.test(cleanTarget)) {
@@ -118,31 +118,42 @@ export async function POST(req: Request) {
 
       if (telegramBotToken) {
         try {
-          // If no direct chat ID, attempt to lookup user from bot's latest getUpdates
-          if (!targetChatId) {
-            const updatesRes = await fetch(`https://api.telegram.org/bot${telegramBotToken}/getUpdates`, {
-              signal: AbortSignal.timeout(3000),
-            });
-            const updatesData = await updatesRes.json();
-            if (updatesData.ok && Array.isArray(updatesData.result) && updatesData.result.length > 0) {
-              const cleanUsername = cleanTarget.replace(/^@/, '').toLowerCase();
-              const foundUpdate = updatesData.result.reverse().find((u: any) => {
-                const username = u.message?.from?.username?.toLowerCase();
-                const phone = u.message?.contact?.phone_number?.replace(/[^0-9]/g, '');
-                return (username && username === cleanUsername) || (phone && cleanTarget.includes(phone));
-              });
+          // Always fetch latest chats from bot to find matching user
+          const updatesRes = await fetch(`https://api.telegram.org/bot${telegramBotToken}/getUpdates`, {
+            signal: AbortSignal.timeout(5000),
+          });
+          const updatesData = await updatesRes.json();
 
-              if (foundUpdate) {
-                targetChatId = foundUpdate.message?.chat?.id;
-              } else if (updatesData.result.length > 0) {
-                // Deliver to latest active chat if recent message received
-                targetChatId = updatesData.result[0].message?.chat?.id;
-              }
+          if (updatesData.ok && Array.isArray(updatesData.result) && updatesData.result.length > 0) {
+            const updates = updatesData.result;
+            const cleanInput = cleanTarget.replace(/^[@+]/g, '').replace(/[^0-9a-zA-Z]/g, '').toLowerCase();
+
+            // Try to match by username or phone number
+            const foundUpdate = updates.slice().reverse().find((u: any) => {
+              const username = u.message?.from?.username?.toLowerCase();
+              const phone = u.message?.contact?.phone_number?.replace(/[^0-9]/g, '');
+              const chatId = String(u.message?.chat?.id || '');
+              return (
+                (username && cleanInput.includes(username)) ||
+                (username && username.includes(cleanInput)) ||
+                (phone && cleanInput.includes(phone)) ||
+                (chatId === cleanTarget)
+              );
+            });
+
+            if (foundUpdate) {
+              targetChatId = foundUpdate.message?.chat?.id;
+              console.log(`[Telegram] Matched user chat: ${targetChatId} (username: ${foundUpdate.message?.from?.username})`);
+            } else if (!targetChatId) {
+              // No match found and no TELEGRAM_CHAT_ID env — use the most recent chat
+              const lastUpdate = updates[updates.length - 1];
+              targetChatId = lastUpdate.message?.chat?.id;
+              console.log(`[Telegram] No match, using latest chat: ${targetChatId}`);
             }
           }
 
           if (targetChatId) {
-            await fetch(`https://api.telegram.org/bot${telegramBotToken}/sendMessage`, {
+            const sendRes = await fetch(`https://api.telegram.org/bot${telegramBotToken}/sendMessage`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -151,11 +162,20 @@ export async function POST(req: Request) {
                 parse_mode: 'Markdown',
               }),
             });
-            console.log(`[Eazzio Security] Telegram message dispatched to chat ${targetChatId}`);
+            const sendData = await sendRes.json();
+            if (sendData.ok) {
+              console.log(`[Eazzio Security] ✅ Telegram OTP dispatched to chat ${targetChatId}`);
+            } else {
+              console.warn(`[Eazzio Security] ❌ Telegram send failed:`, sendData.description);
+            }
+          } else {
+            console.warn(`[Eazzio Security] ❌ No Telegram chat ID found. User must /start the bot first.`);
           }
         } catch (tgErr) {
           console.warn('[Telegram Gateway Warning]', tgErr);
         }
+      } else {
+        console.warn('[Telegram] TELEGRAM_BOT_TOKEN not set in .env');
       }
       console.log(`[Eazzio Security] Telegram OTP for ${cleanTarget}: ${generatedOtp}`);
       dispatchNotice = `6-digit verification code sent via Telegram (${cleanTarget})`;
