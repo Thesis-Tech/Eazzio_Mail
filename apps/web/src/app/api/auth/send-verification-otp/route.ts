@@ -111,26 +111,59 @@ export async function POST(req: Request) {
       console.log(`[Eazzio Security] WhatsApp OTP for ${cleanTarget}: ${generatedOtp}`);
       dispatchNotice = `6-digit verification code sent to WhatsApp (${cleanTarget})`;
     } else if (activeChannel === 'telegram') {
-      const telegramBotToken = process.env.TELEGRAM_BOT_TOKEN;
-      const telegramChatId = process.env.TELEGRAM_CHAT_ID;
-      if (telegramBotToken && telegramChatId) {
+      const telegramBotToken = process.env.TELEGRAM_BOT_TOKEN || '8829661356:AAEy9v5IqhyL1_QwEqyu3B8plYFWwRTjGqE';
+      let targetChatId = process.env.TELEGRAM_CHAT_ID;
+
+      // If user provided a numeric chat ID directly
+      if (/^-?\d{5,15}$/.test(cleanTarget)) {
+        targetChatId = cleanTarget;
+      }
+
+      if (telegramBotToken) {
         try {
-          await fetch(`https://api.telegram.org/bot${telegramBotToken}/sendMessage`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              chat_id: telegramChatId,
-              text: `🔐 *Eazzio Mail Verification*\n\nTarget: \`${cleanTarget}\`\nVerification Code: *${generatedOtp}*\n\nExpires in 5 minutes.`,
-              parse_mode: 'Markdown',
-            }),
-          });
+          // If no direct chat ID, attempt to lookup user from bot's latest getUpdates
+          if (!targetChatId) {
+            const updatesRes = await fetch(`https://api.telegram.org/bot${telegramBotToken}/getUpdates`, {
+              signal: AbortSignal.timeout(3000),
+            });
+            const updatesData = await updatesRes.json();
+            if (updatesData.ok && Array.isArray(updatesData.result) && updatesData.result.length > 0) {
+              const cleanUsername = cleanTarget.replace(/^@/, '').toLowerCase();
+              const foundUpdate = updatesData.result.reverse().find((u: any) => {
+                const username = u.message?.from?.username?.toLowerCase();
+                const phone = u.message?.contact?.phone_number?.replace(/[^0-9]/g, '');
+                return (username && username === cleanUsername) || (phone && cleanTarget.includes(phone));
+              });
+
+              if (foundUpdate) {
+                targetChatId = foundUpdate.message?.chat?.id;
+              } else if (updatesData.result.length > 0) {
+                // Deliver to latest active chat if recent message received
+                targetChatId = updatesData.result[0].message?.chat?.id;
+              }
+            }
+          }
+
+          if (targetChatId) {
+            await fetch(`https://api.telegram.org/bot${telegramBotToken}/sendMessage`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                chat_id: targetChatId,
+                text: `🔐 *Eazzio Mail Security Verification*\n\nYour 6-digit verification code is:\n\n👉 \`${generatedOtp}\` 👈\n\nThis code expires in 5 minutes. Do not share it with anyone.`,
+                parse_mode: 'Markdown',
+              }),
+            });
+            console.log(`[Eazzio Security] Telegram message dispatched to chat ${targetChatId}`);
+          }
         } catch (tgErr) {
           console.warn('[Telegram Gateway Warning]', tgErr);
         }
       }
       console.log(`[Eazzio Security] Telegram OTP for ${cleanTarget}: ${generatedOtp}`);
-      dispatchNotice = `6-digit verification code sent to Telegram (${cleanTarget})`;
+      dispatchNotice = `6-digit verification code sent via @eazzioMailOtp_bot (${cleanTarget})`;
     }
+
 
     return NextResponse.json({
       success: true,

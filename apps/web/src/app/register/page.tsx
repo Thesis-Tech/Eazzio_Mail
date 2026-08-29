@@ -687,8 +687,23 @@ export default function RegisterPage() {
                       className="flex-1 bg-white border border-[#CBD5E1] hover:border-[#94A3B8] focus:border-[#14B8A6] focus:ring-2 focus:ring-[#14B8A6]/20 rounded-[10px] px-3.5 py-2.5 text-sm text-[#0F172A] placeholder-[#64748B] outline-none transition-all font-medium"
                     />
                   </div>
+                  {verificationChannel === 'telegram' && (
+                    <p className="text-[11px] text-[#64748B] pt-0.5">
+                      💡 Tip: Open{' '}
+                      <a
+                        href="https://t.me/eazzioMailOtp_bot"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[#229ED9] underline font-semibold"
+                      >
+                        @eazzioMailOtp_bot
+                      </a>{' '}
+                      in Telegram and click <b>Start</b> to receive your code directly.
+                    </p>
+                  )}
                 </div>
               )}
+
 
               {/* Send / Resend Code Action */}
               <div className="flex items-center justify-between pt-1">
