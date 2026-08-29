@@ -17,7 +17,17 @@ import {
   Sparkles,
   Volume2,
   Palette,
+  Globe,
+  Copy,
+  CheckCircle2,
+  AlertCircle,
+  RefreshCw,
+  Key,
+  ShieldCheck,
+  Loader2,
+  ExternalLink,
 } from 'lucide-react';
+
 import { FolderItem, LabelItem, FilterRule, UserPreferences } from '../../types/mail';
 
 export interface SettingsModalProps {
@@ -56,7 +66,101 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onUpdateFilterRules,
   onUpdatePreferences,
 }) => {
-  const [activeTab, setActiveTab] = useState<'labels' | 'folders' | 'filters' | 'preferences'>('labels');
+  const [activeTab, setActiveTab] = useState<'labels' | 'folders' | 'filters' | 'preferences' | 'domains'>('labels');
+
+  // Domain Management State
+  const [domains, setDomains] = useState<any[]>([]);
+  const [loadingDomains, setLoadingDomains] = useState(false);
+  const [newDomainInput, setNewDomainInput] = useState('');
+  const [creatingDomain, setCreatingDomain] = useState(false);
+  const [verifyingDomainId, setVerifyingDomainId] = useState<string | null>(null);
+  const [expandedDomainId, setExpandedDomainId] = useState<string | null>(null);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [domainError, setDomainError] = useState<string | null>(null);
+
+  // Fetch Domains when domains tab is opened
+  const fetchDomains = async () => {
+    try {
+      setLoadingDomains(true);
+      setDomainError(null);
+      const res = await fetch('/api/domains');
+      if (res.ok) {
+        const json = await res.json();
+        setDomains(json.data || []);
+        if (json.data && json.data.length > 0 && !expandedDomainId) {
+          setExpandedDomainId(json.data[0].id);
+        }
+      }
+    } catch (err: any) {
+      setDomainError('Failed to load custom domains');
+    } finally {
+      setLoadingDomains(false);
+    }
+  };
+
+  const handleCreateDomain = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newDomainInput.trim()) return;
+    try {
+      setCreatingDomain(true);
+      setDomainError(null);
+      const res = await fetch('/api/domains', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ domainName: newDomainInput.trim() }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error?.message || 'Failed to add custom domain');
+      }
+      setNewDomainInput('');
+      await fetchDomains();
+      if (json.data?.id) {
+        setExpandedDomainId(json.data.id);
+      }
+    } catch (err: any) {
+      setDomainError(err.message || 'Error creating domain');
+    } finally {
+      setCreatingDomain(false);
+    }
+  };
+
+  const handleVerifyDomain = async (id: string) => {
+    try {
+      setVerifyingDomainId(id);
+      setDomainError(null);
+      const res = await fetch(`/api/domains/${id}/verify`, { method: 'POST' });
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error?.message || 'Verification failed');
+      }
+      await fetchDomains();
+    } catch (err: any) {
+      setDomainError(err.message || 'DNS verification request failed');
+    } finally {
+      setVerifyingDomainId(null);
+    }
+  };
+
+  const handleDeleteDomain = async (id: string) => {
+    if (!window.confirm('Are you sure you want to delete this custom domain?')) return;
+    try {
+      setDomainError(null);
+      const res = await fetch(`/api/domains/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        setDomains(domains.filter((d) => d.id !== id));
+        if (expandedDomainId === id) setExpandedDomainId(null);
+      }
+    } catch (err: any) {
+      setDomainError('Failed to delete domain');
+    }
+  };
+
+  const handleCopyToClipboard = (text: string, fieldId: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedField(fieldId);
+    setTimeout(() => setCopiedField(null), 2000);
+  };
 
   // Label Management State
   const [newLabelName, setNewLabelName] = useState('');
@@ -64,6 +168,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [editingLabelId, setEditingLabelId] = useState<string | null>(null);
   const [editingLabelName, setEditingLabelName] = useState('');
   const [editingLabelColor, setEditingLabelColor] = useState('');
+
 
   // Folder Management State
   const [newFolderName, setNewFolderName] = useState('');
@@ -240,7 +345,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <User className="w-4 h-4" />
               <span>Preferences</span>
             </button>
+            <button
+              onClick={() => {
+                setActiveTab('domains');
+                fetchDomains();
+              }}
+              className={`flex items-center gap-2 sm:gap-2.5 px-3 py-2 rounded-xl text-xs font-medium shrink-0 transition-colors ${
+                activeTab === 'domains'
+                  ? 'bg-[#2D5BFF]/15 text-[#2D5BFF] font-semibold'
+                  : 'text-slate-400 hover:bg-[#1C1F26] hover:text-slate-200'
+              }`}
+              data-testid="tab-domains"
+            >
+              <Globe className="w-4 h-4" />
+              <span>Custom Domains</span>
+            </button>
           </div>
+
 
           {/* Tab Content Panels */}
           <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 custom-scrollbar text-slate-200">
@@ -699,9 +820,238 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
               </div>
             )}
+
+            {/* 5. CUSTOM DOMAINS TAB */}
+            {activeTab === 'domains' && (
+              <div className="space-y-6" data-testid="panel-domains">
+                <div>
+                  <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                    <Globe className="w-4 h-4 text-[#2D5BFF]" />
+                    <span>Custom Domains & DNS Verification Wizard</span>
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Connect your own domain to send and receive emails with authenticated MX, SPF, DKIM (RSA-2048), and DMARC alignment.
+                  </p>
+                </div>
+
+                {domainError && (
+                  <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-rose-400 text-xs flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>{domainError}</span>
+                  </div>
+                )}
+
+                {/* Add Custom Domain Form */}
+                <form onSubmit={handleCreateDomain} className="p-4 bg-[#121418] border border-[#2A2E37] rounded-xl space-y-3">
+                  <label className="text-xs font-semibold text-white block">Add New Custom Domain</label>
+                  <div className="flex items-center gap-3">
+                    <div className="relative flex-1">
+                      <Globe className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        placeholder="yourdomain.com (e.g. acme.com, mail.startup.io)"
+                        value={newDomainInput}
+                        onChange={(e) => setNewDomainInput(e.target.value)}
+                        className="w-full bg-[#1A1D24] border border-[#2A2E37] text-white text-xs rounded-lg pl-9 pr-3 py-2.5 outline-none focus:border-[#2D5BFF]"
+                        data-testid="input-new-domain"
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={creatingDomain || !newDomainInput.trim()}
+                      className="px-4 py-2.5 bg-[#2D5BFF] hover:bg-[#2048DB] disabled:opacity-50 text-white text-xs font-medium rounded-lg flex items-center gap-1.5 transition-colors shadow-sm shrink-0"
+                      data-testid="btn-add-domain"
+                    >
+                      {creatingDomain ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Plus className="w-3.5 h-3.5" />
+                      )}
+                      <span>Add Domain</span>
+                    </button>
+                  </div>
+                </form>
+
+                {/* Registered Domains List */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                      Registered Domains ({domains.length})
+                    </h4>
+                    <button
+                      onClick={fetchDomains}
+                      disabled={loadingDomains}
+                      className="text-xs text-slate-400 hover:text-white flex items-center gap-1 transition-colors"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${loadingDomains ? 'animate-spin' : ''}`} />
+                      <span>Refresh</span>
+                    </button>
+                  </div>
+
+                  {loadingDomains && domains.length === 0 ? (
+                    <div className="p-8 text-center text-slate-400 text-xs flex flex-col items-center gap-2">
+                      <Loader2 className="w-6 h-6 animate-spin text-[#2D5BFF]" />
+                      <span>Loading registered domains...</span>
+                    </div>
+                  ) : domains.length === 0 ? (
+                    <div className="p-6 bg-[#121418] border border-[#2A2E37] rounded-xl text-center text-slate-400 text-xs">
+                      No custom domains added yet. Enter your domain above to generate your DKIM keys and DNS records.
+                    </div>
+                  ) : (
+                    domains.map((domain) => {
+                      const isExpanded = expandedDomainId === domain.id;
+                      const isVerifying = verifyingDomainId === domain.id;
+
+                      const statusBadge =
+                        domain.verificationStatus === 'verified' ? (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+                            <CheckCircle2 className="w-3 h-3" /> Verified
+                          </span>
+                        ) : domain.verificationStatus === 'partially_verified' ? (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/15 text-amber-400 border border-amber-500/30 flex items-center gap-1">
+                            <AlertCircle className="w-3 h-3" /> Partially Configured
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-500/15 text-rose-400 border border-rose-500/30 flex items-center gap-1">
+                            <AlertCircle className="w-3 h-3" /> Action Required
+                          </span>
+                        );
+
+                      return (
+                        <div
+                          key={domain.id}
+                          className="bg-[#121418] border border-[#2A2E37] rounded-xl overflow-hidden shadow-sm"
+                          data-testid={`domain-card-${domain.domainName}`}
+                        >
+                          {/* Domain Card Header */}
+                          <div className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[#16181D]">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2.5">
+                                <span className="text-sm font-bold text-white tracking-wide">{domain.domainName}</span>
+                                {statusBadge}
+                              </div>
+                              <div className="flex items-center gap-3 text-[11px] text-slate-400">
+                                <span className="flex items-center gap-1">
+                                  MX: {domain.mxVerified ? <Check className="w-3 h-3 text-emerald-400" /> : <X className="w-3 h-3 text-rose-400" />}
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  SPF: {domain.spfVerified ? <Check className="w-3 h-3 text-emerald-400" /> : <X className="w-3 h-3 text-rose-400" />}
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  DKIM: {domain.dkimVerified ? <Check className="w-3 h-3 text-emerald-400" /> : <X className="w-3 h-3 text-rose-400" />}
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  DMARC: {domain.dmarcVerified ? <Check className="w-3 h-3 text-emerald-400" /> : <X className="w-3 h-3 text-rose-400" />}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => handleVerifyDomain(domain.id)}
+                                disabled={isVerifying}
+                                className="px-3 py-1.5 bg-[#2D5BFF]/15 hover:bg-[#2D5BFF]/25 border border-[#2D5BFF]/30 text-[#2D5BFF] text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                                data-testid={`btn-verify-${domain.domainName}`}
+                              >
+                                <RefreshCw className={`w-3.5 h-3.5 ${isVerifying ? 'animate-spin' : ''}`} />
+                                <span>{isVerifying ? 'Verifying DNS...' : 'Verify DNS Now'}</span>
+                              </button>
+
+                              <button
+                                onClick={() => setExpandedDomainId(isExpanded ? null : domain.id)}
+                                className="px-3 py-1.5 bg-[#1A1D24] hover:bg-[#252830] border border-[#2A2E37] text-slate-300 text-xs font-medium rounded-lg transition-colors"
+                              >
+                                {isExpanded ? 'Hide Records' : 'DNS Records'}
+                              </button>
+
+                              <button
+                                onClick={() => handleDeleteDomain(domain.id)}
+                                className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
+                                title="Delete Domain"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Expanded DNS Configuration Wizard Table */}
+                          {isExpanded && (
+                            <div className="p-4 border-t border-[#2A2E37] space-y-3 bg-[#0E1013]">
+                              <p className="text-xs text-slate-300 font-medium">
+                                Add the following DNS records to your domain registrar (GoDaddy, Cloudflare, Namecheap, Route 53):
+                              </p>
+
+                              <div className="space-y-2.5">
+                                {(domain.dnsRecords || []).map((rec: any, idx: number) => {
+                                  const fieldKey = `${domain.id}-${rec.purpose}`;
+                                  const isCopied = copiedField === fieldKey;
+
+                                  return (
+                                    <div
+                                      key={idx}
+                                      className="p-3 bg-[#16181D] border border-[#2A2E37] rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs"
+                                    >
+                                      <div className="flex items-center gap-3 shrink-0">
+                                        <span className="px-2 py-1 bg-[#2D5BFF]/15 text-[#2D5BFF] font-bold text-[10px] rounded-md uppercase">
+                                          {rec.recordType}
+                                        </span>
+                                        <div>
+                                          <p className="font-semibold text-white">{rec.purpose}</p>
+                                          <p className="text-[11px] text-slate-400 font-mono">Host: {rec.host}</p>
+                                        </div>
+                                      </div>
+
+                                      <div className="flex-1 min-w-0 bg-[#0E1013] border border-[#2A2E37] rounded-lg p-2 flex items-center justify-between gap-2">
+                                        <span className="font-mono text-[11px] text-slate-300 truncate select-all">
+                                          {rec.value}
+                                        </span>
+                                        <button
+                                          onClick={() => handleCopyToClipboard(rec.value, fieldKey)}
+                                          className="p-1.5 rounded bg-[#1A1D24] hover:bg-[#2A2E37] text-slate-300 hover:text-white shrink-0 transition-colors flex items-center gap-1 text-[10px]"
+                                          title="Copy Record Value"
+                                        >
+                                          {isCopied ? (
+                                            <>
+                                              <Check className="w-3 h-3 text-emerald-400" />
+                                              <span className="text-emerald-400 font-medium">Copied</span>
+                                            </>
+                                          ) : (
+                                            <>
+                                              <Copy className="w-3 h-3" />
+                                              <span>Copy</span>
+                                            </>
+                                          )}
+                                        </button>
+                                      </div>
+
+                                      <div className="shrink-0 flex items-center gap-1.5">
+                                        {rec.status === 'verified' ? (
+                                          <span className="text-emerald-400 flex items-center gap-1 text-[11px] font-medium">
+                                            <CheckCircle2 className="w-3.5 h-3.5" /> OK
+                                          </span>
+                                        ) : (
+                                          <span className="text-amber-400/80 flex items-center gap-1 text-[11px] font-medium">
+                                            <AlertCircle className="w-3.5 h-3.5" /> Pending
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
     </div>
   );
 };
+
