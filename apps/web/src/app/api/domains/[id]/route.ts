@@ -5,11 +5,12 @@ const API_BACKEND_URL = process.env.API_BACKEND_URL || 'http://127.0.0.1:8080';
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const headers = getProxyAuthHeaders(req);
-    const response = await fetch(`${API_BACKEND_URL}/v1/domains/${params.id}`, {
+    const response = await fetch(`${API_BACKEND_URL}/v1/domains/${id}`, {
       method: 'GET',
       headers,
     });
@@ -25,11 +26,12 @@ export async function GET(
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const headers = getProxyAuthHeaders(req);
-    const response = await fetch(`${API_BACKEND_URL}/v1/domains/${params.id}`, {
+    const response = await fetch(`${API_BACKEND_URL}/v1/domains/${id}`, {
       method: 'DELETE',
       headers,
     });
@@ -42,3 +44,4 @@ export async function DELETE(
     );
   }
 }
+

@@ -148,7 +148,7 @@ export class DomainService {
 
     return {
       id: domain.id,
-      organizationId: domain.organizationId,
+      organizationId: domain.organizationId ?? null,
       domainName: domain.domainName,
       verificationStatus: domain.verificationStatus,
       mxVerified: domain.mxVerified,
@@ -195,7 +195,7 @@ export class DomainService {
 
     return {
       id: domain.id,
-      organizationId: domain.organizationId,
+      organizationId: domain.organizationId ?? null,
       domainName: domain.domainName,
       verificationStatus: domain.verificationStatus,
       mxVerified: domain.mxVerified,
@@ -207,6 +207,7 @@ export class DomainService {
       createdAt: domain.createdAt.toISOString(),
       activatedAt: domain.activatedAt ? domain.activatedAt.toISOString() : null,
     };
+
   }
 
   public async listDomains(organizationId?: string | null): Promise<DomainDetailsResponse[]> {

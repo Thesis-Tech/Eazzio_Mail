@@ -5,11 +5,12 @@ const API_BACKEND_URL = process.env.API_BACKEND_URL || 'http://127.0.0.1:8080';
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const headers = getProxyAuthHeaders(req);
-    const response = await fetch(`${API_BACKEND_URL}/v1/domains/${params.id}/verify`, {
+    const response = await fetch(`${API_BACKEND_URL}/v1/domains/${id}/verify`, {
       method: 'POST',
       headers,
     });
@@ -22,3 +23,4 @@ export async function POST(
     );
   }
 }
+
