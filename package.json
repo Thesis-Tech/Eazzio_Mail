@@ -8,9 +8,12 @@
     "test": "pnpm --recursive run test",
     "typecheck": "pnpm --recursive run typecheck",
     "dev": "pnpm --filter @eazzio/api start & pnpm --filter @eazzio/web dev",
+    "db:migrate": "npx tsx scripts/migrate.ts",
+    "mail:diag": "npx tsx -e \"import { SmtpDiagnosticRunner } from './packages/infra-adapters/src/email-transport/smtp-diagnostic-cli.js'; SmtpDiagnosticRunner.runDiagnostics(process.argv[1] || 'gmail.com').then(console.log);\"",
     "mail:inject": "npx tsx scripts/inject-eml.ts",
     "mail:inject:batch": "npx tsx scripts/batch-inject-eml.ts",
     "mail:poller": "npx tsx scripts/poll-inbound.ts"
+
   },
   "devDependencies": {
     "@types/node": "^26.2.0",
