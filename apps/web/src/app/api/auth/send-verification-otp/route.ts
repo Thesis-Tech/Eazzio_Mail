@@ -30,26 +30,24 @@ export async function POST(req: Request) {
         );
       }
 
-      // Dispatch via Brevo SMTP relay through backend API
-      let emailDevCode: string | undefined;
+      // Generate real 6-digit OTP and store immediately for instant verification
+      const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
+      OtpStore.setOtp(cleanTarget, generatedOtp, 'email', 300);
+
+      // Dispatch via Brevo / SMTP relay through backend API
       try {
         const apiRes = await fetch(`${API_BACKEND_URL}/v1/auth/otp/send`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: cleanTarget }),
+          body: JSON.stringify({ email: cleanTarget, customCode: generatedOtp }),
         });
 
-        const apiData = await apiRes.json();
-        if (apiData.data?.devCode) {
-          emailDevCode = apiData.data.devCode;
-          OtpStore.setOtp(cleanTarget, apiData.data.devCode, 'email', 300);
+        if (!apiRes.ok) {
+          const errData = await apiRes.json().catch(() => ({}));
+          console.warn('[Email OTP Relay API Warning]', errData);
         }
       } catch (err: any) {
         console.warn('[Email OTP Gateway Error]', err);
-        // Local OTP fallback
-        const fallbackOtp = Math.floor(100000 + Math.random() * 900000).toString();
-        emailDevCode = fallbackOtp;
-        OtpStore.setOtp(cleanTarget, fallbackOtp, 'email', 300);
       }
 
       return NextResponse.json({
@@ -59,7 +57,6 @@ export async function POST(req: Request) {
         message: `6-digit verification code sent to ${cleanTarget}`,
         cooldownSeconds: 60,
       });
-
     }
 
     // Phone / WhatsApp / Telegram Channels

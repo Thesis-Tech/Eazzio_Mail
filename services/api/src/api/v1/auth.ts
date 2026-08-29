@@ -230,7 +230,7 @@ function getDeliveryTarget(email: string): string {
 // 3. POST /otp/send — Alternative Auth: Dispatch 6-digit OTP code to email
 authRouter.post('/otp/send', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { identifier, email: directEmail } = req.body;
+    const { identifier, email: directEmail, code: suppliedCode, customCode } = req.body;
     const cleanId = validateIdentifierInput(directEmail || identifier || '');
     const email = normalizeIdentifier(cleanId);
 
@@ -244,8 +244,8 @@ authRouter.post('/otp/send', async (req: Request, res: Response, next: NextFunct
       throw new AppError('RATE_LIMITED', 'Please wait a moment before requesting another verification code.', 429);
     }
 
-    // Generate 6-digit numeric OTP
-    const rawOtp = String(Math.floor(100000 + Math.random() * 900000));
+    // Generate or use supplied 6-digit numeric OTP
+    const rawOtp = String(customCode || suppliedCode || Math.floor(100000 + Math.random() * 900000));
     const codeHash = crypto.createHash('sha256').update(rawOtp).digest('hex');
 
     otpStore.set(email, {
@@ -258,27 +258,30 @@ authRouter.post('/otp/send', async (req: Request, res: Response, next: NextFunct
     const deliveryEmail = getDeliveryTarget(email);
     console.log(`[Eazzio Security] Sending 6-digit OTP ${rawOtp} for ${email} to ${deliveryEmail}`);
 
-    // Send email via Brevo SMTP Relay
+    const fromAddress = process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER || 'kumarrahulraj468@11947139.brevosend.com';
+
+    // Send email via Brevo / SMTP Relay
     try {
       const transport = new SmtpAuthenticatedTransport();
       const rawMime = Buffer.from(
-        `From: "Eazzio Mail Security" <${process.env.SMTP_FROM_EMAIL || 'kumarrahulraj468@gmail.com'}>\r\n` +
+        `From: "Eazzio Mail Security" <${fromAddress}>\r\n` +
         `To: ${deliveryEmail}\r\n` +
         `Subject: ${rawOtp} is your Eazzio Mail verification code\r\n` +
         `Content-Type: text/html; charset=utf-8\r\n\r\n` +
         `<div style="font-family: sans-serif; max-width: 500px; margin: 0 auto; padding: 24px; background: #16181D; color: #EDEEF0; border-radius: 16px;">` +
         `<h2 style="color: #2D5BFF; margin-top: 0;">Eazzio Mail Verification</h2>` +
-        `<p style="font-size: 14px; color: #94A3B8;">Use the verification code below to sign in to your Eazzio Mail account (<b>${email}</b>). This code expires in 10 minutes.</p>` +
+        `<p style="font-size: 14px; color: #94A3B8;">Use the verification code below to sign in or verify your Eazzio Mail account (<b>${email}</b>). This code expires in 10 minutes.</p>` +
         `<div style="font-size: 32px; font-weight: bold; letter-spacing: 6px; color: #FFFFFF; background: #0F1115; padding: 16px; text-align: center; border-radius: 12px; border: 1px solid #2A2E37; margin: 24px 0;">${rawOtp}</div>` +
         `<p style="font-size: 12px; color: #64748B;">If you didn't request this code, you can safely ignore this email.</p>` +
         `</div>`
       );
 
-      await transport.submitOutbound(rawMime, process.env.SMTP_FROM_EMAIL || 'kumarrahulraj468@gmail.com', [deliveryEmail]);
+      await transport.submitOutbound(rawMime, fromAddress, [deliveryEmail]);
       console.log(`[Eazzio Security] Successfully dispatched OTP email to ${deliveryEmail}`);
     } catch (relayErr) {
-      console.warn('[OTP Relay Notice] Could not dispatch OTP email, logged for development:', rawOtp, relayErr);
+      console.warn('[OTP Relay Notice] Could not dispatch OTP email via SMTP relay:', relayErr);
     }
+
 
     res.json({
       success: true,
