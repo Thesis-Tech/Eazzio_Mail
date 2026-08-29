@@ -4,24 +4,73 @@
  *   npx tsx scripts/send-test-email.ts <recipient-email> [custom-otp-or-message]
  *   pnpm mail:send <recipient-email> [custom-otp-or-message]
  */
+import * as fs from 'fs';
+import * as path from 'path';
 import { SmtpAuthenticatedTransport } from '../packages/infra-adapters/src/email-transport/smtp-authenticated-adapter.js';
+
+// Automatically load .env from repository root
+function loadEnvFile() {
+  const possiblePaths = [
+    path.resolve(process.cwd(), '.env'),
+    path.resolve(process.cwd(), 'apps/web/.env.local'),
+    path.resolve(process.cwd(), '../.env'),
+  ];
+  for (const envPath of possiblePaths) {
+    if (fs.existsSync(envPath)) {
+      const content = fs.readFileSync(envPath, 'utf8');
+      for (const line of content.split('\n')) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith('#')) continue;
+        const eqIdx = trimmed.indexOf('=');
+        if (eqIdx !== -1) {
+          const key = trimmed.slice(0, eqIdx).trim();
+          let val = trimmed.slice(eqIdx + 1).trim();
+          if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+            val = val.slice(1, -1);
+          }
+          if (val && !process.env[key]) {
+            process.env[key] = val;
+          }
+        }
+      }
+    }
+  }
+}
+loadEnvFile();
 
 async function sendTestEmail() {
   const args = process.argv.slice(2);
   const recipient = args[0] || process.env.SMTP_TEST_RECIPIENT || 'kumarrahulraj468@gmail.com';
   const customOtp = args[1] || String(Math.floor(100000 + Math.random() * 900000));
 
+  const smtpHost = process.env.SMTP_HOST || 'smtp-relay.brevo.com';
+  const smtpPort = Number(process.env.SMTP_PORT) || 587;
+  const smtpUser = process.env.SMTP_USERNAME || process.env.SMTP_USER || process.env.SMTP_AUTH_USER;
+  const smtpPass = process.env.SMTP_PASSWORD || process.env.SMTP_PASS || process.env.SMTP_AUTH_PASS;
+  const fromEmail = process.env.SMTP_FROM_EMAIL || smtpUser || 'kumarrahulraj468@11947139.brevosend.com';
+
   console.log('════════════════════════════════════════════════════════════════');
   console.log('📬 EAZZIO MAIL — LIVE EMAIL & OTP DISPATCH CLI');
   console.log('════════════════════════════════════════════════════════════════');
   console.log(`🎯 Recipient Target : ${recipient}`);
   console.log(`🔑 Verification Code: ${customOtp}`);
-  console.log(`⚙️  SMTP Host        : ${process.env.SMTP_HOST || 'smtp-relay.brevo.com'}`);
-  console.log(`👤 SMTP User        : ${process.env.SMTP_USER || '(from .env)'}`);
-  console.log(`✉️  From Address     : ${process.env.SMTP_FROM_EMAIL || 'kumarrahulraj468@11947139.brevosend.com'}`);
+  console.log(`⚙️  SMTP Host        : ${smtpHost}:${smtpPort}`);
+  console.log(`👤 SMTP User        : ${smtpUser ? smtpUser : '❌ NOT SET IN .ENV'}`);
+  console.log(`🔑 SMTP Pass        : ${smtpPass ? '******** (configured)' : '❌ NOT SET IN .ENV'}`);
+  console.log(`✉️  From Address     : ${fromEmail}`);
   console.log('────────────────────────────────────────────────────────────────');
 
-  const fromEmail = process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER || 'kumarrahulraj468@11947139.brevosend.com';
+  if (!smtpUser || !smtpPass) {
+    console.error('❌ Missing SMTP Authentication Credentials in .env!');
+    console.error('\n📝 Please add your Brevo / SMTP login credentials to .env:');
+    console.error('   SMTP_HOST=smtp-relay.brevo.com');
+    console.error('   SMTP_PORT=587');
+    console.error('   SMTP_USER=your-brevo-login-email');
+    console.error('   SMTP_PASS=your-brevo-smtp-master-key');
+    console.error('   SMTP_FROM_EMAIL=kumarrahulraj468@11947139.brevosend.com\n');
+    process.exit(1);
+  }
+
 
   const transport = new SmtpAuthenticatedTransport({
     fromEmail,
