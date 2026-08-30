@@ -393,10 +393,10 @@ authRouter.post('/otp/verify', async (req: Request, res: Response, next: NextFun
   }
 });
 
-// 5. POST /forgot-password — Initiate Password Recovery
+// 5. POST /forgot-password — Initiate Password Recovery (Multi-Channel)
 authRouter.post('/forgot-password', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { identifier, email: directEmail } = req.body;
+    const { identifier, email: directEmail, channel, recoveryTarget } = req.body;
     const cleanId = validateIdentifierInput(directEmail || identifier || '');
     const email = normalizeIdentifier(cleanId);
 
@@ -404,8 +404,7 @@ authRouter.post('/forgot-password', async (req: Request, res: Response, next: Ne
       throw new AppError('VALIDATION_ERROR', 'Enter your email or username', 400);
     }
 
-    const deliveryEmail = getDeliveryTarget(email);
-    const resetToken = crypto.randomBytes(4).toString('hex').toUpperCase(); // 8-char easy token like A9F21B8C
+    const resetToken = crypto.randomBytes(4).toString('hex').toUpperCase(); // 8-char like A9F21B8C
     const tokenHash = crypto.createHash('sha256').update(resetToken).digest('hex');
 
     resetTokenStore.set(email, {
@@ -414,33 +413,110 @@ authRouter.post('/forgot-password', async (req: Request, res: Response, next: Ne
       expiresAt: Date.now() + 30 * 60 * 1000, // 30 minutes
     });
 
-    console.log(`[Eazzio Security] Generated Password Reset Token ${resetToken} for ${email} -> delivering to ${deliveryEmail}`);
+    // Determine delivery target and channel
+    const activeChannel = channel || 'email';
+    const deliveryTarget = (recoveryTarget || '').trim() || getDeliveryTarget(email);
 
-    try {
-      const transport = new SmtpAuthenticatedTransport();
-      const rawMime = Buffer.from(
-        `From: "Eazzio Mail Security" <${process.env.SMTP_FROM_EMAIL || 'kumarrahulraj468@gmail.com'}>\r\n` +
-        `To: ${deliveryEmail}\r\n` +
-        `Subject: Reset your Eazzio Mail password - Code: ${resetToken}\r\n` +
-        `Content-Type: text/html; charset=utf-8\r\n\r\n` +
-        `<div style="font-family: sans-serif; max-width: 500px; margin: 0 auto; padding: 24px; background: #16181D; color: #EDEEF0; border-radius: 16px;">` +
-        `<h2 style="color: #2D5BFF; margin-top: 0;">Password Reset Request</h2>` +
-        `<p style="font-size: 14px; color: #94A3B8;">We received a request to reset your password for Eazzio Mail account (<b>${email}</b>). Use the security code below to reset your password:</p>` +
-        `<div style="font-size: 24px; font-family: monospace; font-weight: bold; letter-spacing: 4px; color: #FFFFFF; background: #0F1115; padding: 14px; text-align: center; border-radius: 10px; border: 1px solid #2A2E37; margin: 20px 0;">${resetToken}</div>` +
-        `<p style="font-size: 12px; color: #64748B;">This code expires in 30 minutes. If you did not make this request, you can ignore this email.</p>` +
-        `</div>`
-      );
-      await transport.submitOutbound(rawMime, process.env.SMTP_FROM_EMAIL || 'kumarrahulraj468@gmail.com', [deliveryEmail]);
-      console.log(`[Eazzio Security] Successfully dispatched Password Reset email to ${deliveryEmail}`);
-    } catch (sendErr) {
-      console.warn('[Password Reset Notice] Recovery email dispatch failed:', sendErr);
+    console.log(`[Eazzio Security] Generated Password Reset Token ${resetToken} for ${email} -> delivering via ${activeChannel} to ${deliveryTarget}`);
+
+    // --- Email Channel ---
+    if (activeChannel === 'email') {
+      try {
+        const fromAddress = process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER || 'kumarrahulraj468@gmail.com';
+        const transport = new SmtpAuthenticatedTransport();
+        const rawMime = Buffer.from(
+          `From: "Eazzio Mail Security" <${fromAddress}>\r\n` +
+          `To: ${deliveryTarget}\r\n` +
+          `Subject: ${resetToken} is your Eazzio Mail password reset code\r\n` +
+          `Content-Type: text/html; charset=utf-8\r\n\r\n` +
+          `<div style="font-family: sans-serif; max-width: 500px; margin: 0 auto; padding: 24px; background: #16181D; color: #EDEEF0; border-radius: 16px;">` +
+          `<h2 style="color: #14B8A6; margin-top: 0;">Password Reset Request</h2>` +
+          `<p style="font-size: 14px; color: #94A3B8;">We received a request to reset your password for Eazzio Mail account (<b>${email}</b>). Use the security code below:</p>` +
+          `<div style="font-size: 28px; font-family: monospace; font-weight: bold; letter-spacing: 4px; color: #FFFFFF; background: #0F1115; padding: 16px; text-align: center; border-radius: 12px; border: 1px solid #2A2E37; margin: 20px 0;">${resetToken}</div>` +
+          `<p style="font-size: 12px; color: #64748B;">This code expires in 30 minutes. If you did not make this request, you can ignore this email.</p>` +
+          `</div>`
+        );
+        await transport.submitOutbound(rawMime, fromAddress, [deliveryTarget]);
+        console.log(`[Eazzio Security] ✅ Password Reset email dispatched to ${deliveryTarget}`);
+      } catch (sendErr) {
+        console.warn('[Password Reset] Email dispatch failed:', sendErr);
+      }
     }
 
-    // Always return safe generic message to prevent account enumeration
+    // --- Telegram Channel ---
+    if (activeChannel === 'telegram') {
+      const telegramBotToken = process.env.TELEGRAM_BOT_TOKEN;
+      if (telegramBotToken) {
+        try {
+          let chatId: string | number | undefined = process.env.TELEGRAM_CHAT_ID;
+          // Try to find chat from getUpdates
+          const updatesRes = await fetch(`https://api.telegram.org/bot${telegramBotToken}/getUpdates`, {
+            signal: AbortSignal.timeout(5000),
+          });
+          const updatesData = await updatesRes.json();
+          if (updatesData.ok && Array.isArray(updatesData.result) && updatesData.result.length > 0) {
+            const cleanInput = deliveryTarget.replace(/^[@+]/g, '').replace(/[^0-9a-zA-Z]/g, '').toLowerCase();
+            const found = updatesData.result.slice().reverse().find((u: any) => {
+              const username = u.message?.from?.username?.toLowerCase();
+              const phone = u.message?.contact?.phone_number?.replace(/[^0-9]/g, '');
+              return (username && (cleanInput.includes(username) || username.includes(cleanInput))) ||
+                     (phone && cleanInput.includes(phone));
+            });
+            if (found) chatId = found.message?.chat?.id;
+            else if (!chatId) chatId = updatesData.result[updatesData.result.length - 1].message?.chat?.id;
+          }
+          if (chatId) {
+            await fetch(`https://api.telegram.org/bot${telegramBotToken}/sendMessage`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                chat_id: chatId,
+                text: `🔐 *Eazzio Mail Password Reset*\n\nYour password reset code for *${email}* is:\n\n👉 \`${resetToken}\` 👈\n\nThis code expires in 30 minutes. Do not share it with anyone.`,
+                parse_mode: 'Markdown',
+              }),
+            });
+            console.log(`[Eazzio Security] ✅ Password Reset code sent via Telegram to chat ${chatId}`);
+          }
+        } catch (tgErr) {
+          console.warn('[Password Reset] Telegram dispatch failed:', tgErr);
+        }
+      }
+    }
+
+    // --- WhatsApp Channel ---
+    if (activeChannel === 'whatsapp') {
+      const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
+      const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+      if (accessToken && phoneNumberId) {
+        try {
+          const fullPhone = deliveryTarget.startsWith('+')
+            ? deliveryTarget.replace(/[^0-9]/g, '')
+            : `91${deliveryTarget.replace(/[^0-9]/g, '')}`;
+          await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}/messages`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              messaging_product: 'whatsapp',
+              recipient_type: 'individual',
+              to: fullPhone,
+              type: 'text',
+              text: {
+                preview_url: false,
+                body: `Your Eazzio Mail password reset code for ${email} is: *${resetToken}*. It expires in 30 minutes. Do not share this code with anyone.`,
+              },
+            }),
+          });
+          console.log(`[Eazzio Security] ✅ Password Reset code sent via WhatsApp to ${fullPhone}`);
+        } catch (waErr) {
+          console.warn('[Password Reset] WhatsApp dispatch failed:', waErr);
+        }
+      }
+    }
+
     res.json({
       success: true,
       data: {
-        message: `If the account exists, password recovery instructions have been sent to ${deliveryEmail}.`,
+        message: `Password reset code sent via ${activeChannel} to ${deliveryTarget}.`,
         devToken: process.env.NODE_ENV !== 'production' ? resetToken : undefined,
       },
     });

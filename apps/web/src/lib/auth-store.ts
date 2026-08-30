@@ -222,11 +222,15 @@ export class AuthStore {
     return authUser;
   }
 
-  public static async forgotPassword(identifier: string): Promise<{ message: string; devToken?: string }> {
+  public static async forgotPassword(
+    identifier: string,
+    channel?: 'email' | 'telegram' | 'whatsapp',
+    recoveryTarget?: string,
+  ): Promise<{ message: string; devToken?: string }> {
     const res = await fetch('/api/v1/auth/forgot-password', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ identifier }),
+      body: JSON.stringify({ identifier, channel, recoveryTarget }),
     });
 
     const json = await res.json();
