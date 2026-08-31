@@ -10,6 +10,7 @@ import {
   RemoveFormatting, Undo2, Redo2, Search
 } from 'lucide-react';
 import { ComposerAttachment, ComposeEmailPayload } from '@/types/mail';
+export type { ComposerAttachment, ComposeEmailPayload };
 
 interface MailComposerProps {
   isOpen: boolean;
@@ -648,7 +649,7 @@ export const MailComposer: React.FC<MailComposerProps> = ({
                     <FileDown className="w-3.5 h-3.5 text-blue-400" />
                     <span className="font-semibold text-white max-w-[160px] truncate">{att.name}</span>
                     <span className="text-[10px] font-mono text-slate-500">
-                      {Math.round(att.sizeBytes / 1024)} KB
+                      {Math.round(((att as any).sizeBytes ?? att.size ?? 0) / 1024)} KB
                     </span>
                     <button 
                       type="button"

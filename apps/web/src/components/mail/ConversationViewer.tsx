@@ -9,7 +9,7 @@ import {
   Bold, Italic, Underline, Link as LinkIcon, Image as ImageIcon,
   Maximize2, MoreHorizontal, Check, BadgeCheck, ChevronRight
 } from 'lucide-react';
-import { MessageDetail, ComposerAttachment } from '@/types/mail';
+import { MessageDetail } from '@/types/mail';
 
 interface TrimmedMessageProps {
   bodyHtml?: string;

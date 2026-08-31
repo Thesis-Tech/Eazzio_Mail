@@ -83,3 +83,35 @@ export interface UserPreferences {
   soundNotifications: boolean;
   theme: 'dark' | 'light' | 'system';
 }
+
+export interface ComposerAttachment {
+  id: string;
+  name: string;
+  size?: number;
+  sizeBytes?: number;
+  type?: string;
+  contentType?: string;
+  dataBase64?: string;
+  file?: File;
+  url?: string;
+}
+
+export interface ComposeEmailPayload {
+  to: string[];
+  cc?: string[];
+  bcc?: string[];
+  subject: string;
+  body: string;
+  bodyHtml?: string;
+  bodyText?: string;
+  isHtml?: boolean;
+  attachments?: ComposerAttachment[];
+  threadId?: string;
+  inReplyTo?: string;
+  scheduledAt?: string;
+  security?: {
+    isConfidential?: boolean;
+    expiresInDays?: number;
+    requiresPasscode?: boolean;
+  };
+}

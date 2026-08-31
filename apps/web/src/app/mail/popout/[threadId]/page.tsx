@@ -119,7 +119,7 @@ export default function MailPopoutPage() {
 
           <div className="text-right hidden sm:block">
             <span className="text-xs font-semibold text-slate-200 block uppercase tracking-wider">
-              {currentUser?.name || 'Rahul Kumar'}
+              {currentUser?.displayName || 'Rahul Kumar'}
             </span>
             <span className="text-[11px] text-slate-400 font-mono">
               &lt;{currentUser?.email || 'kumarrahul0@eazzio.com'}&gt;
