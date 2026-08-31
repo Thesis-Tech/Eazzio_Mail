@@ -346,7 +346,7 @@ export const ConversationViewer: React.FC<ConversationViewerProps> = ({
             <button 
               type="button"
               onClick={() => {
-                if (latestMessage) onReply?.(latestMessage);
+                window.open(`/mail/popout/${threadId}`, '_blank', 'width=1000,height=850,resizable=yes,scrollbars=yes');
               }}
               className="p-1.5 rounded-full hover:bg-white/10 hover:text-white transition-colors"
               title="In new window"
