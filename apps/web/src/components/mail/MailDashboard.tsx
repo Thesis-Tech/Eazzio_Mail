@@ -1354,6 +1354,47 @@ export function MailDashboardPage({ initialFolder = 'fld-inbox' }: { initialFold
         if (tab) setSettingsTab(tab);
         setIsSettingsOpen(true);
       }}
+      onCreateLabel={async (name: string, color: string) => {
+        try {
+          const authState = AuthStore.getState();
+          const token = authState.token || '';
+          const senderEmail = authState.user?.email || '';
+
+          const res = await fetch('/api/settings/labels', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+              'x-user-email': senderEmail,
+            },
+            body: JSON.stringify({ name, color }),
+          });
+
+          if (res.ok) {
+            const json = await res.json();
+            const created = json.data || { id: `lbl-${Date.now()}`, name, color };
+            setLabels((prev) => [...prev, created]);
+            setToasts((prev) => [
+              {
+                id: `toast-${Date.now()}`,
+                title: 'Label Created',
+                senderName: 'Eazzio Mailbox',
+                message: `Label "${name}" was created successfully.`,
+                timestamp: 'Just now',
+              },
+              ...prev,
+            ]);
+          } else {
+            // Local fallback
+            const created = { id: `lbl-${Date.now()}`, name, color };
+            setLabels((prev) => [...prev, created]);
+          }
+        } catch (err) {
+          console.error('Failed to create label:', err);
+          const created = { id: `lbl-${Date.now()}`, name, color };
+          setLabels((prev) => [...prev, created]);
+        }
+      }}
     >
       <div 
         style={{ backgroundColor: 'var(--theme-bg-main, #0A0C10)' }}
