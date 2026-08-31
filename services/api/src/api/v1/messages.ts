@@ -262,10 +262,13 @@ messagesRouter.get('/', async (req: AuthenticatedRequest, res: Response, next: N
              m.is_read, m.is_starred, m.is_important, m.direction, m.delivery_state,
              m.received_at,
              COALESCE(
-               (SELECT json_agg(json_build_object('name', split_part(r.address::text, '@', 1), 'email', r.address::text, 'type', r.kind))
-                FROM message_recipients r WHERE r.message_id = m.id),
-               (SELECT json_agg(json_build_object('name', split_part(q.recipient_address, '@', 1), 'email', q.recipient_address, 'type', 'to'))
-                FROM outbound_queue q WHERE q.message_id = m.id),
+               NULLIF((SELECT json_agg(json_build_object('name', split_part(r.address::text, '@', 1), 'email', r.address::text, 'type', r.kind))
+                FROM message_recipients r WHERE r.message_id = m.id), '[]'::json),
+               NULLIF((SELECT json_agg(json_build_object('name', split_part(q.recipient_address, '@', 1), 'email', q.recipient_address, 'type', 'to'))
+                FROM outbound_queue q WHERE q.message_id = m.id), '[]'::json),
+               (SELECT json_agg(json_build_object('name', split_part(mb.address, '@', 1), 'email', mb.address, 'type', 'to'))
+                FROM messages m2 JOIN mailboxes mb ON mb.id = m2.mailbox_id
+                WHERE m2.message_id_header = m.message_id_header AND m2.id != m.id AND m2.direction = 'inbound'),
                '[]'::json
              ) as recipients
       FROM messages m
@@ -778,13 +781,42 @@ messagesRouter.get('/:id', async (req: AuthenticatedRequest, res: Response, next
     }
 
     const first = rows[0];
-    const recipients = rows
+    let recipients = rows
       .filter((r) => r.recipient_address)
       .map((r) => ({
         name: r.recipient_address.split('@')[0],
         email: r.recipient_address,
         type: r.recipient_kind || 'to',
       }));
+
+    if (recipients.length === 0 && first.message_id_header) {
+      const linked = (await defaultDb.query(
+        `SELECT mb.address FROM messages m2
+         JOIN mailboxes mb ON mb.id = m2.mailbox_id
+         WHERE m2.message_id_header = $1 AND m2.id != $2 AND m2.direction = 'inbound'`,
+        [first.message_id_header, first.id]
+      )) as any[];
+
+      if (linked.length > 0) {
+        recipients = linked.map((lr) => ({
+          name: lr.address.split('@')[0],
+          email: lr.address,
+          type: 'to',
+        }));
+      } else {
+        const queueRecipients = (await defaultDb.query(
+          `SELECT recipient_address FROM outbound_queue WHERE message_id = $1`,
+          [first.id]
+        )) as any[];
+        if (queueRecipients.length > 0) {
+          recipients = queueRecipients.map((qr) => ({
+            name: qr.recipient_address.split('@')[0],
+            email: qr.recipient_address,
+            type: 'to',
+          }));
+        }
+      }
+    }
 
     // Retrieve body from database or storage
     let bodyHtml = first.body_html || (first.body_text ? `<p>${first.body_text.replace(/\n/g, '<br>')}</p>` : `<p>${first.snippet || ''}</p>`);
