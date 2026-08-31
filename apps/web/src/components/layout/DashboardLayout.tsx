@@ -25,7 +25,7 @@ export interface DashboardLayoutProps {
   onSelectFolder?: (folderId: string) => void;
   onSelectLabel?: (labelId: string) => void;
   onOpenCompose?: () => void;
-  onOpenSettings?: () => void;
+  onOpenSettings?: (tab?: any) => void;
   onSearch?: (query: string) => void;
   availableThreads?: ThreadSummary[];
   customFolders?: FolderItem[];
@@ -140,17 +140,57 @@ export const THEME_CONFIGS: Record<string, ThemeConfig> = {
     id: 'sunset',
     name: 'Crimson Dusk',
     bgMain: '#120609',
-    bgSidebar: '#0B0305',
+    bgSidebar: '#0A0305',
     bgHeader: '#120609',
-    bgCard: '#240B13',
-    bgHover: '#33101C',
+    bgCard: '#1F0B11',
+    bgHover: '#2C1019',
     border: '#4D1627',
     accent: '#F43F5E',
     accentHover: '#E11D48',
     accentBg: 'rgba(244, 63, 94, 0.15)',
     accentGlow: 'rgba(244, 63, 94, 0.35)',
   },
+  'cyberpunk': {
+    id: 'cyberpunk',
+    name: 'Cyberpunk Gold',
+    bgMain: '#0B0B08',
+    bgSidebar: '#060604',
+    bgHeader: '#0B0B08',
+    bgCard: '#1A180B',
+    bgHover: '#2A2610',
+    border: '#4A4214',
+    accent: '#EAB308',
+    accentHover: '#CA8A04',
+    accentBg: 'rgba(234, 179, 8, 0.15)',
+    accentGlow: 'rgba(234, 179, 8, 0.35)',
+  },
+  'ocean': {
+    id: 'ocean',
+    name: 'Deep Ocean',
+    bgMain: '#040C12',
+    bgSidebar: '#02070A',
+    bgHeader: '#040C12',
+    bgCard: '#081D2C',
+    bgHover: '#0D2B42',
+    border: '#13476E',
+    accent: '#06B6D4',
+    accentHover: '#0891B2',
+    accentBg: 'rgba(6, 182, 212, 0.15)',
+    accentGlow: 'rgba(6, 182, 212, 0.35)',
+  },
 };
+
+export function getThemeConfig(themeId: string): ThemeConfig {
+  if (THEME_CONFIGS[themeId]) return THEME_CONFIGS[themeId]!;
+  try {
+    const customJson = localStorage.getItem(`eazzio_custom_theme_${themeId}`);
+    if (customJson) {
+      const parsed = JSON.parse(customJson);
+      if (parsed.bgMain && parsed.accent) return parsed;
+    }
+  } catch (_) {}
+  return THEME_CONFIGS['dark-oled']!;
+}
 
 export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   children,
@@ -185,7 +225,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   const [conversationView, setConversationView] = useState(true);
 
   // Active theme configuration
-  const currentTheme = THEME_CONFIGS[theme] || THEME_CONFIGS['dark-oled']!;
+  const currentTheme = getThemeConfig(theme);
 
   // Handle Density Change with instant persistence
   const handleDensityChange = (newDensity: 'default' | 'comfortable' | 'compact') => {

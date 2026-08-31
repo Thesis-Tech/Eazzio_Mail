@@ -44,6 +44,7 @@ import {
   HelpCircle,
   Eye,
   EyeOff,
+  Wand2,
 } from 'lucide-react';
 
 import { FolderItem, LabelItem, FilterRule, UserPreferences } from '../../types/mail';
@@ -51,10 +52,13 @@ import { FolderItem, LabelItem, FilterRule, UserPreferences } from '../../types/
 export interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
+  initialTab?: 'general' | 'labels' | 'inbox' | 'accounts' | 'filters' | 'forwarding' | 'themes';
   folders: FolderItem[];
   labels: LabelItem[];
   filterRules: FilterRule[];
   preferences: UserPreferences;
+  currentThemeId?: string;
+  onThemeChange?: (themeId: string) => void;
   onUpdateFolders: (folders: FolderItem[]) => void;
   onUpdateLabels: (labels: LabelItem[]) => void;
   onUpdateFilterRules: (rules: FilterRule[]) => void;
@@ -72,22 +76,27 @@ const PRESET_COLORS = [
   '#84CC16', // Lime
 ];
 
-const THEMES = [
-  { id: 'dark-oled', name: 'Default Dark', bg: '#0A0C10', accent: '#2D5BFF', border: '#1E232B' },
-  { id: 'midnight', name: 'Midnight Blue', bg: '#070D18', accent: '#38BDF8', border: '#1E3B68' },
-  { id: 'emerald', name: 'Cyber Emerald', bg: '#030E0B', accent: '#10B981', border: '#103F31' },
-  { id: 'purple', name: 'Deep Amethyst', bg: '#0D0716', accent: '#A855F7', border: '#3D1C63' },
-  { id: 'graphite', name: 'Graphite Slate', bg: '#111113', accent: '#14B8A6', border: '#2E2E38' },
-  { id: 'sunset', name: 'Crimson Dusk', bg: '#120609', accent: '#F43F5E', border: '#4D1627' },
+const PRESET_THEMES = [
+  { id: 'dark-oled', name: 'Default Dark', bg: '#0A0C10', accent: '#2D5BFF', border: '#1E232B', desc: 'Deep black with electric royal blue accents' },
+  { id: 'midnight', name: 'Midnight Blue', bg: '#070D18', accent: '#38BDF8', border: '#1E3B68', desc: 'Navy night canvas with vivid sky blue' },
+  { id: 'emerald', name: 'Cyber Emerald', bg: '#030E0B', accent: '#10B981', border: '#103F31', desc: 'Futuristic matrix black with neon mint glow' },
+  { id: 'purple', name: 'Deep Amethyst', bg: '#0D0716', accent: '#A855F7', border: '#3D1C63', desc: 'Royal dark purple with neon violet radiance' },
+  { id: 'graphite', name: 'Graphite Slate', bg: '#111113', accent: '#14B8A6', border: '#2E2E38', desc: 'Industrial neutral zinc with cyber teal' },
+  { id: 'sunset', name: 'Crimson Dusk', bg: '#120609', accent: '#F43F5E', border: '#4D1627', desc: 'Dark burgundy canvas with glowing coral rose' },
+  { id: 'cyberpunk', name: 'Cyberpunk Gold', bg: '#0B0B08', accent: '#EAB308', border: '#4A4214', desc: 'Obsidian charcoal with high-voltage yellow' },
+  { id: 'ocean', name: 'Deep Ocean', bg: '#040C12', accent: '#06B6D4', border: '#13476E', desc: 'Abyssal navy with brilliant cyan highlights' },
 ];
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
   onClose,
+  initialTab = 'general',
   folders,
   labels,
   filterRules,
   preferences,
+  currentThemeId = 'dark-oled',
+  onThemeChange,
   onUpdateFolders,
   onUpdateLabels,
   onUpdateFilterRules,
@@ -95,7 +104,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<
     'general' | 'labels' | 'inbox' | 'accounts' | 'filters' | 'forwarding' | 'themes'
-  >('general');
+  >(initialTab);
+
+  // Sync initialTab when modal opens
+  useEffect(() => {
+    if (isOpen && initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [isOpen, initialTab]);
 
   // General Settings State
   const [pageSize, setPageSize] = useState<number>(50);
@@ -103,8 +119,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [defaultReplyBehavior, setDefaultReplyBehavior] = useState<'reply' | 'reply_all'>('reply');
   const [hoverActions, setHoverActions] = useState<boolean>(true);
   const [sendAndArchive, setSendAndArchive] = useState<boolean>(false);
-  const [externalImages, setExternalImages] = useState<'always' | 'ask'>('always');
-  const [smartCompose, setSmartCompose] = useState<boolean>(true);
   const [conversationView, setConversationView] = useState<boolean>(true);
   const [desktopNotifications, setDesktopNotifications] = useState<'all' | 'important' | 'off'>('all');
   const [starPreset, setStarPreset] = useState<'1star' | '4stars' | 'all'>('1star');
@@ -130,7 +144,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     forums: false,
   });
   const [readingPanePos, setReadingPanePos] = useState<'none' | 'right' | 'below'>('right');
-  const [importanceMarkers, setImportanceMarkers] = useState<boolean>(true);
 
   // Domain Management State
   const [domains, setDomains] = useState<any[]>([]);
@@ -138,9 +151,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [newDomainInput, setNewDomainInput] = useState('');
   const [creatingDomain, setCreatingDomain] = useState(false);
   const [verifyingDomainId, setVerifyingDomainId] = useState<string | null>(null);
-  const [expandedDomainId, setExpandedDomainId] = useState<string | null>(null);
-  const [copiedField, setCopiedField] = useState<string | null>(null);
-  const [domainError, setDomainError] = useState<string | null>(null);
 
   // Blocked Addresses State
   const [blockedAddresses, setBlockedAddresses] = useState<string[]>([
@@ -152,9 +162,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   // Labels Tab State
   const [newLabelName, setNewLabelName] = useState('');
   const [newLabelColor, setNewLabelColor] = useState(PRESET_COLORS[0]!);
-  const [editingLabelId, setEditingLabelId] = useState<string | null>(null);
-  const [editLabelName, setEditLabelName] = useState('');
-  const [editLabelColor, setEditLabelColor] = useState(PRESET_COLORS[0]!);
 
   // Filter Rules Tab State
   const [newRuleName, setNewRuleName] = useState('');
@@ -169,11 +176,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [popEnabled, setPopEnabled] = useState(false);
   const [imapEnabled, setImapEnabled] = useState(true);
   const [imapExpunge, setImapExpunge] = useState<'auto' | 'manual'>('auto');
-  const [imapFolderLimit, setImapFolderLimit] = useState<number>(1000);
+
+  // Custom Theme Builder State
+  const [selectedThemeId, setSelectedThemeId] = useState<string>(currentThemeId);
+  const [customThemeName, setCustomThemeName] = useState('My Custom Theme');
+  const [customBgMain, setCustomBgMain] = useState('#080B10');
+  const [customBgSidebar, setCustomBgSidebar] = useState('#05070A');
+  const [customBgCard, setCustomBgCard] = useState('#10141E');
+  const [customAccent, setCustomAccent] = useState('#6366F1');
+  const [customBorder, setCustomBorder] = useState('#1E293B');
 
   // Load Preferences & Domains on Open
   useEffect(() => {
     if (isOpen) {
+      setSelectedThemeId(currentThemeId);
       fetch('/api/settings/preferences')
         .then((res) => res.json())
         .then((json) => {
@@ -186,31 +202,75 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             if (p.inboxType) setInboxType(p.inboxType);
             if (p.readingPane) setReadingPanePos(p.readingPane);
             if (p.conversationView !== undefined) setConversationView(p.conversationView);
+            if (p.theme) setSelectedThemeId(p.theme);
           }
         })
         .catch(() => {});
 
       fetchDomains();
     }
-  }, [isOpen]);
+  }, [isOpen, currentThemeId]);
 
   const fetchDomains = async () => {
     try {
       setLoadingDomains(true);
-      setDomainError(null);
       const res = await fetch('/api/domains');
       if (res.ok) {
         const json = await res.json();
         setDomains(json.data || []);
-        if (json.data && json.data.length > 0 && !expandedDomainId) {
-          setExpandedDomainId(json.data[0].id);
-        }
       }
     } catch (_) {
-      setDomainError('Failed to load custom domains');
     } finally {
       setLoadingDomains(false);
     }
+  };
+
+  const handleApplyTheme = (themeId: string) => {
+    setSelectedThemeId(themeId);
+    if (onThemeChange) {
+      onThemeChange(themeId);
+    }
+    try {
+      localStorage.setItem('eazzio_theme', themeId);
+      fetch('/api/settings/preferences', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ theme: themeId }),
+      }).catch(() => {});
+    } catch (_) {}
+  };
+
+  const handleCreateCustomTheme = (e: React.FormEvent) => {
+    e.preventDefault();
+    const id = `custom-${Date.now()}`;
+    const customConfig = {
+      id,
+      name: customThemeName.trim() || 'Custom Theme',
+      bgMain: customBgMain,
+      bgSidebar: customBgSidebar,
+      bgHeader: customBgMain,
+      bgCard: customBgCard,
+      bgHover: `${customBgCard}cc`,
+      border: customBorder,
+      accent: customAccent,
+      accentHover: customAccent,
+      accentBg: `${customAccent}26`,
+      accentGlow: `${customAccent}55`,
+    };
+
+    try {
+      localStorage.setItem(`eazzio_custom_theme_${id}`, JSON.stringify(customConfig));
+      localStorage.setItem('eazzio_theme', id);
+      setSelectedThemeId(id);
+      if (onThemeChange) {
+        onThemeChange(id);
+      }
+      fetch('/api/settings/preferences', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ theme: id }),
+      }).catch(() => {});
+    } catch (_) {}
   };
 
   const handleSaveGeneral = async () => {
@@ -222,6 +282,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         hoverActions,
         sendAndArchive,
         conversationView,
+        theme: selectedThemeId,
         signature: { text: signatureText, enabled: Boolean(signatureText.trim()) },
         autoReply: {
           enabled: vacationEnabled,
@@ -321,12 +382,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
       {/* Modal Box */}
       <div 
-        style={{ backgroundColor: 'var(--theme-bg-main, #0A0C10)', borderColor: 'var(--theme-border, #1E232B)' }}
+        style={{ 
+          backgroundColor: 'var(--theme-bg-main, #0A0C10)', 
+          borderColor: 'var(--theme-border, #1E232B)' 
+        }}
         className="relative w-full max-w-5xl h-[92vh] max-h-[850px] rounded-2xl border shadow-2xl flex flex-col z-10 overflow-hidden text-slate-200 font-sans"
       >
         {/* Modal Header */}
         <div 
-          style={{ backgroundColor: 'var(--theme-bg-header, #0A0C10)', borderColor: 'var(--theme-border, #1E232B)' }}
+          style={{ 
+            backgroundColor: 'var(--theme-bg-header, #0A0C10)', 
+            borderColor: 'var(--theme-border, #1E232B)' 
+          }}
           className="h-16 px-6 border-b flex items-center justify-between shrink-0"
         >
           <div className="flex items-center gap-3">
@@ -338,7 +405,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
             <div>
               <h2 className="text-base font-bold text-white tracking-tight">Settings</h2>
-              <p className="text-xs text-slate-400">Configure your inbox preferences, labels, filters, and custom domains</p>
+              <p className="text-xs text-slate-400">Configure your inbox preferences, labels, filters, custom themes, and domains</p>
             </div>
           </div>
 
@@ -352,7 +419,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
         {/* Gmail Navigation Tabs Bar */}
         <div 
-          style={{ backgroundColor: 'var(--theme-bg-card, #12141A)', borderColor: 'var(--theme-border, #1E232B)' }}
+          style={{ 
+            backgroundColor: 'var(--theme-bg-card, #12141A)', 
+            borderColor: 'var(--theme-border, #1E232B)' 
+          }}
           className="flex items-center px-6 border-b overflow-x-auto custom-scrollbar no-scrollbar shrink-0 text-xs font-semibold gap-1"
         >
           {[
@@ -362,7 +432,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             { id: 'accounts', label: 'Accounts & Custom Domains' },
             { id: 'filters', label: 'Filters and Blocked Addresses' },
             { id: 'forwarding', label: 'Forwarding and POP/IMAP' },
-            { id: 'themes', label: 'Themes' },
+            { id: 'themes', label: 'Themes & Custom Colors' },
           ].map((tab) => {
             const isActive = activeTab === tab.id;
             return (
@@ -379,7 +449,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <div 
                     style={{ backgroundColor: 'var(--theme-accent, #2D5BFF)' }}
                     className="absolute bottom-0 left-0 right-0 h-0.5 rounded-t-full"
-                  ></div>
+                  />
                 )}
               </button>
             );
@@ -769,7 +839,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <div key={sys.slug} className="grid grid-cols-3 p-3 items-center">
                       <div className="font-medium text-white">{sys.name}</div>
                       <div className="flex items-center gap-3 text-slate-400">
-                        <button className="hover:text-white font-semibold text-[#2D5BFF]">show</button>
+                        <button className="hover:text-white font-semibold" style={{ color: 'var(--theme-accent, #2D5BFF)' }}>show</button>
                         <span>|</span>
                         <button className="hover:text-white">hide</button>
                       </div>
@@ -868,7 +938,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         name="inboxType"
                         checked={inboxType === t.id}
                         onChange={() => setInboxType(t.id as any)}
-                        className="mt-0.5 accent-[#2D5BFF]"
+                        style={{ accentColor: 'var(--theme-accent, #2D5BFF)' }}
+                        className="mt-0.5"
                       />
                       <div>
                         <div className="font-bold text-white">{t.label}</div>
@@ -893,7 +964,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           checked={categories[key] ?? false}
                           disabled={key === 'primary'}
                           onChange={(e) => setCategories({ ...categories, [key]: e.target.checked })}
-                          className="accent-[#2D5BFF]"
+                          style={{ accentColor: 'var(--theme-accent, #2D5BFF)' }}
                         />
                         <span className={`text-slate-200 ${key === 'primary' ? 'font-bold text-white' : ''}`}>{cat}</span>
                       </label>
@@ -918,7 +989,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         name="readingPane"
                         checked={readingPanePos === p.id}
                         onChange={() => setReadingPanePos(p.id as any)}
-                        className="accent-[#2D5BFF]"
+                        style={{ accentColor: 'var(--theme-accent, #2D5BFF)' }}
                       />
                       <span className="text-slate-200">{p.label}</span>
                     </label>
@@ -943,7 +1014,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <span className="text-slate-400">&lt;rahul@eazzio.com&gt;</span>
                     <span className="ml-2 px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[10px] font-bold">Default</span>
                   </div>
-                  <button className="text-[#2D5BFF] hover:underline font-semibold">edit info</button>
+                  <button style={{ color: 'var(--theme-accent, #2D5BFF)' }} className="hover:underline font-semibold">edit info</button>
                 </div>
               </div>
 
@@ -952,7 +1023,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                      <Globe className="w-4 h-4 text-[#2D5BFF]" />
+                      <Globe style={{ color: 'var(--theme-accent, #2D5BFF)' }} className="w-4 h-4" />
                       <span>Custom Domains & DNS Verification Wizard</span>
                     </h3>
                     <p className="text-slate-400 text-[11px]">Connect your business domain with DKIM RSA-2048, SPF, DMARC, and MX records.</p>
@@ -1166,7 +1237,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   {blockedAddresses.map((addr) => (
                     <div key={addr} className="p-3.5 flex items-center justify-between">
                       <span className="font-mono text-slate-300">{addr}</span>
-                      <button onClick={() => handleUnblock(addr)} className="text-[#2D5BFF] hover:underline font-semibold">
+                      <button onClick={() => handleUnblock(addr)} style={{ color: 'var(--theme-accent, #2D5BFF)' }} className="hover:underline font-semibold">
                         unblock
                       </button>
                     </div>
@@ -1213,7 +1284,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       name="popStatus"
                       checked={!popEnabled}
                       onChange={() => setPopEnabled(false)}
-                      className="accent-[#2D5BFF]"
+                      style={{ accentColor: 'var(--theme-accent, #2D5BFF)' }}
                     />
                     <span className="text-slate-200">Status: POP is disabled</span>
                   </label>
@@ -1223,7 +1294,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       name="popStatus"
                       checked={popEnabled}
                       onChange={() => setPopEnabled(true)}
-                      className="accent-[#2D5BFF]"
+                      style={{ accentColor: 'var(--theme-accent, #2D5BFF)' }}
                     />
                     <span className="text-slate-200">Enable POP for all mail</span>
                   </label>
@@ -1245,7 +1316,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         name="imapExpunge"
                         checked={imapExpunge === 'auto'}
                         onChange={() => setImapExpunge('auto')}
-                        className="accent-[#2D5BFF]"
+                        style={{ accentColor: 'var(--theme-accent, #2D5BFF)' }}
                       />
                       <span>Auto-Expunge on — Immediately update the server (default)</span>
                     </label>
@@ -1255,7 +1326,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         name="imapExpunge"
                         checked={imapExpunge === 'manual'}
                         onChange={() => setImapExpunge('manual')}
-                        className="accent-[#2D5BFF]"
+                        style={{ accentColor: 'var(--theme-accent, #2D5BFF)' }}
                       />
                       <span>Auto-Expunge off — Wait for client to update</span>
                     </label>
@@ -1266,49 +1337,234 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           )}
 
           {/* ========================================================= */}
-          {/* 7. THEMES TAB */}
+          {/* 7. THEMES TAB (Preset Gallery + Custom Theme Creator) */}
           {/* ========================================================= */}
           {activeTab === 'themes' && (
-            <div className="space-y-6">
+            <div className="space-y-8">
+              
+              {/* Preset Gallery */}
               <div>
-                <h3 className="text-sm font-bold text-white mb-1">Visual Themes Gallery</h3>
-                <p className="text-slate-400 text-[11px]">Select a color theme to transform your entire mail workspace in real time.</p>
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                    <Palette style={{ color: 'var(--theme-accent, #2D5BFF)' }} className="w-4 h-4" />
+                    <span>Visual Themes Gallery</span>
+                  </h3>
+                  <span className="text-[11px] text-slate-400">Click any preset to apply instantly across the entire interface</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3.5">
+                  {PRESET_THEMES.map((th) => {
+                    const isSelected = selectedThemeId === th.id;
+                    return (
+                      <button
+                        key={th.id}
+                        onClick={() => handleApplyTheme(th.id)}
+                        style={{ 
+                          backgroundColor: th.bg, 
+                          borderColor: isSelected ? th.accent : th.border,
+                        }}
+                        className={`p-3.5 rounded-2xl border text-left flex flex-col justify-between h-36 transition-all duration-200 relative group shadow-xl hover:scale-[1.02] ${
+                          isSelected ? 'ring-2 ring-offset-2 ring-offset-black' : ''
+                        }`}
+                      >
+                        <div className="flex items-center justify-between w-full">
+                          <div className="w-4 h-4 rounded-full shadow-lg" style={{ backgroundColor: th.accent }} />
+                          {isSelected && (
+                            <div 
+                              style={{ backgroundColor: th.accent }}
+                              className="w-5 h-5 rounded-full flex items-center justify-center text-white shadow-md"
+                            >
+                              <Check className="w-3.5 h-3.5" />
+                            </div>
+                          )}
+                        </div>
+                        <div>
+                          <div className="font-bold text-white text-sm">{th.name}</div>
+                          <div className="text-[10px] text-slate-400 mt-0.5 line-clamp-1">{th.desc}</div>
+                          <div className="text-[9px] text-slate-500 font-mono mt-1">{th.bg}</div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                {THEMES.map((th) => (
-                  <button
-                    key={th.id}
-                    onClick={() => {
-                      try {
-                        localStorage.setItem('eazzio_theme', th.id);
-                        fetch('/api/settings/preferences', {
-                          method: 'PUT',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ theme: th.id }),
-                        }).catch(() => {});
-                      } catch (_) {}
-                    }}
-                    style={{ backgroundColor: th.bg, borderColor: th.border }}
-                    className="p-4 rounded-2xl border text-left flex flex-col justify-between h-32 hover:scale-[1.02] transition-transform relative group shadow-xl"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="w-4 h-4 rounded-full" style={{ backgroundColor: th.accent }} />
-                    </div>
+              {/* Custom Theme Creator */}
+              <div 
+                style={{ 
+                  backgroundColor: 'var(--theme-bg-card, #12141A)', 
+                  borderColor: 'var(--theme-border, #1E232B)' 
+                }}
+                className="p-5 rounded-2xl border space-y-4"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Wand2 style={{ color: 'var(--theme-accent, #2D5BFF)' }} className="w-4 h-4" />
+                    <h3 className="text-sm font-bold text-white">Create Custom Theme</h3>
+                  </div>
+                  <span className="text-[11px] text-slate-400">Design your own bespoke palette with full color control</span>
+                </div>
+
+                <form onSubmit={handleCreateCustomTheme} className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    {/* Theme Name */}
                     <div>
-                      <div className="font-bold text-white text-sm">{th.name}</div>
-                      <div className="text-[10px] text-slate-400 font-mono">{th.bg}</div>
+                      <label className="block text-slate-400 mb-1 font-medium">Theme Name</label>
+                      <input
+                        type="text"
+                        value={customThemeName}
+                        onChange={(e) => setCustomThemeName(e.target.value)}
+                        style={{ backgroundColor: 'var(--theme-bg-sidebar, #090A0D)', borderColor: 'var(--theme-border, #1E232B)' }}
+                        className="w-full p-2 rounded-lg border text-white outline-none"
+                        placeholder="e.g. Neon Cyber"
+                      />
                     </div>
-                  </button>
-                ))}
+
+                    {/* Main Background */}
+                    <div>
+                      <label className="block text-slate-400 mb-1 font-medium">Main Background</label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={customBgMain}
+                          onChange={(e) => setCustomBgMain(e.target.value)}
+                          className="w-9 h-9 rounded-lg bg-transparent border-0 cursor-pointer"
+                        />
+                        <input
+                          type="text"
+                          value={customBgMain}
+                          onChange={(e) => setCustomBgMain(e.target.value)}
+                          style={{ backgroundColor: 'var(--theme-bg-sidebar, #090A0D)', borderColor: 'var(--theme-border, #1E232B)' }}
+                          className="w-full p-2 rounded-lg border text-white font-mono uppercase"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Accent Color */}
+                    <div>
+                      <label className="block text-slate-400 mb-1 font-medium">Accent / Brand Glow</label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={customAccent}
+                          onChange={(e) => setCustomAccent(e.target.value)}
+                          className="w-9 h-9 rounded-lg bg-transparent border-0 cursor-pointer"
+                        />
+                        <input
+                          type="text"
+                          value={customAccent}
+                          onChange={(e) => setCustomAccent(e.target.value)}
+                          style={{ backgroundColor: 'var(--theme-bg-sidebar, #090A0D)', borderColor: 'var(--theme-border, #1E232B)' }}
+                          className="w-full p-2 rounded-lg border text-white font-mono uppercase"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    {/* Sidebar Background */}
+                    <div>
+                      <label className="block text-slate-400 mb-1 font-medium">Sidebar / Drawer</label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={customBgSidebar}
+                          onChange={(e) => setCustomBgSidebar(e.target.value)}
+                          className="w-9 h-9 rounded-lg bg-transparent border-0 cursor-pointer"
+                        />
+                        <input
+                          type="text"
+                          value={customBgSidebar}
+                          onChange={(e) => setCustomBgSidebar(e.target.value)}
+                          style={{ backgroundColor: 'var(--theme-bg-sidebar, #090A0D)', borderColor: 'var(--theme-border, #1E232B)' }}
+                          className="w-full p-2 rounded-lg border text-white font-mono uppercase"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Card / Panel Background */}
+                    <div>
+                      <label className="block text-slate-400 mb-1 font-medium">Card / Modal Surface</label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={customBgCard}
+                          onChange={(e) => setCustomBgCard(e.target.value)}
+                          className="w-9 h-9 rounded-lg bg-transparent border-0 cursor-pointer"
+                        />
+                        <input
+                          type="text"
+                          value={customBgCard}
+                          onChange={(e) => setCustomBgCard(e.target.value)}
+                          style={{ backgroundColor: 'var(--theme-bg-sidebar, #090A0D)', borderColor: 'var(--theme-border, #1E232B)' }}
+                          className="w-full p-2 rounded-lg border text-white font-mono uppercase"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Border Color */}
+                    <div>
+                      <label className="block text-slate-400 mb-1 font-medium">Border Lines</label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={customBorder}
+                          onChange={(e) => setCustomBorder(e.target.value)}
+                          className="w-9 h-9 rounded-lg bg-transparent border-0 cursor-pointer"
+                        />
+                        <input
+                          type="text"
+                          value={customBorder}
+                          onChange={(e) => setCustomBorder(e.target.value)}
+                          style={{ backgroundColor: 'var(--theme-bg-sidebar, #090A0D)', borderColor: 'var(--theme-border, #1E232B)' }}
+                          className="w-full p-2 rounded-lg border text-white font-mono uppercase"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Live Preview & Submit */}
+                  <div className="flex items-center justify-between pt-3 border-t border-white/5">
+                    {/* Live Preview Card */}
+                    <div 
+                      style={{ backgroundColor: customBgMain, borderColor: customBorder }}
+                      className="p-3 rounded-xl border flex items-center gap-3 w-72 shadow-lg"
+                    >
+                      <div style={{ backgroundColor: customAccent }} className="w-3.5 h-3.5 rounded-full" />
+                      <div className="flex-1">
+                        <div className="font-bold text-white text-[11px] truncate">{customThemeName || 'Preview'}</div>
+                        <div style={{ color: customAccent }} className="text-[9px] font-semibold">Active Palette</div>
+                      </div>
+                      <div 
+                        style={{ backgroundColor: customBgCard, borderColor: customBorder }}
+                        className="px-2 py-0.5 rounded border text-[9px] text-slate-300"
+                      >
+                        Card
+                      </div>
+                    </div>
+
+                    <button
+                      type="submit"
+                      style={{ backgroundColor: 'var(--theme-accent, #2D5BFF)' }}
+                      className="px-5 py-2.5 rounded-xl text-white font-bold shadow-lg hover:brightness-110 transition-all flex items-center gap-2"
+                    >
+                      <Wand2 className="w-4 h-4" />
+                      <span>Save & Apply Custom Theme</span>
+                    </button>
+                  </div>
+                </form>
               </div>
+
             </div>
           )}
         </div>
 
         {/* Modal Footer */}
         <div 
-          style={{ backgroundColor: 'var(--theme-bg-header, #0A0C10)', borderColor: 'var(--theme-border, #1E232B)' }}
+          style={{ 
+            backgroundColor: 'var(--theme-bg-header, #0A0C10)', 
+            borderColor: 'var(--theme-border, #1E232B)' 
+          }}
           className="h-16 px-6 border-t flex items-center justify-between shrink-0"
         >
           <div className="text-[11px] text-slate-500 font-mono">

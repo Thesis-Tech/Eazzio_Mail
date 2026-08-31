@@ -80,6 +80,7 @@ export function MailDashboardPage({ initialFolder = 'fld-inbox' }: { initialFold
   const [filterRules, setFilterRules] = useState<FilterRule[]>(initialFilters);
   const [preferences, setPreferences] = useState<UserPreferences>(initialPreferences);
   const [density, setDensity] = useState<'default' | 'comfortable' | 'compact'>('default');
+  const [settingsTab, setSettingsTab] = useState<'general' | 'labels' | 'inbox' | 'accounts' | 'filters' | 'forwarding' | 'themes'>('general');
   const [toasts, setToasts] = useState<ToastNotification[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [conversationMap, setConversationMap] = useState<Record<string, MessageDetail[]>>({});
@@ -1246,7 +1247,10 @@ export function MailDashboardPage({ initialFolder = 'fld-inbox' }: { initialFold
         setComposeInitialData({});
         setIsComposeOpen(true);
       }}
-      onOpenSettings={() => setIsSettingsOpen(true)}
+      onOpenSettings={(tab?: any) => {
+        if (tab) setSettingsTab(tab);
+        setIsSettingsOpen(true);
+      }}
     >
       <div className="flex-1 flex overflow-hidden" style={{ backgroundColor: 'var(--theme-bg-main, #0A0C10)' }}>
         {/* Left Column: Thread List (Full-width when no message open, resizable split when message is selected) */}
@@ -1495,6 +1499,7 @@ export function MailDashboardPage({ initialFolder = 'fld-inbox' }: { initialFold
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
+        initialTab={settingsTab}
         labels={labels}
         folders={folders}
         filterRules={filterRules}
