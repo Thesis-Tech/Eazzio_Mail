@@ -249,7 +249,7 @@ export default function MailDashboardPage() {
             ? [{ name: msg.recipient_address.split('@')[0], email: msg.recipient_address }]
             : (msg.direction === 'inbound' || slug === 'inbox')
             ? [{ name: 'You', email: senderEmail }]
-            : [{ name: 'Recipient', email: 'external@eazzio.com' }];
+            : [];
 
           const detail: MessageDetail = {
             id: msg.id,

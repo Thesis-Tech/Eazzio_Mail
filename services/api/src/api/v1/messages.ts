@@ -1064,7 +1064,27 @@ messagesRouter.post('/compose', async (req: AuthenticatedRequest, res: Response,
       queueIds = result.queueIds;
     }
 
-    // 5. Persist recipient records for external queue entries
+    // 5. Persist recipient records for sender's message (Sent folder)
+    for (const toAddr of normalizedTo) {
+      await defaultDb.query(
+        `INSERT INTO message_recipients (id, message_id, kind, address) VALUES (gen_random_uuid(), $1, 'to', $2)`,
+        [senderMsgId, toAddr]
+      );
+    }
+    for (const ccAddr of normalizedCc) {
+      await defaultDb.query(
+        `INSERT INTO message_recipients (id, message_id, kind, address) VALUES (gen_random_uuid(), $1, 'cc', $2)`,
+        [senderMsgId, ccAddr]
+      );
+    }
+    for (const bccAddr of normalizedBcc) {
+      await defaultDb.query(
+        `INSERT INTO message_recipients (id, message_id, kind, address) VALUES (gen_random_uuid(), $1, 'bcc', $2)`,
+        [senderMsgId, bccAddr]
+      );
+    }
+
+    // 5b. Persist recipient records for external queue entries if any
     for (const qId of queueIds) {
       const qRows = (await defaultDb.query(`SELECT message_id, recipient_address FROM outbound_queue WHERE id = $1`, [qId])) as any[];
       if (qRows.length > 0) {
