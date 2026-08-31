@@ -262,10 +262,10 @@ messagesRouter.get('/', async (req: AuthenticatedRequest, res: Response, next: N
              m.is_read, m.is_starred, m.is_important, m.direction, m.delivery_state,
              m.received_at,
              COALESCE(
-               NULLIF((SELECT json_agg(json_build_object('name', split_part(r.address::text, '@', 1), 'email', r.address::text, 'type', r.kind))
-                FROM message_recipients r WHERE r.message_id = m.id), '[]'::json),
-               NULLIF((SELECT json_agg(json_build_object('name', split_part(q.recipient_address, '@', 1), 'email', q.recipient_address, 'type', 'to'))
-                FROM outbound_queue q WHERE q.message_id = m.id), '[]'::json),
+               (SELECT json_agg(json_build_object('name', split_part(r.address::text, '@', 1), 'email', r.address::text, 'type', r.kind))
+                FROM message_recipients r WHERE r.message_id = m.id),
+               (SELECT json_agg(json_build_object('name', split_part(q.recipient_address, '@', 1), 'email', q.recipient_address, 'type', 'to'))
+                FROM outbound_queue q WHERE q.message_id = m.id),
                (SELECT json_agg(json_build_object('name', split_part(mb.address, '@', 1), 'email', mb.address, 'type', 'to'))
                 FROM messages m2 JOIN mailboxes mb ON mb.id = m2.mailbox_id
                 WHERE m2.message_id_header = m.message_id_header AND m2.id != m.id AND m2.direction = 'inbound'),
