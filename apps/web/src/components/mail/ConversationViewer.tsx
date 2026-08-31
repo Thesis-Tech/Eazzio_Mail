@@ -273,14 +273,6 @@ export const ConversationViewer: React.FC<ConversationViewerProps> = ({
             <Sparkles className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">{isSummarizing ? 'Summarizing...' : 'Summarize'}</span>
           </button>
-          <button 
-            type="button"
-            onClick={() => window.print()} 
-            className="p-2 rounded-full text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
-            title="Print all"
-          >
-            <Printer className="w-4 h-4" />
-          </button>
           {onClose && (
             <button 
               type="button"
