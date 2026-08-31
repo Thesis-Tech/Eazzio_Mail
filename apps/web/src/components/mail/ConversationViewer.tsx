@@ -1,14 +1,15 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   Star, Trash2, Archive, Mail, Reply, Forward, ShieldCheck, ShieldAlert, 
   Paperclip, Download, Sparkles, ChevronDown, ChevronUp, Send, X, FileText, 
   Printer, ExternalLink, Smile, ArrowLeft, Clock, AlertOctagon, 
   MoreVertical, CheckCircle2, AlertTriangle, EyeOff, Tag, MoveRight,
-  Bold, Italic, Underline, Link as LinkIcon, Image as ImageIcon
+  Bold, Italic, Underline, Link as LinkIcon, Image as ImageIcon,
+  Maximize2, MoreHorizontal
 } from 'lucide-react';
-import { MessageDetail } from '../../types/mail';
+import { MessageDetail, ComposerAttachment } from '@/types/mail';
 
 interface TrimmedMessageProps {
   bodyHtml?: string;
@@ -16,7 +17,7 @@ interface TrimmedMessageProps {
   snippet?: string;
 }
 
-const TrimmedMessageContent: React.FC<TrimmedMessageProps> = ({ bodyHtml, bodyText, snippet }) => {
+export const TrimmedMessageContent: React.FC<TrimmedMessageProps> = ({ bodyHtml, bodyText, snippet }) => {
   const [showQuoted, setShowQuoted] = useState(false);
 
   if (bodyHtml && bodyHtml.includes('<') && bodyHtml.includes('>') && bodyHtml !== '<p></p>' && bodyHtml !== '<p><br></p>') {
@@ -26,24 +27,35 @@ const TrimmedMessageContent: React.FC<TrimmedMessageProps> = ({ bodyHtml, bodyTe
       const quotedHtml = bodyHtml.slice(quoteIndex);
       return (
         <div className="space-y-3 font-sans">
-          <div className="text-[14px] text-slate-200 leading-relaxed prose prose-invert max-w-none [&_a]:text-[#2D5BFF] [&_a]:underline" dangerouslySetInnerHTML={{ __html: primaryHtml }} />
-          <div>
+          <div 
+            className="text-[14px] text-slate-200 leading-relaxed max-w-none [&_a]:text-[#2D5BFF] [&_a]:underline [&_p]:my-1.5 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6" 
+            dangerouslySetInnerHTML={{ __html: primaryHtml || '<p></p>' }} 
+          />
+          <div className="pt-1">
             <button 
               type="button"
               onClick={() => setShowQuoted(!showQuoted)} 
-              className="px-2.5 py-0.5 rounded bg-[#1E232B] hover:bg-[#2A313C] text-slate-400 hover:text-white text-xs font-bold tracking-widest transition-colors inline-flex items-center gap-1.5"
-              title="Toggle quoted text"
+              className="px-2.5 py-0.5 rounded-full bg-white/10 hover:bg-white/20 text-slate-400 hover:text-white text-xs font-mono font-bold tracking-widest transition-all inline-flex items-center gap-1 shadow-sm"
+              title="Show trimmed content"
             >
               •••
             </button>
             {showQuoted && (
-              <div className="mt-3 pl-3 border-l-2 border-[#2A313C] text-xs text-slate-400 leading-relaxed prose prose-invert max-w-none [&_a]:text-[#2D5BFF] animate-in fade-in slide-in-from-top-2" dangerouslySetInnerHTML={{ __html: quotedHtml }} />
+              <div 
+                className="mt-3 pl-3.5 border-l-2 border-slate-700/80 text-xs text-slate-400 leading-relaxed max-w-none [&_a]:text-[#2D5BFF] [&_p]:my-1 animate-in fade-in slide-in-from-top-2" 
+                dangerouslySetInnerHTML={{ __html: quotedHtml }} 
+              />
             )}
           </div>
         </div>
       );
     }
-    return <div className="text-[14px] text-slate-200 leading-relaxed font-sans prose prose-invert max-w-none [&_a]:text-[#2D5BFF] [&_a]:underline" dangerouslySetInnerHTML={{ __html: bodyHtml }} />;
+    return (
+      <div 
+        className="text-[14px] text-slate-200 leading-relaxed font-sans max-w-none [&_a]:text-[#2D5BFF] [&_a]:underline [&_p]:my-1.5 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6" 
+        dangerouslySetInnerHTML={{ __html: bodyHtml }} 
+      />
+    );
   }
 
   const rawText = bodyText || snippet || '(No content)';
@@ -56,17 +68,19 @@ const TrimmedMessageContent: React.FC<TrimmedMessageProps> = ({ bodyHtml, bodyTe
     return (
       <div className="space-y-3 font-sans">
         <div className="text-[14px] text-slate-200 leading-relaxed whitespace-pre-wrap">{primaryText || '(No text content)'}</div>
-        <div>
+        <div className="pt-1">
           <button 
             type="button"
             onClick={() => setShowQuoted(!showQuoted)} 
-            className="px-2.5 py-0.5 rounded bg-[#1E232B] hover:bg-[#2A313C] text-slate-400 hover:text-white text-xs font-bold tracking-widest transition-colors inline-flex items-center gap-1.5"
-            title="Toggle quoted text"
+            className="px-2.5 py-0.5 rounded-full bg-white/10 hover:bg-white/20 text-slate-400 hover:text-white text-xs font-mono font-bold tracking-widest transition-all inline-flex items-center gap-1 shadow-sm"
+            title="Show trimmed content"
           >
             •••
           </button>
           {showQuoted && (
-            <div className="mt-3 pl-3 border-l-2 border-[#2A313C] text-xs text-slate-400 leading-relaxed whitespace-pre-wrap animate-in fade-in slide-in-from-top-2">{quotedText}</div>
+            <div className="mt-3 pl-3.5 border-l-2 border-slate-700/80 text-xs text-slate-400 leading-relaxed whitespace-pre-wrap animate-in fade-in slide-in-from-top-2">
+              {quotedText}
+            </div>
           )}
         </div>
       </div>
@@ -102,10 +116,17 @@ export const ConversationViewer: React.FC<ConversationViewerProps> = ({
     new Set(messages.length > 0 ? [messages[messages.length - 1]!.id] : [])
   );
   const [activeDetailsId, setActiveDetailsId] = useState<string | null>(null);
-  const [replyText, setReplyText] = useState('');
+  
+  // Inline Reply state
   const [isReplying, setIsReplying] = useState(false);
+  const [replyMode, setReplyMode] = useState<'reply' | 'replyAll' | 'forward'>('reply');
+  const [replyText, setReplyText] = useState('');
+  const [showQuotedInReply, setShowQuotedInReply] = useState(false);
+  const [isFormattingOpen, setIsFormattingOpen] = useState(false);
   const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [isSummarizing, setIsSummarizing] = useState(false);
+
+  const replyEditorRef = useRef<HTMLDivElement>(null);
 
   const handleToggleExpand = (id: string) => {
     const next = new Set(expandedMessageIds);
@@ -117,12 +138,39 @@ export const ConversationViewer: React.FC<ConversationViewerProps> = ({
   const handleGenerateAiSummary = () => {
     setIsSummarizing(true);
     setTimeout(() => {
-      setAiSummary(`✨ AI Summary: This thread contains discussion regarding system verification and message delivery. Key points: Confirmation of outbound routing to internal and external recipients.`);
+      setAiSummary(`✨ AI Summary: This conversation is regarding "${subject}". Key takeaways: Outbound delivery and test routing confirmed.`);
       setIsSummarizing(false);
     }, 600);
   };
 
   const latestMessage = messages[messages.length - 1];
+
+  const handleStartReply = (mode: 'reply' | 'replyAll' | 'forward', customText?: string) => {
+    setReplyMode(mode);
+    setIsReplying(true);
+    if (customText) setReplyText(customText);
+    setTimeout(() => {
+      replyEditorRef.current?.focus();
+    }, 50);
+  };
+
+  const handleSendInlineReply = () => {
+    if (!replyText.trim() && !replyEditorRef.current?.innerText.trim()) return;
+    const finalContent = replyText.trim() || replyEditorRef.current?.innerText.trim() || '';
+    
+    // Format quote cleanly
+    const quoteAuthor = latestMessage?.from?.name || latestMessage?.from?.email || 'Sender';
+    const quoteEmail = latestMessage?.from?.email || '';
+    const quoteDate = latestMessage?.receivedAt || 'Recent';
+    const originalBody = latestMessage?.bodyHtml || latestMessage?.bodyText || latestMessage?.snippet || '';
+
+    const formattedPayload = `${finalContent}\n\n<div class="gmail_quote"><div class="gmail_attr">On ${quoteDate}, ${quoteAuthor} &lt;${quoteEmail}&gt; wrote:</div><blockquote class="gmail_quote" style="margin: 0 0 0 .8ex; border-left: 1px #ccc solid; padding-left: 1ex;">${originalBody}</blockquote></div>`;
+
+    onSendReply?.(threadId, formattedPayload);
+    setReplyText('');
+    if (replyEditorRef.current) replyEditorRef.current.innerHTML = '';
+    setIsReplying(false);
+  };
 
   return (
     <div 
@@ -185,12 +233,6 @@ export const ConversationViewer: React.FC<ConversationViewerProps> = ({
           >
             <Clock className="w-4 h-4" />
           </button>
-          <button 
-            className="p-2 rounded-full text-slate-300 hover:text-white hover:bg-white/10 transition-colors hidden md:inline-flex"
-            title="Labels"
-          >
-            <Tag className="w-4 h-4" />
-          </button>
         </div>
 
         {/* Right Utilities */}
@@ -229,21 +271,21 @@ export const ConversationViewer: React.FC<ConversationViewerProps> = ({
         className="flex-1 overflow-y-auto custom-scrollbar relative"
       >
         {/* Subject Header */}
-        <div className="px-6 sm:px-12 pt-5 pb-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-xl sm:text-2xl text-slate-100 font-normal tracking-tight">
+        <div className="px-6 sm:px-12 pt-6 pb-4">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <h1 className="text-xl sm:text-2xl text-slate-100 font-semibold tracking-tight">
               {subject || '(No Subject)'}
             </h1>
             {folderName && (
               <span 
                 style={{ backgroundColor: 'var(--theme-bg-card, #1E232B)', borderColor: 'var(--theme-border, #2A313C)' }}
-                className="text-[11px] px-2 py-0.5 rounded uppercase font-semibold text-slate-400 border tracking-wider"
+                className="text-[11px] px-2.5 py-0.5 rounded-full uppercase font-semibold text-slate-400 border tracking-wider"
               >
                 {folderName}
               </span>
             )}
             {labels.map(l => (
-              <span key={l} className="text-[11px] px-2 py-0.5 rounded border border-slate-700 bg-slate-800 text-slate-300 font-semibold">
+              <span key={l} className="text-[11px] px-2.5 py-0.5 rounded-full border border-blue-500/30 bg-blue-500/10 text-blue-300 font-semibold">
                 {l}
               </span>
             ))}
@@ -263,7 +305,7 @@ export const ConversationViewer: React.FC<ConversationViewerProps> = ({
 
         {/* 3. Messages in Thread */}
         <div className="px-4 sm:px-10 pb-6 space-y-4">
-          {messages.map((msg, index) => {
+          {messages.map((msg) => {
             const isExpanded = expandedMessageIds.has(msg.id);
             const isDetailsOpen = activeDetailsId === msg.id;
 
@@ -275,7 +317,7 @@ export const ConversationViewer: React.FC<ConversationViewerProps> = ({
                   borderColor: 'var(--theme-border, #1E232B)',
                 }}
                 className={`rounded-2xl border transition-all ${
-                  isExpanded ? 'shadow-md' : 'hover:bg-white/[0.02] cursor-pointer'
+                  isExpanded ? 'shadow-lg border-white/10' : 'hover:bg-white/[0.02] cursor-pointer border-white/5'
                 }`}
               >
                 {/* Message Header */}
@@ -286,10 +328,10 @@ export const ConversationViewer: React.FC<ConversationViewerProps> = ({
                   <div className="flex items-start gap-3.5 min-w-0">
                     {/* Avatar */}
                     <div 
-                      style={{ background: `linear-gradient(135deg, var(--theme-accent, #2D5BFF), #14B8A6)` }}
-                      className="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-xs shrink-0 shadow-sm mt-0.5"
+                      style={{ background: `linear-gradient(135deg, #2D5BFF, #14B8A6)` }}
+                      className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-xs shrink-0 shadow-md mt-0.5"
                     >
-                      {msg.from.name ? msg.from.name.slice(0, 2).toUpperCase() : 'U'}
+                      {msg.from.name ? msg.from.name.slice(0, 2).toUpperCase() : (msg.from.email?.slice(0, 2).toUpperCase() || 'U')}
                     </div>
 
                     <div className="min-w-0">
@@ -302,6 +344,7 @@ export const ConversationViewer: React.FC<ConversationViewerProps> = ({
                       {/* Line 2: to me dropdown toggle */}
                       <div className="relative mt-0.5">
                         <button 
+                          type="button"
                           onClick={(e) => {
                             e.stopPropagation();
                             setActiveDetailsId(isDetailsOpen ? null : msg.id);
@@ -317,7 +360,7 @@ export const ConversationViewer: React.FC<ConversationViewerProps> = ({
                           <div 
                             onClick={(e) => e.stopPropagation()}
                             style={{ backgroundColor: 'var(--theme-bg-sidebar, #090A0D)', borderColor: 'var(--theme-border, #2A313C)' }}
-                            className="absolute left-0 top-full mt-2 p-3.5 rounded-xl border shadow-2xl z-30 w-72 text-xs space-y-2 animate-in fade-in zoom-in-95"
+                            className="absolute left-0 top-full mt-2 p-3.5 rounded-xl border shadow-2xl z-30 w-80 text-xs space-y-2 animate-in fade-in zoom-in-95"
                           >
                             <div className="flex justify-between"><span className="text-slate-500 font-medium">from:</span><span className="text-slate-200 font-semibold">{msg.from.name ? `${msg.from.name} <${msg.from.email}>` : msg.from.email}</span></div>
                             <div className="flex justify-between"><span className="text-slate-500 font-medium">to:</span><span className="text-slate-200">{msg.to.map(t => t.email || t.name).join(', ')}</span></div>
@@ -342,6 +385,7 @@ export const ConversationViewer: React.FC<ConversationViewerProps> = ({
                   <div className="flex items-center gap-2 shrink-0">
                     <span className="text-xs text-slate-400">{msg.receivedAt}</span>
                     <button 
+                      type="button"
                       onClick={(e) => {
                         e.stopPropagation();
                         onToggleStar?.(threadId);
@@ -352,21 +396,23 @@ export const ConversationViewer: React.FC<ConversationViewerProps> = ({
                       <Star className="w-4 h-4" />
                     </button>
                     <button 
+                      type="button"
                       onClick={(e) => {
                         e.stopPropagation();
-                        setIsReplying(true);
+                        handleStartReply('reply');
                       }}
-                      className="p-1 rounded text-slate-400 hover:text-white transition-colors"
+                      className="p-1.5 rounded-full hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
                       title="Reply"
                     >
                       <Reply className="w-4 h-4" />
                     </button>
                     <button 
+                      type="button"
                       onClick={(e) => {
                         e.stopPropagation();
                         handleToggleExpand(msg.id);
                       }}
-                      className="p-1 rounded text-slate-400 hover:text-white transition-colors"
+                      className="p-1.5 rounded-full hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
                     >
                       {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                     </button>
@@ -385,24 +431,22 @@ export const ConversationViewer: React.FC<ConversationViewerProps> = ({
         </div>
 
         {/* 4. Bottom Action Area (Gmail Standard) */}
-        <div className="px-4 sm:px-10 pb-8">
+        <div className="px-4 sm:px-10 pb-12">
           {/* Smart Reply Pill Suggestions */}
           {!isReplying && (
             <div className="flex flex-wrap items-center gap-2 mb-4">
               {['Got it, thanks!', 'Looks good to me.', 'I will review this today.', 'Could you provide more details?'].map((suggestion) => (
                 <button
                   key={suggestion}
-                  onClick={() => {
-                    setReplyText(suggestion);
-                    setIsReplying(true);
-                  }}
+                  type="button"
+                  onClick={() => handleStartReply('reply', suggestion)}
                   style={{
                     backgroundColor: 'var(--theme-bg-card, #12141A)',
                     borderColor: 'var(--theme-border, #1E232B)',
                   }}
-                  className="px-3.5 py-1.5 rounded-full border text-xs font-medium text-slate-300 hover:text-white hover:border-white/30 hover:scale-[1.02] active:scale-95 transition-all shadow-sm flex items-center gap-1.5"
+                  className="px-4 py-1.5 rounded-full border text-xs font-medium text-slate-300 hover:text-white hover:border-white/30 hover:scale-[1.02] active:scale-95 transition-all shadow-sm flex items-center gap-1.5"
                 >
-                  <Sparkles style={{ color: 'var(--theme-accent, #2D5BFF)' }} className="w-3 h-3 opacity-80" />
+                  <Sparkles className="w-3.5 h-3.5 text-blue-400" />
                   <span>{suggestion}</span>
                 </button>
               ))}
@@ -410,41 +454,41 @@ export const ConversationViewer: React.FC<ConversationViewerProps> = ({
           )}
 
           {/* Collapsed State: Reply & Forward Action Buttons */}
-          {!isReplying && !replyText ? (
+          {!isReplying ? (
             <div className="flex items-center gap-3">
               <button
-                onClick={() => setIsReplying(true)}
+                type="button"
+                onClick={() => handleStartReply('reply')}
                 style={{
                   backgroundColor: 'var(--theme-bg-card, #12141A)',
                   borderColor: 'var(--theme-border, #1E232B)',
                 }}
-                className="px-6 py-2 rounded-full border text-slate-300 hover:text-white hover:border-white/30 text-xs font-semibold flex items-center gap-2 transition-all shadow-sm hover:brightness-110"
+                className="px-6 py-2.5 rounded-full border text-slate-300 hover:text-white hover:border-white/30 text-xs font-semibold flex items-center gap-2 transition-all shadow-sm hover:brightness-110"
               >
-                <Reply className="w-3.5 h-3.5 text-slate-400" />
+                <Reply className="w-4 h-4 text-slate-400" />
                 <span>Reply</span>
               </button>
               <button
-                onClick={() => {
-                  if (latestMessage) onForward?.(latestMessage);
-                }}
+                type="button"
+                onClick={() => handleStartReply('forward')}
                 style={{
                   backgroundColor: 'var(--theme-bg-card, #12141A)',
                   borderColor: 'var(--theme-border, #1E232B)',
                 }}
-                className="px-6 py-2 rounded-full border text-slate-300 hover:text-white hover:border-white/30 text-xs font-semibold flex items-center gap-2 transition-all shadow-sm hover:brightness-110"
+                className="px-6 py-2.5 rounded-full border text-slate-300 hover:text-white hover:border-white/30 text-xs font-semibold flex items-center gap-2 transition-all shadow-sm hover:brightness-110"
               >
-                <Forward className="w-3.5 h-3.5 text-slate-400" />
+                <Forward className="w-4 h-4 text-slate-400" />
                 <span>Forward</span>
               </button>
             </div>
           ) : (
-            /* Expanded State: Inline Rich Composer */
+            /* Gmail Inline Rich Reply Box */
             <div
               style={{
                 backgroundColor: 'var(--theme-bg-card, #12141A)',
                 borderColor: 'var(--theme-border, #1E232B)',
               }}
-              className="rounded-2xl border shadow-xl overflow-hidden animate-in fade-in duration-200"
+              className="rounded-2xl border shadow-2xl overflow-hidden animate-in fade-in duration-200"
             >
               {/* Header */}
               <div
@@ -452,97 +496,157 @@ export const ConversationViewer: React.FC<ConversationViewerProps> = ({
                   backgroundColor: 'var(--theme-bg-sidebar, #090A0D)',
                   borderColor: 'var(--theme-border, #1E232B)',
                 }}
-                className="px-4 py-2 border-b flex items-center justify-between text-xs"
+                className="px-4 py-2.5 border-b flex items-center justify-between text-xs"
               >
                 <div className="flex items-center gap-2 text-slate-300">
-                  <Reply className="w-3.5 h-3.5 text-slate-400" />
-                  <span>Replying to:</span>
-                  <span className="font-semibold text-white">
-                    {latestMessage?.from?.name || latestMessage?.from?.email || 'Sender'}
+                  {replyMode === 'forward' ? (
+                    <Forward className="w-4 h-4 text-blue-400" />
+                  ) : (
+                    <Reply className="w-4 h-4 text-blue-400" />
+                  )}
+                  <span className="font-semibold text-slate-400">
+                    {replyMode === 'forward' ? 'Forwarding to:' : 'Replying to:'}
                   </span>
-                  <span className="text-slate-500">&lt;{latestMessage?.from?.email}&gt;</span>
+                  <span className="font-semibold text-white">
+                    {replyMode === 'forward' ? 'Select recipient...' : (latestMessage?.from?.name || latestMessage?.from?.email || 'Sender')}
+                  </span>
+                  {replyMode !== 'forward' && (
+                    <span className="text-slate-500">&lt;{latestMessage?.from?.email}&gt;</span>
+                  )}
                 </div>
-                <button
-                  onClick={() => {
-                    setIsReplying(false);
-                    setReplyText('');
-                  }}
-                  className="p-1 rounded text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
-                >
-                  <X className="w-4 h-4" />
-                </button>
+
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (latestMessage) {
+                        if (replyMode === 'forward') onForward?.(latestMessage);
+                        else onReply?.(latestMessage);
+                        setIsReplying(false);
+                      }
+                    }}
+                    className="p-1 rounded text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+                    title="Pop out reply"
+                  >
+                    <Maximize2 className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsReplying(false);
+                      setReplyText('');
+                    }}
+                    className="p-1 rounded text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                    title="Close"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
 
-              {/* Text Area */}
-              <textarea
-                autoFocus
-                value={replyText}
-                onChange={(e) => setReplyText(e.target.value)}
-                placeholder="Write your reply here..."
-                rows={5}
-                className="w-full bg-transparent p-4 text-sm text-white placeholder-slate-500 outline-none resize-none"
-              />
+              {/* Text Input */}
+              <div className="p-4">
+                <textarea
+                  autoFocus
+                  value={replyText}
+                  onChange={(e) => setReplyText(e.target.value)}
+                  placeholder={`Reply to ${latestMessage?.from?.name || latestMessage?.from?.email || 'message'}...`}
+                  rows={4}
+                  className="w-full bg-transparent text-sm text-white placeholder-slate-500 outline-none resize-none leading-relaxed"
+                />
 
-              {/* Toolbar & Send */}
+                {/* Trimmed Original Message inside Inline Reply */}
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowQuotedInReply(!showQuotedInReply)}
+                    className="px-2.5 py-0.5 rounded-full bg-white/10 hover:bg-white/20 text-slate-400 hover:text-white text-xs font-mono font-bold tracking-widest transition-all inline-flex items-center gap-1 shadow-sm"
+                    title="Toggle original message"
+                  >
+                    •••
+                  </button>
+
+                  {showQuotedInReply && (
+                    <div className="mt-3 pl-3.5 border-l-2 border-slate-700 text-xs text-slate-400 leading-relaxed animate-in fade-in">
+                      <div className="font-semibold text-slate-300 mb-1">
+                        On {latestMessage?.receivedAt}, {latestMessage?.from?.name || latestMessage?.from?.email} wrote:
+                      </div>
+                      <div 
+                        dangerouslySetInnerHTML={{ 
+                          __html: latestMessage?.bodyHtml || `<p>${latestMessage?.bodyText || latestMessage?.snippet || ''}</p>` 
+                        }} 
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Bottom Actions Row */}
               <div
                 style={{
-                  backgroundColor: 'var(--theme-bg-header, #0A0C10)',
+                  backgroundColor: 'var(--theme-bg-sidebar, #090A0D)',
                   borderColor: 'var(--theme-border, #1E232B)',
                 }}
                 className="p-3 border-t flex items-center justify-between"
               >
                 {/* Left Formats */}
                 <div className="flex items-center gap-1 text-slate-400">
-                  <button type="button" className="p-1.5 rounded hover:text-white hover:bg-white/10" title="Bold">
-                    <Bold className="w-3.5 h-3.5" />
-                  </button>
-                  <button type="button" className="p-1.5 rounded hover:text-white hover:bg-white/10" title="Italic">
-                    <Italic className="w-3.5 h-3.5" />
-                  </button>
-                  <button type="button" className="p-1.5 rounded hover:text-white hover:bg-white/10" title="Underline">
-                    <Underline className="w-3.5 h-3.5" />
-                  </button>
-                  <div style={{ backgroundColor: 'var(--theme-border, #1E232B)' }} className="w-[1px] h-4 mx-1"></div>
-                  <button type="button" className="p-1.5 rounded hover:text-white hover:bg-white/10" title="Attach file">
-                    <Paperclip className="w-3.5 h-3.5" />
-                  </button>
-                  <button type="button" className="p-1.5 rounded hover:text-white hover:bg-white/10" title="Insert link">
-                    <LinkIcon className="w-3.5 h-3.5" />
-                  </button>
-                  <button type="button" className="p-1.5 rounded hover:text-white hover:bg-white/10" title="Insert emoji">
-                    <Smile className="w-3.5 h-3.5" />
-                  </button>
                   <button
                     type="button"
+                    onClick={handleSendInlineReply}
+                    disabled={!replyText.trim()}
+                    className="px-5 py-2 rounded-full bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs flex items-center gap-2 transition-all disabled:opacity-50 shadow-md mr-2"
+                  >
+                    <span>Send</span>
+                    <Send className="w-3.5 h-3.5" />
+                  </button>
+
+                  <button 
+                    type="button" 
+                    onClick={() => setIsFormattingOpen(!isFormattingOpen)} 
+                    className={`px-2 py-1 rounded text-xs font-bold transition-colors ${
+                      isFormattingOpen ? 'bg-blue-500/20 text-blue-400' : 'hover:text-white hover:bg-white/10'
+                    }`} 
+                    title="Formatting options"
+                  >
+                    Aa
+                  </button>
+                  <button 
+                    type="button" 
                     onClick={() => {
-                      setReplyText('');
+                      if (latestMessage) onReply?.(latestMessage);
                       setIsReplying(false);
                     }}
-                    className="p-1.5 rounded hover:text-rose-400 hover:bg-rose-500/10 ml-2"
-                    title="Discard draft"
+                    className="p-1.5 rounded hover:text-white hover:bg-white/10" 
+                    title="Attach files (open composer)"
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
+                    <Paperclip className="w-4 h-4" />
+                  </button>
+                  <button 
+                    type="button" 
+                    onClick={() => {
+                      if (latestMessage) onReply?.(latestMessage);
+                      setIsReplying(false);
+                    }}
+                    className="p-1.5 rounded hover:text-white hover:bg-white/10" 
+                    title="Insert emoji (open composer)"
+                  >
+                    <Smile className="w-4 h-4" />
                   </button>
                 </div>
 
-                {/* Right Send */}
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => {
-                      if (replyText.trim()) {
-                        onSendReply?.(threadId, replyText);
-                        setReplyText('');
-                        setIsReplying(false);
-                      }
-                    }}
-                    disabled={!replyText.trim()}
-                    style={{ backgroundColor: 'var(--theme-accent, #2D5BFF)' }}
-                    className="px-5 py-2 rounded-xl text-white font-bold text-xs flex items-center gap-1.5 shadow-lg hover:brightness-110 disabled:opacity-50 transition-all"
-                  >
-                    <Send className="w-3.5 h-3.5" />
-                    <span>Send</span>
-                  </button>
-                </div>
+                {/* Right Discard */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setReplyText('');
+                    setIsReplying(false);
+                  }}
+                  className="p-2 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                  title="Discard draft"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
               </div>
             </div>
           )}
@@ -551,3 +655,5 @@ export const ConversationViewer: React.FC<ConversationViewerProps> = ({
     </div>
   );
 };
+
+export default ConversationViewer;

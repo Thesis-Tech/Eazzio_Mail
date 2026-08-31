@@ -158,6 +158,10 @@ export const MailComposer: React.FC<MailComposerProps> = ({
   const [isConfidential, setIsConfidential] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  
+  // Quoted Old Mail State
+  const [quotedHtml, setQuotedHtml] = useState<string | null>(null);
+  const [showQuotedInComposer, setShowQuotedInComposer] = useState(false);
 
   const editorRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -205,18 +209,41 @@ export const MailComposer: React.FC<MailComposerProps> = ({
       setIsMinimized(false);
       setIsMaximized(false);
 
-      // Populate contentEditable editor
-      setTimeout(() => {
-        if (editorRef.current) {
-          if (initialBody) {
-            editorRef.current.innerHTML = initialBody.includes('<') && initialBody.includes('>')
-              ? initialBody
-              : initialBody.replace(/\n/g, '<br>');
-          } else {
-            editorRef.current.innerHTML = '';
-          }
+      // Check if initialBody contains a quoted message
+      if (initialBody) {
+        const quoteIndex = initialBody.search(/(<div\s+class="gmail_quote"|<blockquote|<div\s+class="gmail_attr")/i);
+        if (quoteIndex !== -1) {
+          const primary = initialBody.slice(0, quoteIndex).trim();
+          const quoted = initialBody.slice(quoteIndex).trim();
+          setQuotedHtml(quoted);
+          setShowQuotedInComposer(false);
+
+          setTimeout(() => {
+            if (editorRef.current) {
+              editorRef.current.innerHTML = primary;
+              editorRef.current.focus();
+            }
+          }, 50);
+        } else {
+          setQuotedHtml(null);
+          setTimeout(() => {
+            if (editorRef.current) {
+              editorRef.current.innerHTML = initialBody.includes('<') && initialBody.includes('>')
+                ? initialBody
+                : initialBody.replace(/\n/g, '<br>');
+              editorRef.current.focus();
+            }
+          }, 50);
         }
-      }, 50);
+      } else {
+        setQuotedHtml(null);
+        setTimeout(() => {
+          if (editorRef.current) {
+            editorRef.current.innerHTML = '';
+            editorRef.current.focus();
+          }
+        }, 50);
+      }
     }
     prevIsOpenRef.current = isOpen;
   }, [isOpen, initialSubject, initialBody]);
@@ -323,6 +350,14 @@ export const MailComposer: React.FC<MailComposerProps> = ({
     const htmlContent = editorRef.current ? editorRef.current.innerHTML : '';
     const textContent = editorRef.current ? editorRef.current.innerText : '';
 
+    const finalHtml = quotedHtml 
+      ? `${htmlContent.trim() || `<p>${textContent.trim()}</p>`}<br><br>${quotedHtml}`
+      : (htmlContent.trim() || `<p>${textContent.trim()}</p>`);
+
+    const finalPlainText = quotedHtml
+      ? `${textContent.trim()}\n\n${quotedHtml.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()}`
+      : textContent.trim();
+
     setIsSending(true);
     try {
       await onSend({
@@ -330,9 +365,9 @@ export const MailComposer: React.FC<MailComposerProps> = ({
         cc: ccChips,
         bcc: bccChips,
         subject: subject.trim() || '(No Subject)',
-        body: textContent.trim(),
-        bodyHtml: htmlContent.trim() || `<p>${textContent.trim()}</p>`,
-        bodyText: textContent.trim(),
+        body: finalPlainText,
+        bodyHtml: finalHtml,
+        bodyText: finalPlainText,
         attachments,
         scheduledAt: scheduledDate?.toISOString(),
       });
@@ -574,8 +609,29 @@ export const MailComposer: React.FC<MailComposerProps> = ({
               onKeyUp={saveSelection}
               onMouseUp={saveSelection}
               onBlur={saveSelection}
-              className="flex-1 w-full bg-transparent text-sm text-slate-200 leading-relaxed outline-none min-h-[160px] focus:outline-none empty:before:content-[attr(data-placeholder)] empty:before:text-slate-600 empty:before:pointer-events-none [&_ul]:list-disc [&_ul]:pl-7 [&_ul]:my-2 [&_ul_li]:list-disc [&_ol]:list-decimal [&_ol]:pl-7 [&_ol]:my-2 [&_ol_li]:list-decimal [&_li]:my-1 [&_blockquote]:border-l-2 [&_blockquote]:border-slate-500 [&_blockquote]:pl-3 [&_a]:text-blue-400 [&_a]:underline font-sans"
+              className="flex-1 w-full bg-transparent text-sm text-slate-200 leading-relaxed outline-none min-h-[140px] focus:outline-none empty:before:content-[attr(data-placeholder)] empty:before:text-slate-600 empty:before:pointer-events-none [&_ul]:list-disc [&_ul]:pl-7 [&_ul]:my-2 [&_ul_li]:list-disc [&_ol]:list-decimal [&_ol]:pl-7 [&_ol]:my-2 [&_ol_li]:list-decimal [&_li]:my-1 [&_blockquote]:border-l-2 [&_blockquote]:border-slate-500 [&_blockquote]:pl-3 [&_a]:text-blue-400 [&_a]:underline font-sans"
             />
+
+            {/* Quoted Original Mail (Gmail '...' Button) */}
+            {quotedHtml && (
+              <div className="mt-2 pt-2 border-t border-white/5">
+                <button
+                  type="button"
+                  onClick={() => setShowQuotedInComposer(!showQuotedInComposer)}
+                  className="px-2.5 py-0.5 rounded-full bg-white/10 hover:bg-white/20 text-slate-400 hover:text-white text-xs font-mono font-bold tracking-widest transition-all inline-flex items-center gap-1 shadow-sm select-none"
+                  title="Show trimmed content"
+                >
+                  •••
+                </button>
+
+                {showQuotedInComposer && (
+                  <div 
+                    className="mt-3 pl-3.5 border-l-2 border-slate-700 text-xs text-slate-400 leading-relaxed max-w-none [&_a]:text-[#2D5BFF] [&_p]:my-1 animate-in fade-in"
+                    dangerouslySetInnerHTML={{ __html: quotedHtml }}
+                  />
+                )}
+              </div>
+            )}
 
             {/* Attachment preview chips */}
             {attachments.length > 0 && (

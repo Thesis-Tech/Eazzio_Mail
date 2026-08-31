@@ -972,19 +972,23 @@ export function MailDashboardPage({ initialFolder = 'fld-inbox' }: { initialFold
     }
   };
 
-  const handleSendReply = (threadId: string, replyText: string) => {
+  const handleSendReply = async (threadId: string, replyText: string) => {
     const activeMessages = conversationMap[threadId] || [];
+    const latestMsg = activeMessages[activeMessages.length - 1];
+    const currentUserEmail = AuthStore.getState().user?.email || 'user@eazzio.com';
+    const targetRecipient = latestMsg?.from?.email || activeMessages[0]?.from?.email || 'sender@eazzio.com';
+
     const newMsg: MessageDetail = {
       id: `msg-${Date.now()}`,
       threadId,
       mailboxId: 'mbx-primary',
       folderId: activeFolderId,
-      from: { name: 'You', email: AuthStore.getState().user?.email || 'user@eazzio.com' },
-      to: [{ name: 'Sender', email: activeMessages[0]?.from.email || 'sender@eazzio.com' }],
-      subject: `Re: ${activeMessages[0]?.subject || 'Conversation'}`,
-      snippet: replyText.slice(0, 80),
-      bodyText: replyText,
-      bodyHtml: `<p>${replyText}</p>`,
+      from: { name: 'You', email: currentUserEmail },
+      to: [{ name: latestMsg?.from?.name || 'Recipient', email: targetRecipient }],
+      subject: `Re: ${latestMsg?.subject || activeMessages[0]?.subject || 'Conversation'}`.replace(/^(Re:\s*)+/i, 'Re: '),
+      snippet: replyText.replace(/<[^>]+>/g, '').slice(0, 80),
+      bodyText: replyText.replace(/<[^>]+>/g, ''),
+      bodyHtml: replyText.includes('<') ? replyText : `<p>${replyText.replace(/\n/g, '<br>')}</p>`,
       receivedAt: 'Just now',
       isRead: true,
       isStarred: false,
@@ -1009,18 +1013,46 @@ export function MailDashboardPage({ initialFolder = 'fld-inbox' }: { initialFold
           ? {
               ...t,
               messageCount: t.messageCount + 1,
-              snippet: replyText.slice(0, 80),
+              snippet: replyText.replace(/<[^>]+>/g, '').slice(0, 80),
               lastMessageAt: 'Just now',
             }
           : t
       )
     );
+
+    // Persist reply to backend
+    try {
+      const authState = AuthStore.getState();
+      const token = authState.token || '';
+      await fetch('/api/messages/compose', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+          'x-user-email': currentUserEmail,
+        },
+        body: JSON.stringify({
+          to: [targetRecipient],
+          subject: newMsg.subject,
+          body: newMsg.bodyText,
+          bodyHtml: newMsg.bodyHtml,
+          bodyText: newMsg.bodyText,
+          threadId,
+        }),
+      });
+    } catch (err) {
+      console.warn('Failed to persist reply to backend:', err);
+    }
   };
 
   const handleReply = (msg: MessageDetail) => {
     const rawSubj = msg.subject || '';
     const cleanSubj = rawSubj.toLowerCase().startsWith('re:') ? rawSubj : `Re: ${rawSubj}`;
-    const quotedBody = `\n\nOn ${msg.receivedAt}, ${msg.from.name || msg.from.email} wrote:\n> ${(msg.bodyText || msg.snippet || '').split('\n').join('\n> ')}`;
+    const dateStr = msg.receivedAt || 'Recent';
+    const authorStr = msg.from.name ? `${msg.from.name} <${msg.from.email}>` : msg.from.email;
+    const origBodyHtml = msg.bodyHtml || `<p>${(msg.bodyText || msg.snippet || '').replace(/\n/g, '<br>')}</p>`;
+    
+    const quotedBody = `<br><br><div class="gmail_quote"><div class="gmail_attr">On ${dateStr}, ${authorStr} wrote:<br></div><blockquote class="gmail_quote" style="margin: 0px 0px 0px 0.8ex; border-left: 1px solid rgb(204, 204, 204); padding-left: 1ex;">${origBodyHtml}</blockquote></div>`;
 
     setComposeInitialData({
       to: [msg.from.email],
@@ -1043,7 +1075,11 @@ export function MailDashboardPage({ initialFolder = 'fld-inbox' }: { initialFold
     ];
     const uniqueTo = Array.from(new Set(allTo.filter(Boolean)));
     const uniqueCc = msg.cc ? Array.from(new Set(msg.cc.map((c) => c.email).filter((e) => e && e.toLowerCase() !== currentUserEmail))) : [];
-    const quotedBody = `\n\nOn ${msg.receivedAt}, ${msg.from.name || msg.from.email} wrote:\n> ${(msg.bodyText || msg.snippet || '').split('\n').join('\n> ')}`;
+    
+    const dateStr = msg.receivedAt || 'Recent';
+    const authorStr = msg.from.name ? `${msg.from.name} <${msg.from.email}>` : msg.from.email;
+    const origBodyHtml = msg.bodyHtml || `<p>${(msg.bodyText || msg.snippet || '').replace(/\n/g, '<br>')}</p>`;
+    const quotedBody = `<br><br><div class="gmail_quote"><div class="gmail_attr">On ${dateStr}, ${authorStr} wrote:<br></div><blockquote class="gmail_quote" style="margin: 0px 0px 0px 0.8ex; border-left: 1px solid rgb(204, 204, 204); padding-left: 1ex;">${origBodyHtml}</blockquote></div>`;
 
     setComposeInitialData({
       to: uniqueTo,
@@ -1059,13 +1095,14 @@ export function MailDashboardPage({ initialFolder = 'fld-inbox' }: { initialFold
   const handleForward = (msg: MessageDetail) => {
     const rawSubj = msg.subject || '';
     const cleanSubj = rawSubj.toLowerCase().startsWith('fwd:') ? rawSubj : `Fwd: ${rawSubj}`;
-    const fwdBody = `\n\n---------- Forwarded message ---------\nFrom: ${msg.from.name || ''} <${msg.from.email}>\nDate: ${msg.receivedAt}\nSubject: ${msg.subject}\nTo: ${msg.to.map((t) => t.email).join(', ')}\n\n${msg.bodyText || msg.snippet || ''}`;
+    const origBodyHtml = msg.bodyHtml || `<p>${(msg.bodyText || msg.snippet || '').replace(/\n/g, '<br>')}</p>`;
+    const fwdBody = `<br><br><div class="gmail_quote"><div class="gmail_attr">---------- Forwarded message ---------<br>From: <b>${msg.from.name || ''}</b> &lt;${msg.from.email}&gt;<br>Date: ${msg.receivedAt}<br>Subject: ${msg.subject}<br>To: ${msg.to.map((t) => t.email).join(', ')}<br><br></div><blockquote class="gmail_quote" style="margin: 0px 0px 0px 0.8ex; border-left: 1px solid rgb(204, 204, 204); padding-left: 1ex;">${origBodyHtml}</blockquote></div>`;
 
     const composerAttachments: ComposerAttachment[] = (msg.attachments || []).map((att) => ({
       id: att.id,
       name: att.filename,
       sizeBytes: att.sizeBytes,
-      type: att.contentType,
+      contentType: att.contentType,
     }));
 
     setComposeInitialData({
