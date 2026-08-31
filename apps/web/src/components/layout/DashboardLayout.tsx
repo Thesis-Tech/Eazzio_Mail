@@ -69,6 +69,20 @@ export interface ThemeConfig {
 }
 
 export const THEME_CONFIGS: Record<string, ThemeConfig> = {
+  'eazzio-teal': {
+    id: 'eazzio-teal',
+    name: 'Eazzio Teal (Brand)',
+    bgMain: '#0A0C10',
+    bgSidebar: '#090A0D',
+    bgHeader: '#0A0C10',
+    bgCard: '#12141A',
+    bgHover: '#15181F',
+    border: '#1E232B',
+    accent: '#14B8A6',
+    accentHover: '#0D9488',
+    accentBg: 'rgba(20, 184, 166, 0.14)',
+    accentGlow: 'rgba(20, 184, 166, 0.35)',
+  },
   'dark-oled': {
     id: 'dark-oled',
     name: 'Default Dark',
@@ -192,7 +206,7 @@ export function getThemeConfig(themeId: string): ThemeConfig {
       if (parsed.bgMain && parsed.accent) return parsed;
     }
   } catch (_) {}
-  return THEME_CONFIGS['dark-oled']!;
+  return THEME_CONFIGS['eazzio-teal']!;
 }
 
 export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
@@ -225,7 +239,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   const [isAdvancedSearchOpen, setIsAdvancedSearchOpen] = useState(false);
   const [internalDensity, setInternalDensity] = useState<'default' | 'comfortable' | 'compact'>('default');
   const activeDensity = propDensity || internalDensity;
-  const [theme, setTheme] = useState('dark-oled');
+  const [theme, setTheme] = useState('eazzio-teal');
   const [inboxType, setInboxType] = useState<'default' | 'important' | 'unread' | 'starred' | 'priority'>('default');
   const [internalReadingPane, setInternalReadingPane] = useState<'none' | 'right' | 'below'>('none');
   const activeReadingPane = propReadingPane || internalReadingPane;

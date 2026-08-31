@@ -1,13 +1,8 @@
 'use client';
 
-import { MailDashboardPage } from '@/components/mail/MailDashboard';
+import React from 'react';
+import { MailDashboard } from '../../../components/mail/MailDashboard';
 
-export default function MailSettingsPage() {
-  return (
-    <MailDashboardPage 
-      initialFolder="fld-inbox" 
-      initialSettingsOpen={true} 
-      initialSettingsTab="general" 
-    />
-  );
+export default function SettingsPage() {
+  return <MailDashboard initialFolder="fld-inbox" initialSettingsOpen={true} initialSettingsTab="general" />;
 }

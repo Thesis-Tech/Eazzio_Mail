@@ -77,7 +77,8 @@ const PRESET_COLORS = [
 ];
 
 const PRESET_THEMES = [
-  { id: 'dark-oled', name: 'Default Dark', bg: '#0A0C10', accent: '#2D5BFF', border: '#1E232B', desc: 'Deep black with electric royal blue accents' },
+  { id: 'eazzio-teal', name: 'Eazzio Brand (Default)', bg: '#0A0C10', accent: '#14B8A6', border: '#1E232B', desc: 'Official Eazzio brand dark canvas with cyber teal accents' },
+  { id: 'dark-oled', name: 'Royal Dark', bg: '#0A0C10', accent: '#2D5BFF', border: '#1E232B', desc: 'Deep black with electric royal blue accents' },
   { id: 'midnight', name: 'Midnight Blue', bg: '#070D18', accent: '#38BDF8', border: '#1E3B68', desc: 'Navy night canvas with vivid sky blue' },
   { id: 'emerald', name: 'Cyber Emerald', bg: '#030E0B', accent: '#10B981', border: '#103F31', desc: 'Futuristic matrix black with neon mint glow' },
   { id: 'purple', name: 'Deep Amethyst', bg: '#0D0716', accent: '#A855F7', border: '#3D1C63', desc: 'Royal dark purple with neon violet radiance' },
@@ -95,7 +96,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   labels,
   filterRules,
   preferences,
-  currentThemeId = 'dark-oled',
+  currentThemeId = 'eazzio-teal',
   onThemeChange,
   onUpdateFolders,
   onUpdateLabels,
