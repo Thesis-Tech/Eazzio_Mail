@@ -516,7 +516,7 @@ authRouter.post('/forgot-password', async (req: Request, res: Response, next: Ne
     res.json({
       success: true,
       data: {
-        message: `Password reset code sent via ${activeChannel} to ${deliveryTarget}.`,
+        message: `Password reset instructions have been sent via ${activeChannel} to ${deliveryTarget}.`,
         devToken: process.env.NODE_ENV !== 'production' ? resetToken : undefined,
       },
     });

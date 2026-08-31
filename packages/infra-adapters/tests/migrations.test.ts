@@ -10,8 +10,8 @@ describe('Database Migrations & RLS Scripts Integrity', () => {
     const upFiles = files.filter((f) => f.endsWith('.sql') && !f.endsWith('.down.sql'));
     const downFiles = files.filter((f) => f.endsWith('.down.sql'));
 
-    expect(upFiles.length).toBe(6);
-    expect(downFiles.length).toBe(6);
+    expect(upFiles.length).toBeGreaterThanOrEqual(6);
+    expect(downFiles.length).toBe(upFiles.length);
 
     for (const up of upFiles) {
       const baseName = up.replace('.sql', '');

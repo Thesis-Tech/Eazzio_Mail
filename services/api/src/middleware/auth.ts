@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { TokenService, TokenPayload } from '@eazzio/identity';
+import { AppError } from './error-handler.js';
 
 export interface AuthenticatedRequest extends Request {
   user?: TokenPayload;
@@ -9,9 +10,18 @@ export async function requireAuth(req: AuthenticatedRequest, _res: Response, nex
   const authHeader = req.headers.authorization;
   const userEmailHeader = (req.headers['x-user-email'] as string | undefined)?.trim()?.toLowerCase();
 
+  // If no auth header and no user email header, require authentication
+  if (!authHeader && !userEmailHeader) {
+    return next(new AppError('AUTH_REQUIRED', 'Authentication required', 401));
+  }
+
   // 1. Support Explicit Named Dev Identity Tokens
   if (authHeader) {
     const token = authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1]! : authHeader;
+
+    if (!token) {
+      return next(new AppError('AUTH_REQUIRED', 'Authentication required', 401));
+    }
 
     if (token === 'dev-token-personal' || token.startsWith('dev-token-rahul')) {
       req.user = {
@@ -58,14 +68,17 @@ export async function requireAuth(req: AuthenticatedRequest, _res: Response, nex
     }
   }
 
-  // 3. Fallback to x-user-email or default dev user
-  const effectiveEmail = userEmailHeader || 'rahulkumar@eazzio.com';
-  req.user = {
-    userId: `usr-${Buffer.from(effectiveEmail).toString('hex').slice(0, 16)}`,
-    sessionId: `sess-${Date.now()}`,
-    email: effectiveEmail,
-    scopes: ['*'],
-  };
-  return next();
+  // 3. Fallback to x-user-email if provided
+  if (userEmailHeader) {
+    req.user = {
+      userId: `usr-${Buffer.from(userEmailHeader).toString('hex').slice(0, 16)}`,
+      sessionId: `sess-${Date.now()}`,
+      email: userEmailHeader,
+      scopes: ['*'],
+    };
+    return next();
+  }
+
+  return next(new AppError('AUTH_REQUIRED', 'Invalid or expired session token', 401));
 }
 
