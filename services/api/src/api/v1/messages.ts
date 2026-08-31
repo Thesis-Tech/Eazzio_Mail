@@ -504,6 +504,12 @@ messagesRouter.post('/batch-action', async (req: AuthenticatedRequest, res: Resp
         `UPDATE messages SET folder_id = $2 WHERE (id = ANY($1) OR thread_id = ANY($1)) AND mailbox_id = $3`,
         [threadIds, archiveFolderId, mailboxId]
       );
+    } else if (action === 'unarchive' || action === 'inbox' || action === 'move-to-inbox') {
+      const inboxFolderId = await getFolderId(mailboxId, 'inbox');
+      await defaultDb.query(
+        `UPDATE messages SET folder_id = $2 WHERE (id = ANY($1) OR thread_id = ANY($1)) AND mailbox_id = $3`,
+        [threadIds, inboxFolderId, mailboxId]
+      );
     } else if (action === 'read') {
       await defaultDb.query(
         `UPDATE messages SET is_read = true WHERE (id = ANY($1) OR thread_id = ANY($1)) AND mailbox_id = $2`,

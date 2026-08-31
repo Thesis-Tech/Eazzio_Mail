@@ -100,6 +100,7 @@ export interface ConversationViewerProps {
   folderName?: string;
   labels?: string[];
   onArchive?: (threadId: string) => void;
+  onUnarchive?: (threadId: string) => void;
   onDelete?: (threadId: string) => void;
   onToggleStar?: (threadId: string) => void;
   onSnooze?: (threadId: string) => void;
@@ -113,7 +114,7 @@ export interface ConversationViewerProps {
 
 export const ConversationViewer: React.FC<ConversationViewerProps> = ({
   threadId, subject, messages, folderName, labels = [],
-  onArchive, onDelete, onToggleStar, onSnooze, onSpam,
+  onArchive, onUnarchive, onDelete, onToggleStar, onSnooze, onSpam,
   onSendReply, onReply, onReplyAll, onForward, onClose,
 }) => {
   const [expandedMessageIds, setExpandedMessageIds] = useState<Set<string>>(
@@ -132,6 +133,8 @@ export const ConversationViewer: React.FC<ConversationViewerProps> = ({
   const [isSummarizing, setIsSummarizing] = useState(false);
 
   const replyEditorRef = useRef<HTMLDivElement>(null);
+
+  const isArchiveFolder = folderName?.toLowerCase().includes('archive');
 
   const handleToggleExpand = (id: string) => {
     const next = new Set(expandedMessageIds);
@@ -202,14 +205,26 @@ export const ConversationViewer: React.FC<ConversationViewerProps> = ({
           
           <div style={{ backgroundColor: 'var(--theme-border, #1E232B)' }} className="w-[1px] h-5 mx-1 hidden sm:block"></div>
 
-          <button 
-            type="button"
-            onClick={() => onArchive?.(threadId)} 
-            className="p-2 rounded-full text-slate-300 hover:text-white hover:bg-white/10 transition-colors"
-            title="Archive"
-          >
-            <Archive className="w-4 h-4" />
-          </button>
+          {isArchiveFolder ? (
+            <button 
+              type="button"
+              onClick={() => onUnarchive?.(threadId)} 
+              className="p-2 rounded-full text-slate-300 hover:text-white hover:bg-white/10 transition-colors"
+              title="Move to Inbox (Unarchive)"
+            >
+              <Mail className="w-4 h-4" />
+            </button>
+          ) : (
+            <button 
+              type="button"
+              onClick={() => onArchive?.(threadId)} 
+              className="p-2 rounded-full text-slate-300 hover:text-white hover:bg-white/10 transition-colors"
+              title="Archive"
+            >
+              <Archive className="w-4 h-4" />
+            </button>
+          )}
+
           <button 
             type="button"
             onClick={() => onSpam?.(threadId, true)} 
@@ -298,7 +313,17 @@ export const ConversationViewer: React.FC<ConversationViewerProps> = ({
 
             <span className="inline-flex items-center gap-1 text-[11px] px-2.5 py-0.5 rounded bg-white/10 text-slate-300 font-medium hover:bg-white/15 cursor-default transition-colors">
               <span>{folderName || 'Inbox'}</span>
-              <X className="w-3 h-3 text-slate-400 hover:text-white cursor-pointer" />
+              <button
+                type="button"
+                onClick={() => {
+                  if (isArchiveFolder) onUnarchive?.(threadId);
+                  else onArchive?.(threadId);
+                }}
+                className="hover:text-white text-slate-400 p-0.5 rounded-full hover:bg-white/10 transition-colors"
+                title={isArchiveFolder ? "Move to Inbox" : "Archive"}
+              >
+                <X className="w-3 h-3" />
+              </button>
             </span>
 
             {labels.map(l => (

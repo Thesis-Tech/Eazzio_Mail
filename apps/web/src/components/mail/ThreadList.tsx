@@ -16,6 +16,7 @@ export interface ThreadListProps {
   onToggleStar?: (threadId: string) => void;
   onBulkDelete?: (threadIds: string[]) => void;
   onBulkArchive?: (threadIds: string[]) => void;
+  onBulkUnarchive?: (threadIds: string[]) => void;
   onBulkMarkRead?: (threadIds: string[], isRead: boolean) => void;
   onSnooze?: (threadIds: string[]) => void;
   onBulkSpam?: (threadIds: string[], isSpam: boolean) => void;
@@ -44,6 +45,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
   onToggleStar,
   onBulkDelete,
   onBulkArchive,
+  onBulkUnarchive,
   onBulkMarkRead,
   onSnooze,
   onBulkSpam,
@@ -63,6 +65,8 @@ export const ThreadList: React.FC<ThreadListProps> = ({
   const [activeCategory, setActiveCategory] = useState('primary');
   const selectMenuRef = useRef<HTMLDivElement>(null);
   const moreMenuRef = useRef<HTMLDivElement>(null);
+
+  const isArchiveFolder = folderName.toLowerCase().includes('archive');
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -89,11 +93,12 @@ export const ThreadList: React.FC<ThreadListProps> = ({
     setSelectedIds(next);
   };
 
-  const handleBulkAction = (action: 'read' | 'unread' | 'delete' | 'archive') => {
+  const handleBulkAction = (action: 'read' | 'unread' | 'delete' | 'archive' | 'unarchive') => {
     const ids = Array.from(selectedIds);
     if (ids.length === 0) return;
     if (action === 'delete' && onBulkDelete) onBulkDelete(ids);
     if (action === 'archive' && onBulkArchive) onBulkArchive(ids);
+    if (action === 'unarchive' && onBulkUnarchive) onBulkUnarchive(ids);
     if (action === 'read' && onBulkMarkRead) onBulkMarkRead(ids, true);
     if (action === 'unread' && onBulkMarkRead) onBulkMarkRead(ids, false);
     setSelectedIds(new Set());
@@ -162,9 +167,25 @@ export const ThreadList: React.FC<ThreadListProps> = ({
 
           {selectedIds.size > 0 ? (
             <div className="flex items-center gap-1 animate-in fade-in">
-              <button type="button" onClick={() => handleBulkAction('archive')} className="p-2 rounded-full text-slate-400 hover:text-white hover:bg-white/10 transition-colors" title="Archive">
-                <Archive className="w-4 h-4" />
-              </button>
+              {isArchiveFolder ? (
+                <button 
+                  type="button" 
+                  onClick={() => handleBulkAction('unarchive')} 
+                  className="p-2 rounded-full text-slate-400 hover:text-white hover:bg-white/10 transition-colors" 
+                  title="Move to Inbox (Unarchive)"
+                >
+                  <Mail className="w-4 h-4" />
+                </button>
+              ) : (
+                <button 
+                  type="button" 
+                  onClick={() => handleBulkAction('archive')} 
+                  className="p-2 rounded-full text-slate-400 hover:text-white hover:bg-white/10 transition-colors" 
+                  title="Archive"
+                >
+                  <Archive className="w-4 h-4" />
+                </button>
+              )}
               <button type="button" onClick={() => onBulkSpam?.(Array.from(selectedIds), true)} className="p-2 rounded-full text-slate-400 hover:text-white hover:bg-white/10 transition-colors" title="Report spam">
                 <AlertOctagon className="w-4 h-4" />
               </button>
@@ -350,14 +371,25 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                       style={{ backgroundColor: 'var(--theme-bg-sidebar, #090A0D)', borderColor: 'var(--theme-border, #2A313C)' }}
                       className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center gap-0.5 p-1 rounded-full border shadow-xl opacity-0 group-hover:opacity-100 transition-all duration-150"
                     >
-                      <button 
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); onBulkArchive?.([thread.id]); }} 
-                        className="p-1.5 rounded-full text-slate-400 hover:text-white hover:bg-white/10 transition-colors" 
-                        title="Archive"
-                      >
-                        <Archive className="w-3.5 h-3.5" />
-                      </button>
+                      {isArchiveFolder ? (
+                        <button 
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); onBulkUnarchive?.([thread.id]); }} 
+                          className="p-1.5 rounded-full text-slate-400 hover:text-white hover:bg-white/10 transition-colors" 
+                          title="Move to Inbox (Unarchive)"
+                        >
+                          <Mail className="w-3.5 h-3.5" />
+                        </button>
+                      ) : (
+                        <button 
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); onBulkArchive?.([thread.id]); }} 
+                          className="p-1.5 rounded-full text-slate-400 hover:text-white hover:bg-white/10 transition-colors" 
+                          title="Archive"
+                        >
+                          <Archive className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                       <button 
                         type="button"
                         onClick={(e) => { e.stopPropagation(); onBulkDelete?.([thread.id]); }} 

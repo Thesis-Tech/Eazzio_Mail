@@ -746,6 +746,65 @@ export function MailDashboardPage({ initialFolder = 'fld-inbox' }: { initialFold
     }
   };
 
+  const handleBulkUnarchive = async (threadIds: string[]) => {
+    if (threadIds.length === 0) return;
+
+    const idSet = new Set(threadIds);
+    setThreads((prev) => {
+      const updated = prev.filter((t) => !idSet.has(t.id));
+      setFolders((fPrev) =>
+        fPrev.map((f) =>
+          f.id === activeFolderId
+            ? {
+                ...f,
+                totalCount: updated.length,
+                unreadCount: updated.filter((t) => t.isUnread).length,
+              }
+            : f
+        )
+      );
+      return updated;
+    });
+
+    if (selectedThreadId && idSet.has(selectedThreadId)) {
+      setSelectedThreadId(null);
+    }
+
+    try {
+      const authState = AuthStore.getState();
+      const token = authState.token || '';
+      const senderEmail = authState.user?.email || '';
+
+      await fetch('/api/messages/batch', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+          'x-user-email': senderEmail,
+        },
+        body: JSON.stringify({
+          action: 'unarchive',
+          threadIds,
+        }),
+      });
+
+      setToasts((prev) => [
+        {
+          id: `toast-${Date.now()}`,
+          title: 'Restored to Inbox',
+          senderName: 'Eazzio Mailbox',
+          message: `${threadIds.length} conversation(s) moved back to Inbox.`,
+          timestamp: 'Just now',
+        },
+        ...prev,
+      ]);
+
+      syncOtherFolderCounts();
+    } catch (err) {
+      console.error('Failed to execute unarchive:', err);
+    }
+  };
+
   const handleBulkMarkRead = async (threadIds: string[], isRead: boolean) => {
     const idSet = new Set(threadIds);
     setThreads((prev) => {
@@ -1468,6 +1527,7 @@ export function MailDashboardPage({ initialFolder = 'fld-inbox' }: { initialFold
                 onToggleStar={handleToggleStar}
                 onBulkDelete={handleBulkDelete}
                 onBulkArchive={handleBulkArchive}
+                onBulkUnarchive={handleBulkUnarchive}
                 onBulkMarkRead={handleBulkMarkRead}
                 onSnooze={handleOpenSnooze}
                 onBulkSpam={handleBulkSpam}
@@ -1512,6 +1572,7 @@ export function MailDashboardPage({ initialFolder = 'fld-inbox' }: { initialFold
               onReplyAll={handleReplyAll}
               onForward={handleForward}
               onArchive={(threadId) => handleBulkArchive([threadId])}
+              onUnarchive={(threadId) => handleBulkUnarchive([threadId])}
               onDelete={(threadId) => handleBulkDelete([threadId])}
               onToggleStar={(threadId) => handleToggleStar(threadId)}
               onSnooze={(threadId) => handleOpenSnooze([threadId])}
