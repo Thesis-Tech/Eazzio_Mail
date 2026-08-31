@@ -110,17 +110,28 @@ export const ConversationViewer: React.FC<ConversationViewerProps> = ({
   const isVerified = latestMessage?.security?.dkim === 'pass' && latestMessage?.security?.spf === 'pass';
 
   return (
-    <div className="flex flex-col h-full bg-[#0A0C10] text-[#EDEEF0] overflow-hidden relative font-sans">
+    <div 
+      style={{ backgroundColor: 'var(--theme-bg-main, #0A0C10)' }}
+      className="flex flex-col h-full text-[#EDEEF0] overflow-hidden relative font-sans"
+    >
       {/* Header */}
-      <div className="h-16 px-4 sm:px-6 border-b border-[#1E232B] flex items-center justify-between gap-4 shrink-0 bg-[#0A0C10]/90 backdrop-blur-md sticky top-0 z-20">
+      <div 
+        style={{ backgroundColor: 'var(--theme-bg-header, #0A0C10)', borderColor: 'var(--theme-border, #1E232B)' }}
+        className="h-16 px-4 sm:px-6 border-b flex items-center justify-between gap-4 shrink-0 backdrop-blur-md sticky top-0 z-20"
+      >
         <div className="flex items-center gap-3 min-w-0 flex-1">
           {onClose && (
-            <button onClick={onClose} className="md:hidden p-2 -ml-2 rounded-xl text-slate-400 hover:text-white hover:bg-[#1E232B] transition-colors shrink-0">
+            <button onClick={onClose} className="md:hidden p-2 -ml-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors shrink-0">
               <ArrowLeft className="w-5 h-5" />
             </button>
           )}
           <h1 className="text-lg sm:text-xl font-bold text-white tracking-tight truncate">{subject || '(No Subject)'}</h1>
-          <span className="hidden sm:flex text-xs px-2.5 py-1 rounded-md bg-[#1E232B] text-slate-300 font-bold shrink-0 shadow-inner">{messages.length}</span>
+          <span 
+            style={{ backgroundColor: 'var(--theme-bg-card, #12141A)', borderColor: 'var(--theme-border, #1E232B)' }}
+            className="hidden sm:flex text-xs px-2.5 py-1 rounded-md text-slate-300 font-bold shrink-0 border"
+          >
+            {messages.length}
+          </span>
           {labels.map(l => (
             <span key={l} className="hidden lg:flex text-[11px] px-2 py-0.5 rounded border border-slate-700 bg-slate-800 text-slate-300 font-semibold">{l}</span>
           ))}
@@ -130,18 +141,27 @@ export const ConversationViewer: React.FC<ConversationViewerProps> = ({
           <button onClick={handleGenerateAiSummary} className="hidden sm:flex px-3 py-1.5 rounded-lg bg-gradient-to-r from-purple-500/10 to-blue-500/10 border border-purple-500/20 text-purple-400 hover:from-purple-500/20 hover:to-blue-500/20 text-xs font-bold items-center gap-1.5 transition-all shadow-sm">
             <Sparkles className="w-4 h-4" /> <span>Summarize</span>
           </button>
-          <div className="w-[1px] h-6 bg-[#1E232B] mx-1 hidden sm:block"></div>
-          <button onClick={() => window.print()} className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-[#1E232B]"><Printer className="w-4 h-4" /></button>
-          <button onClick={() => onArchive?.(threadId)} className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-[#1E232B]"><Archive className="w-4 h-4" /></button>
+          <div style={{ backgroundColor: 'var(--theme-border, #1E232B)' }} className="w-[1px] h-6 mx-1 hidden sm:block"></div>
+          <button onClick={() => window.print()} className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/10"><Printer className="w-4 h-4" /></button>
+          <button onClick={() => onArchive?.(threadId)} className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/10"><Archive className="w-4 h-4" /></button>
           <button onClick={() => onDelete?.(threadId)} className="p-2 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10"><Trash2 className="w-4 h-4" /></button>
           {onClose && (
-            <button onClick={onClose} className="p-2 ml-2 rounded-lg text-slate-400 hover:text-white hover:bg-[#1E232B] bg-[#12141A] border border-[#1E232B] shadow-sm"><X className="w-4 h-4" /></button>
+            <button 
+              onClick={onClose} 
+              style={{ backgroundColor: 'var(--theme-bg-card, #12141A)', borderColor: 'var(--theme-border, #1E232B)' }}
+              className="p-2 ml-2 rounded-lg text-slate-400 hover:text-white border shadow-sm"
+            >
+              <X className="w-4 h-4" />
+            </button>
           )}
         </div>
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar relative bg-[#0A0C10]">
+      <div 
+        style={{ backgroundColor: 'var(--theme-bg-main, #0A0C10)' }}
+        className="flex-1 overflow-y-auto custom-scrollbar relative"
+      >
         
         {/* Security Banner (ProtonMail Tier) */}
         {latestMessage && (
@@ -187,22 +207,35 @@ export const ConversationViewer: React.FC<ConversationViewerProps> = ({
         )}
 
         {aiSummary && (
-          <div className="mx-4 sm:mx-8 mt-4 p-4 rounded-xl bg-gradient-to-r from-[#2D5BFF]/10 to-[#14B8A6]/10 border border-[#2D5BFF]/20 flex items-start gap-3 animate-in fade-in slide-in-from-top-4 shadow-lg">
-            <Sparkles className="w-5 h-5 text-[#2D5BFF] shrink-0 mt-0.5" />
+          <div 
+            style={{ borderColor: 'var(--theme-accent, #2D5BFF)' }}
+            className="mx-4 sm:mx-8 mt-4 p-4 rounded-xl bg-gradient-to-r from-purple-500/10 to-blue-500/10 border flex items-start gap-3 animate-in fade-in slide-in-from-top-4 shadow-lg"
+          >
+            <Sparkles style={{ color: 'var(--theme-accent, #2D5BFF)' }} className="w-5 h-5 shrink-0 mt-0.5" />
             <p className="text-sm text-slate-200 font-medium leading-relaxed">{aiSummary}</p>
           </div>
         )}
 
         {/* Thread Messages */}
         <div className="p-4 sm:p-8 pt-6 space-y-4">
-          {messages.map((msg, index) => {
+          {messages.map((msg) => {
             const isExpanded = expandedMessageIds.has(msg.id);
             return (
-              <div key={msg.id} className={`rounded-2xl border transition-all duration-300 ${isExpanded ? 'bg-[#12141A] border-[#1E232B] shadow-2xl' : 'bg-[#0A0C10] border-[#1E232B]/50 hover:border-[#1E232B] cursor-pointer'}`}>
+              <div 
+                key={msg.id} 
+                style={{
+                  backgroundColor: isExpanded ? 'var(--theme-bg-card, #12141A)' : 'var(--theme-bg-main, #0A0C10)',
+                  borderColor: 'var(--theme-border, #1E232B)',
+                }}
+                className={`rounded-2xl border transition-all duration-300 ${isExpanded ? 'shadow-2xl' : 'hover:border-white/20 cursor-pointer'}`}
+              >
                 {/* Header */}
                 <div onClick={() => handleToggleExpand(msg.id)} className="p-4 sm:p-5 flex items-center justify-between gap-4 select-none cursor-pointer group">
                   <div className="flex items-center gap-4 min-w-0">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-slate-700 to-slate-900 flex items-center justify-center text-white font-bold text-sm shrink-0 border border-slate-600 shadow-md">
+                    <div 
+                      style={{ background: `linear-gradient(135deg, var(--theme-accent, #2D5BFF), #14B8A6)` }}
+                      className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0 shadow-md"
+                    >
                       {msg.from.name ? msg.from.name.slice(0, 2).toUpperCase() : 'U'}
                     </div>
                     <div className="min-w-0">
@@ -215,7 +248,10 @@ export const ConversationViewer: React.FC<ConversationViewerProps> = ({
                   </div>
                   <div className="flex items-center gap-4 shrink-0">
                     <span className="text-xs font-semibold text-slate-400">{msg.receivedAt}</span>
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center bg-[#1E232B] text-slate-400 group-hover:text-white transition-colors">
+                    <div 
+                      style={{ backgroundColor: 'var(--theme-border, #1E232B)' }}
+                      className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 group-hover:text-white transition-colors"
+                    >
                       {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                     </div>
                   </div>
@@ -225,15 +261,15 @@ export const ConversationViewer: React.FC<ConversationViewerProps> = ({
                 {isExpanded && (
                   <div className="px-5 sm:px-16 pb-6 pt-2 animate-in fade-in duration-300">
                     <div className="text-xs text-slate-400 mb-6 flex items-center gap-2 font-medium">
-                      <span className="text-slate-500">To:</span> <span className="text-slate-300 bg-[#1E232B] px-2 py-0.5 rounded-md">{msg.to.map((t) => t.email || t.name).join(', ')}</span>
+                      <span className="text-slate-500">To:</span> <span style={{ backgroundColor: 'var(--theme-border, #1E232B)' }} className="text-slate-300 px-2 py-0.5 rounded-md">{msg.to.map((t) => t.email || t.name).join(', ')}</span>
                     </div>
                     
                     <TrimmedMessageContent bodyHtml={msg.bodyHtml} bodyText={msg.bodyText} snippet={msg.snippet} />
 
                     {/* Action Bar */}
-                    <div className="mt-8 pt-4 border-t border-[#1E232B] flex items-center gap-2">
-                      <button onClick={() => onReply?.(msg)} className="px-4 py-2 rounded-lg bg-[#1E232B] hover:bg-[#2A313C] text-white text-sm font-semibold flex items-center gap-2 transition-colors"><Reply className="w-4 h-4" /> Reply</button>
-                      <button onClick={() => onForward?.(msg)} className="px-4 py-2 rounded-lg bg-[#1E232B] hover:bg-[#2A313C] text-white text-sm font-semibold flex items-center gap-2 transition-colors"><Forward className="w-4 h-4" /> Forward</button>
+                    <div style={{ borderColor: 'var(--theme-border, #1E232B)' }} className="mt-8 pt-4 border-t flex items-center gap-2">
+                      <button onClick={() => onReply?.(msg)} style={{ backgroundColor: 'var(--theme-border, #1E232B)' }} className="px-4 py-2 rounded-lg hover:brightness-125 text-white text-sm font-semibold flex items-center gap-2 transition-all"><Reply className="w-4 h-4" /> Reply</button>
+                      <button onClick={() => onForward?.(msg)} style={{ backgroundColor: 'var(--theme-border, #1E232B)' }} className="px-4 py-2 rounded-lg hover:brightness-125 text-white text-sm font-semibold flex items-center gap-2 transition-all"><Forward className="w-4 h-4" /> Forward</button>
                     </div>
                   </div>
                 )}
@@ -243,21 +279,44 @@ export const ConversationViewer: React.FC<ConversationViewerProps> = ({
         </div>
 
         {/* Quick Reply (Floating Bottom) */}
-        <div className="sticky bottom-0 p-4 sm:p-6 bg-gradient-to-t from-[#0A0C10] via-[#0A0C10]/95 to-transparent z-10">
-          <div className="max-w-4xl mx-auto bg-[#12141A] rounded-2xl border border-[#1E232B] shadow-2xl overflow-hidden focus-within:border-[#2D5BFF]/50 focus-within:ring-4 focus-within:ring-[#2D5BFF]/10 transition-all">
-            <div className="p-3 bg-[#1E232B]/50 border-b border-[#1E232B] flex flex-wrap gap-2">
+        <div className="sticky bottom-0 p-4 sm:p-6 bg-gradient-to-t from-black/80 via-black/40 to-transparent z-10">
+          <div 
+            style={{ backgroundColor: 'var(--theme-bg-card, #12141A)', borderColor: 'var(--theme-border, #1E232B)' }}
+            className="max-w-4xl mx-auto rounded-2xl border shadow-2xl overflow-hidden transition-all"
+          >
+            <div 
+              style={{ backgroundColor: 'var(--theme-bg-sidebar, #090A0D)', borderColor: 'var(--theme-border, #1E232B)' }}
+              className="p-3 border-b flex flex-wrap gap-2"
+            >
               {['Got it, thanks!', 'Looks good to me.', 'I will review this today.', 'Could you provide more details?'].map(s => (
-                <button key={s} onClick={() => setReplyText(s)} className="px-3 py-1.5 rounded-lg bg-[#0A0C10] border border-[#1E232B] hover:border-[#2D5BFF] hover:text-[#2D5BFF] text-xs font-semibold text-slate-400 transition-colors">{s}</button>
+                <button 
+                  key={s} 
+                  onClick={() => setReplyText(s)} 
+                  style={{ backgroundColor: 'var(--theme-bg-main, #0A0C10)', borderColor: 'var(--theme-border, #1E232B)' }}
+                  className="px-3 py-1.5 rounded-lg border hover:border-white/30 text-xs font-semibold text-slate-400 transition-colors"
+                >
+                  {s}
+                </button>
               ))}
             </div>
             <form onSubmit={(e) => { e.preventDefault(); if(replyText.trim()) { onSendReply?.(threadId, replyText); setReplyText(''); } }}>
               <textarea value={replyText} onChange={e => setReplyText(e.target.value)} placeholder="Click here to reply..." rows={3} className="w-full bg-transparent p-4 text-sm text-white placeholder-slate-500 outline-none resize-none" />
-              <div className="p-3 bg-[#0A0C10] border-t border-[#1E232B] flex items-center justify-between">
+              <div 
+                style={{ backgroundColor: 'var(--theme-bg-main, #0A0C10)', borderColor: 'var(--theme-border, #1E232B)' }}
+                className="p-3 border-t flex items-center justify-between"
+              >
                 <div className="flex gap-1">
-                  <button type="button" className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-[#1E232B]"><LayoutTemplate className="w-4 h-4" /></button>
-                  <button type="button" className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-[#1E232B]"><Paperclip className="w-4 h-4" /></button>
+                  <button type="button" className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/10"><LayoutTemplate className="w-4 h-4" /></button>
+                  <button type="button" className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/10"><Paperclip className="w-4 h-4" /></button>
                 </div>
-                <button type="submit" disabled={!replyText.trim()} className="px-5 py-2 rounded-xl bg-[#2D5BFF] hover:bg-[#1E48E0] disabled:opacity-50 text-white font-bold text-sm flex items-center gap-2 shadow-lg shadow-[#2D5BFF]/20 transition-all"><Send className="w-4 h-4" /> Send</button>
+                <button 
+                  type="submit" 
+                  disabled={!replyText.trim()} 
+                  style={{ backgroundColor: 'var(--theme-accent, #2D5BFF)' }}
+                  className="px-5 py-2 rounded-xl hover:brightness-110 disabled:opacity-50 text-white font-bold text-sm flex items-center gap-2 shadow-lg transition-all"
+                >
+                  <Send className="w-4 h-4" /> Send
+                </button>
               </div>
             </form>
           </div>

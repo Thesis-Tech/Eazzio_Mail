@@ -420,7 +420,19 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 
   return (
     <div 
-      style={{ backgroundColor: currentTheme.bgMain }}
+      style={{
+        backgroundColor: currentTheme.bgMain,
+        ['--theme-bg-main' as any]: currentTheme.bgMain,
+        ['--theme-bg-sidebar' as any]: currentTheme.bgSidebar,
+        ['--theme-bg-header' as any]: currentTheme.bgHeader,
+        ['--theme-bg-card' as any]: currentTheme.bgCard,
+        ['--theme-bg-hover' as any]: currentTheme.bgHover,
+        ['--theme-border' as any]: currentTheme.border,
+        ['--theme-accent' as any]: currentTheme.accent,
+        ['--theme-accent-hover' as any]: currentTheme.accentHover,
+        ['--theme-accent-bg' as any]: currentTheme.accentBg,
+        ['--theme-accent-glow' as any]: currentTheme.accentGlow,
+      }}
       className="flex h-screen w-screen overflow-hidden text-[#EDEEF0] relative font-sans transition-colors duration-300"
     >
       
@@ -440,7 +452,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
       )}
 
       {/* Main App Area */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative" style={{ backgroundColor: currentTheme.bgMain }}>
         
         {/* Header */}
         <header 
@@ -508,26 +520,22 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
             {/* Quick Settings Button */}
             <button
               onClick={() => setIsQuickSettingsOpen(true)}
-              className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-[#1E232B] transition-colors relative"
+              className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors relative"
               title="Settings"
             >
               <Settings className="w-5 h-5" />
             </button>
 
-            <button onClick={() => setIsRightRailOpen(!isRightRailOpen)} className="p-2 rounded-xl text-slate-400 hover:text-[#14B8A6] hover:bg-[#14B8A6]/10 transition-colors hidden lg:block">
-              {isRightRailOpen ? <PanelRightClose className="w-5 h-5" /> : <PanelRightOpen className="w-5 h-5" />}
-            </button>
-
             {/* Profile Dropdown */}
             <div className="relative ml-1">
-              <button onClick={() => setIsProfileOpen(!isProfileOpen)} className="w-9 h-9 rounded-full bg-gradient-to-br from-[#2D5BFF] to-[#14B8A6] p-[2px] transition-transform hover:scale-105 active:scale-95 shadow-md">
+              <button onClick={() => setIsProfileOpen(!isProfileOpen)} className="w-9 h-9 rounded-full p-[2px] transition-transform hover:scale-105 active:scale-95 shadow-md" style={{ background: `linear-gradient(135deg, ${currentTheme.accent}, #14B8A6)` }}>
                 <div className="w-full h-full rounded-full bg-[#12141A] flex items-center justify-center border border-black/50">
                   <span className="text-white text-xs font-bold">{currentUser?.displayName?.slice(0, 2).toUpperCase() || 'RK'}</span>
                 </div>
               </button>
               {isProfileOpen && (
-                <div className="absolute right-0 mt-3 w-64 rounded-2xl bg-[#12141A]/95 backdrop-blur-xl border border-[#1E232B] shadow-2xl py-2 z-50 animate-in fade-in zoom-in-95 origin-top-right">
-                  <div className="px-4 py-3 border-b border-[#1E232B] flex flex-col">
+                <div style={{ backgroundColor: currentTheme.bgCard, borderColor: currentTheme.border }} className="absolute right-0 mt-3 w-64 rounded-2xl backdrop-blur-xl border shadow-2xl py-2 z-50 animate-in fade-in zoom-in-95 origin-top-right">
+                  <div style={{ borderColor: currentTheme.border }} className="px-4 py-3 border-b flex flex-col">
                     <span className="text-sm font-bold text-white truncate">{currentUser?.displayName || 'Rahul Kumar'}</span>
                     <span className="text-xs text-slate-400 truncate">{currentUser?.email || 'rahul@eazzio.com'}</span>
                   </div>
@@ -543,75 +551,12 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           </div>
         </header>
 
-        {/* Content Area */}
-        <main className="flex-1 flex overflow-hidden bg-[#0A0C10] relative z-0">
-          <div className="flex-1 flex flex-col min-w-0 bg-white/[0.02] rounded-tl-xl border-t border-l border-white/[0.05] overflow-hidden m-0 md:m-2 md:mb-0 md:mr-0 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)]">
+        {/* Workspace Body */}
+        <main className="flex-1 flex overflow-hidden relative" style={{ backgroundColor: currentTheme.bgMain }}>
+          {/* Main Children (Thread List / Mail View) */}
+          <div className="flex-1 flex min-w-0 overflow-hidden relative" style={{ backgroundColor: currentTheme.bgMain }}>
             {children}
           </div>
-
-          {/* Right Rail */}
-          {isRightRailOpen && (
-            <div className="hidden lg:flex flex-col w-[320px] bg-[#0A0C10] border-l border-[#1E232B] animate-in slide-in-from-right duration-300">
-              <div className="h-14 flex items-center justify-around border-b border-[#1E232B] px-2 shrink-0">
-                <button onClick={() => setActiveRightTab('calendar')} className={`p-2 rounded-xl flex flex-col items-center gap-1 w-16 transition-colors ${activeRightTab === 'calendar' ? 'text-[#2D5BFF] bg-[#2D5BFF]/10' : 'text-slate-500 hover:text-white hover:bg-[#1E232B]'}`}>
-                  <CalendarDays className="w-5 h-5" />
-                </button>
-                <button onClick={() => setActiveRightTab('tasks')} className={`p-2 rounded-xl flex flex-col items-center gap-1 w-16 transition-colors ${activeRightTab === 'tasks' ? 'text-[#2D5BFF] bg-[#2D5BFF]/10' : 'text-slate-500 hover:text-white hover:bg-[#1E232B]'}`}>
-                  <CheckSquare className="w-5 h-5" />
-                </button>
-                <button onClick={() => setActiveRightTab('notes')} className={`p-2 rounded-xl flex flex-col items-center gap-1 w-16 transition-colors ${activeRightTab === 'notes' ? 'text-[#2D5BFF] bg-[#2D5BFF]/10' : 'text-slate-500 hover:text-white hover:bg-[#1E232B]'}`}>
-                  <LayoutList className="w-5 h-5" />
-                </button>
-              </div>
-              
-              <div className="flex-1 p-5 overflow-y-auto custom-scrollbar">
-                {activeRightTab === 'calendar' && (
-                  <div className="space-y-4 animate-in fade-in">
-                    <h3 className="text-sm font-bold text-white mb-4">Upcoming Schedule</h3>
-                    <div className="p-4 rounded-2xl bg-[#12141A] border border-[#1E232B] hover:border-[#2D5BFF]/30 transition-colors cursor-pointer group">
-                      <div className="flex items-center gap-2 text-xs font-bold text-[#2D5BFF] mb-1">
-                        <Clock className="w-3.5 h-3.5" /> 10:00 AM - 11:30 AM
-                      </div>
-                      <div className="text-sm font-semibold text-white mb-2">Team Sync & Review</div>
-                      <div className="flex -space-x-2">
-                        <div className="w-6 h-6 rounded-full bg-rose-500 border-2 border-[#12141A] flex items-center justify-center text-[10px] font-bold">JD</div>
-                        <div className="w-6 h-6 rounded-full bg-emerald-500 border-2 border-[#12141A] flex items-center justify-center text-[10px] font-bold">AS</div>
-                        <div className="w-6 h-6 rounded-full bg-slate-700 border-2 border-[#12141A] flex items-center justify-center text-[10px] font-bold">+3</div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                {activeRightTab === 'tasks' && (
-                  <div className="space-y-4 animate-in fade-in">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-sm font-bold text-white">Tasks</h3>
-                      <button className="p-1 rounded bg-[#1E232B] hover:bg-white/10 text-white"><Plus className="w-4 h-4" /></button>
-                    </div>
-                    <div className="flex items-start gap-3 p-3 rounded-xl hover:bg-[#12141A] transition-colors cursor-pointer">
-                      <div className="w-4 h-4 rounded border border-slate-500 mt-0.5"></div>
-                      <div>
-                        <div className="text-sm font-medium text-white">Review Q3 Marketing Plan</div>
-                        <div className="text-xs text-rose-400 font-medium mt-1">Due Today</div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                {activeRightTab === 'notes' && (
-                  <div className="space-y-4 animate-in fade-in">
-                    <h3 className="text-sm font-bold text-white mb-4">Keep / Notes</h3>
-                    <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-500/90 text-sm">
-                      <div className="font-bold mb-1">Ideas for redesign</div>
-                      <ul className="list-disc pl-4 space-y-1 text-xs">
-                        <li>More gradient glow</li>
-                        <li>Subtle inner shadows</li>
-                        <li>Bento box layouts</li>
-                      </ul>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
         </main>
       </div>
 

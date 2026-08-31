@@ -1245,13 +1245,17 @@ export function MailDashboardPage({ initialFolder = 'fld-inbox' }: { initialFold
       }}
       onOpenSettings={() => setIsSettingsOpen(true)}
     >
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden" style={{ backgroundColor: 'var(--theme-bg-main, #0A0C10)' }}>
         {/* Left Column: Thread List (Full-width when no message open, resizable split when message is selected) */}
         <div
-          style={selectedThreadId ? { width: `${threadListWidth}px` } : undefined}
+          style={{
+            ...(selectedThreadId ? { width: `${threadListWidth}px` } : {}),
+            backgroundColor: 'var(--theme-bg-main, #0A0C10)',
+            borderColor: 'var(--theme-border, #1E232B)',
+          }}
           className={`${
-            selectedThreadId ? 'hidden md:flex shrink-0 border-r border-[#2A2E37]' : 'flex flex-1 w-full'
-          } flex-col bg-[#0F1115] min-w-0`}
+            selectedThreadId ? 'hidden md:flex shrink-0 border-r' : 'flex flex-1 w-full'
+          } flex-col min-w-0`}
         >
           {/* Active Search Term Filter Chip Bar */}
           {(parsedFilters.from ||
@@ -1260,17 +1264,20 @@ export function MailDashboardPage({ initialFolder = 'fld-inbox' }: { initialFold
             parsedFilters.isUnread ||
             parsedFilters.isStarred ||
             parsedFilters.label) && (
-            <div className="px-4 py-2 border-b border-[#2A2E37] bg-[#16181D] flex flex-wrap items-center gap-1.5 text-xs text-[#94A3B8]">
+            <div 
+              style={{ backgroundColor: 'var(--theme-bg-card, #12141A)', borderColor: 'var(--theme-border, #1E232B)' }}
+              className="px-4 py-2 border-b flex flex-wrap items-center gap-1.5 text-xs text-[#94A3B8]"
+            >
               <span className="font-semibold text-white mr-1 flex items-center gap-1">
-                <Search className="w-3 h-3 text-[#2D5BFF]" /> Active Filters:
+                <Search style={{ color: 'var(--theme-accent, #2D5BFF)' }} className="w-3 h-3" /> Active Filters:
               </span>
               {parsedFilters.from && (
-                <span className="px-2 py-0.5 rounded bg-[#2D5BFF]/10 text-[#2D5BFF] border border-[#2D5BFF]/20">
+                <span style={{ backgroundColor: 'var(--theme-accent-bg, rgba(45,91,255,0.1))', color: 'var(--theme-accent, #2D5BFF)', borderColor: 'var(--theme-border, #1E232B)' }} className="px-2 py-0.5 rounded border">
                   from:{parsedFilters.from}
                 </span>
               )}
               {parsedFilters.subject && (
-                <span className="px-2 py-0.5 rounded bg-[#2D5BFF]/10 text-[#2D5BFF] border border-[#2D5BFF]/20">
+                <span style={{ backgroundColor: 'var(--theme-accent-bg, rgba(45,91,255,0.1))', color: 'var(--theme-accent, #2D5BFF)', borderColor: 'var(--theme-border, #1E232B)' }} className="px-2 py-0.5 rounded border">
                   subject:{parsedFilters.subject}
                 </span>
               )}
@@ -1304,11 +1311,15 @@ export function MailDashboardPage({ initialFolder = 'fld-inbox' }: { initialFold
           )}
 
           {/* Gmail-Style Filter Chips Bar (hidden scrollbar) */}
-          <div className="px-4 py-2 border-b border-[#22262E] bg-[#16181D] flex items-center gap-2 overflow-x-auto text-xs shrink-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div 
+            style={{ backgroundColor: 'var(--theme-bg-card, #12141A)', borderColor: 'var(--theme-border, #1E232B)' }}
+            className="px-4 py-2 border-b flex items-center gap-2 overflow-x-auto text-xs shrink-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          >
             {/* From ▾ */}
             <button
               onClick={() => setSearchQuery(searchQuery.includes('from:') ? '' : 'from: ')}
-              className="px-3 py-1 rounded-lg border border-[#2A2E37] bg-[#111317] hover:bg-[#1E232B] text-slate-300 flex items-center gap-1.5 shrink-0 transition-colors"
+              style={{ backgroundColor: 'var(--theme-bg-sidebar, #090A0D)', borderColor: 'var(--theme-border, #1E232B)' }}
+              className="px-3 py-1 rounded-lg border hover:brightness-125 text-slate-300 flex items-center gap-1.5 shrink-0 transition-all"
             >
               <span>From</span>
               <ChevronDown className="w-3 h-3 text-slate-400" />
@@ -1316,7 +1327,8 @@ export function MailDashboardPage({ initialFolder = 'fld-inbox' }: { initialFold
 
             {/* Any time ▾ */}
             <button
-              className="px-3 py-1 rounded-lg border border-[#2A2E37] bg-[#111317] hover:bg-[#1E232B] text-slate-300 flex items-center gap-1.5 shrink-0 transition-colors"
+              style={{ backgroundColor: 'var(--theme-bg-sidebar, #090A0D)', borderColor: 'var(--theme-border, #1E232B)' }}
+              className="px-3 py-1 rounded-lg border hover:brightness-125 text-slate-300 flex items-center gap-1.5 shrink-0 transition-all"
             >
               <span>Any time</span>
               <ChevronDown className="w-3 h-3 text-slate-400" />
@@ -1325,11 +1337,12 @@ export function MailDashboardPage({ initialFolder = 'fld-inbox' }: { initialFold
             {/* Has attachment */}
             <button
               onClick={() => setSearchQuery(searchQuery.includes('has:attachment') ? searchQuery.replace('has:attachment', '').trim() : `${searchQuery} has:attachment`.trim())}
-              className={`px-3 py-1 rounded-lg border flex items-center gap-1.5 shrink-0 transition-colors ${
-                searchQuery.includes('has:attachment')
-                  ? 'border-[#2D5BFF] bg-[#2D5BFF]/20 text-[#2D5BFF] font-semibold'
-                  : 'border-[#2A2E37] bg-[#111317] hover:bg-[#1E232B] text-slate-300'
-              }`}
+              style={{
+                backgroundColor: searchQuery.includes('has:attachment') ? 'var(--theme-accent-bg, rgba(45,91,255,0.15))' : 'var(--theme-bg-sidebar, #090A0D)',
+                borderColor: searchQuery.includes('has:attachment') ? 'var(--theme-accent, #2D5BFF)' : 'var(--theme-border, #1E232B)',
+                color: searchQuery.includes('has:attachment') ? 'var(--theme-accent, #2D5BFF)' : '#CBD5E1',
+              }}
+              className="px-3 py-1 rounded-lg border flex items-center gap-1.5 shrink-0 transition-all"
             >
               <span>Has attachment</span>
             </button>
@@ -1337,7 +1350,8 @@ export function MailDashboardPage({ initialFolder = 'fld-inbox' }: { initialFold
             {/* To ▾ */}
             <button
               onClick={() => setSearchQuery(searchQuery.includes('to:') ? '' : 'to: ')}
-              className="px-3 py-1 rounded-lg border border-[#2A2E37] bg-[#111317] hover:bg-[#1E232B] text-slate-300 flex items-center gap-1.5 shrink-0 transition-colors"
+              style={{ backgroundColor: 'var(--theme-bg-sidebar, #090A0D)', borderColor: 'var(--theme-border, #1E232B)' }}
+              className="px-3 py-1 rounded-lg border hover:brightness-125 text-slate-300 flex items-center gap-1.5 shrink-0 transition-all"
             >
               <span>To</span>
               <ChevronDown className="w-3 h-3 text-slate-400" />
@@ -1346,11 +1360,12 @@ export function MailDashboardPage({ initialFolder = 'fld-inbox' }: { initialFold
             {/* Exclude Social */}
             <button
               onClick={() => setSearchQuery(searchQuery.includes('-label:social') ? searchQuery.replace('-label:social', '').trim() : `${searchQuery} -label:social`.trim())}
-              className={`px-3 py-1 rounded-lg border flex items-center gap-1.5 shrink-0 transition-colors ${
-                searchQuery.includes('-label:social')
-                  ? 'border-[#2D5BFF] bg-[#2D5BFF]/20 text-[#2D5BFF] font-semibold'
-                  : 'border-[#2A2E37] bg-[#111317] hover:bg-[#1E232B] text-slate-300'
-              }`}
+              style={{
+                backgroundColor: searchQuery.includes('-label:social') ? 'var(--theme-accent-bg, rgba(45,91,255,0.15))' : 'var(--theme-bg-sidebar, #090A0D)',
+                borderColor: searchQuery.includes('-label:social') ? 'var(--theme-accent, #2D5BFF)' : 'var(--theme-border, #1E232B)',
+                color: searchQuery.includes('-label:social') ? 'var(--theme-accent, #2D5BFF)' : '#CBD5E1',
+              }}
+              className="px-3 py-1 rounded-lg border flex items-center gap-1.5 shrink-0 transition-all"
             >
               <span>Exclude Social</span>
             </button>
@@ -1358,11 +1373,12 @@ export function MailDashboardPage({ initialFolder = 'fld-inbox' }: { initialFold
             {/* Is unread */}
             <button
               onClick={() => setSearchQuery(searchQuery.includes('is:unread') ? searchQuery.replace('is:unread', '').trim() : `${searchQuery} is:unread`.trim())}
-              className={`px-3 py-1 rounded-lg border flex items-center gap-1.5 shrink-0 transition-colors ${
-                searchQuery.includes('is:unread')
-                  ? 'border-[#2D5BFF] bg-[#2D5BFF]/20 text-[#2D5BFF] font-semibold'
-                  : 'border-[#2A2E37] bg-[#111317] hover:bg-[#1E232B] text-slate-300'
-              }`}
+              style={{
+                backgroundColor: searchQuery.includes('is:unread') ? 'var(--theme-accent-bg, rgba(45,91,255,0.15))' : 'var(--theme-bg-sidebar, #090A0D)',
+                borderColor: searchQuery.includes('is:unread') ? 'var(--theme-accent, #2D5BFF)' : 'var(--theme-border, #1E232B)',
+                color: searchQuery.includes('is:unread') ? 'var(--theme-accent, #2D5BFF)' : '#CBD5E1',
+              }}
+              className="px-3 py-1 rounded-lg border flex items-center gap-1.5 shrink-0 transition-all"
             >
               <span>Is unread</span>
             </button>
@@ -1370,7 +1386,8 @@ export function MailDashboardPage({ initialFolder = 'fld-inbox' }: { initialFold
             {/* Advanced search */}
             <button
               onClick={() => setSearchQuery('is:unread has:attachment')}
-              className="ml-auto text-xs text-[#2D5BFF] hover:underline font-medium shrink-0"
+              style={{ color: 'var(--theme-accent, #2D5BFF)' }}
+              className="ml-auto text-xs hover:underline font-medium shrink-0"
             >
               Advanced search
             </button>
@@ -1379,7 +1396,7 @@ export function MailDashboardPage({ initialFolder = 'fld-inbox' }: { initialFold
           <div className="flex-1 overflow-hidden relative">
             {isLoading ? (
               <div className="flex flex-col items-center justify-center h-full p-8 text-slate-400 space-y-3">
-                <RefreshCw className="w-5 h-5 animate-spin text-[#14B8A6]" />
+                <RefreshCw style={{ color: 'var(--theme-accent, #14B8A6)' }} className="w-5 h-5 animate-spin" />
                 <span className="text-xs">Loading conversations...</span>
               </div>
             ) : (
@@ -1416,7 +1433,10 @@ export function MailDashboardPage({ initialFolder = 'fld-inbox' }: { initialFold
 
         {/* Right Column: Active Conversation Viewer */}
         {selectedThreadId && selectedThread && (
-          <div className="flex flex-1 flex-col overflow-hidden bg-[#0F1115] min-w-0">
+          <div 
+            style={{ backgroundColor: 'var(--theme-bg-main, #0A0C10)' }}
+            className="flex flex-1 flex-col overflow-hidden min-w-0"
+          >
             <ConversationViewer
               threadId={selectedThread.id}
               subject={selectedThread.subject}
