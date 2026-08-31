@@ -14,6 +14,10 @@ import {
 } from 'lucide-react';
 import { PrivacyModeBadge } from '../PrivacyModeBadge';
 
+import { QuickSettingsPanel } from '../settings/QuickSettingsPanel';
+import { AdvancedSearchModal } from '../search/AdvancedSearchModal';
+import { SlidersHorizontal } from 'lucide-react';
+
 export interface DashboardLayoutProps {
   children: React.ReactNode;
   activeFolderId?: string;
@@ -65,6 +69,14 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('connected');
   const [searchQuery, setSearchQuery] = useState('');
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isQuickSettingsOpen, setIsQuickSettingsOpen] = useState(false);
+  const [isAdvancedSearchOpen, setIsAdvancedSearchOpen] = useState(false);
+  const [density, setDensity] = useState<'default' | 'comfortable' | 'compact'>('default');
+  const [theme, setTheme] = useState('dark-oled');
+  const [inboxType, setInboxType] = useState<'default' | 'important' | 'unread' | 'starred' | 'priority'>('default');
+  const [readingPane, setReadingPane] = useState<'none' | 'right' | 'below'>('right');
+  const [conversationView, setConversationView] = useState(true);
+
   const primaryFolders = customFolders.filter(f => ['inbox', 'starred', 'snoozed', 'sent', 'drafts'].includes(f.slug.toLowerCase()));
   const secondaryFolders = customFolders.filter(f => !['inbox', 'starred', 'snoozed', 'sent', 'drafts'].includes(f.slug.toLowerCase()));
   const isSecondaryActive = secondaryFolders.some(f => f.id === activeFolderId || f.slug.toLowerCase() === activeFolderId.replace('fld-', '').toLowerCase());
@@ -259,7 +271,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               <Menu className="w-5 h-5" />
             </button>
             
-            {/* Search Bar */}
+            {/* Search Bar & Advanced Filter Popover */}
             <div className="max-w-2xl w-full flex-1 relative group">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <Search className="w-4 h-4 text-slate-500 group-focus-within:text-[#2D5BFF] transition-colors" />
@@ -270,14 +282,36 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                 value={searchQuery}
                 onChange={(e) => { setSearchQuery(e.target.value); onSearch?.(e.target.value); }}
                 placeholder="Search mail, people, or settings..." 
-                className="w-full bg-[#12141A] border border-[#1E232B] text-sm text-white rounded-xl pl-10 pr-12 py-2.5 outline-none focus:border-[#2D5BFF]/50 focus:bg-[#151821] focus:ring-4 focus:ring-[#2D5BFF]/10 transition-all placeholder:text-slate-500 shadow-inner"
+                className="w-full bg-[#12141A] border border-[#1E232B] text-sm text-white rounded-xl pl-10 pr-20 py-2.5 outline-none focus:border-[#2D5BFF]/50 focus:bg-[#151821] focus:ring-4 focus:ring-[#2D5BFF]/10 transition-all placeholder:text-slate-500 shadow-inner"
               />
-              <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                <div className="flex items-center gap-0.5 text-[10px] font-bold text-slate-500 bg-[#1E232B] px-1.5 py-0.5 rounded border border-slate-700/50 shadow-sm">
+              <div className="absolute inset-y-0 right-0 pr-2.5 flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setIsAdvancedSearchOpen(!isAdvancedSearchOpen)}
+                  className={`p-1 rounded-lg transition-colors ${
+                    isAdvancedSearchOpen
+                      ? 'text-[#2D5BFF] bg-[#2D5BFF]/20'
+                      : 'text-slate-400 hover:text-white hover:bg-[#1E232B]'
+                  }`}
+                  title="Show search options"
+                >
+                  <SlidersHorizontal className="w-4 h-4" />
+                </button>
+                <div className="hidden sm:flex items-center gap-0.5 text-[10px] font-bold text-slate-500 bg-[#1E232B] px-1.5 py-0.5 rounded border border-slate-700/50 shadow-sm pointer-events-none">
                   <Command className="w-3 h-3" />
                   <span>K</span>
                 </div>
               </div>
+
+              {/* Advanced Search Modal Popover */}
+              <AdvancedSearchModal
+                isOpen={isAdvancedSearchOpen}
+                onClose={() => setIsAdvancedSearchOpen(false)}
+                onSearch={(q) => {
+                  setSearchQuery(q);
+                  onSearch?.(q);
+                }}
+              />
             </div>
           </div>
 
@@ -288,7 +322,12 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               <span>Ask AI</span>
             </button>
 
-            <button onClick={onOpenSettings} className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-[#1E232B] transition-colors relative">
+            {/* Quick Settings Button */}
+            <button
+              onClick={() => setIsQuickSettingsOpen(true)}
+              className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-[#1E232B] transition-colors relative"
+              title="Settings"
+            >
               <Settings className="w-5 h-5" />
             </button>
 
@@ -392,6 +431,25 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           )}
         </main>
       </div>
+
+      {/* Quick Settings Slide-Over Panel */}
+      <QuickSettingsPanel
+        isOpen={isQuickSettingsOpen}
+        onClose={() => setIsQuickSettingsOpen(false)}
+        onOpenFullSettings={() => {
+          if (onOpenSettings) onOpenSettings();
+        }}
+        density={density}
+        onChangeDensity={setDensity}
+        theme={theme}
+        onChangeTheme={setTheme}
+        inboxType={inboxType}
+        onChangeInboxType={setInboxType}
+        readingPane={readingPane}
+        onChangeReadingPane={setReadingPane}
+        conversationView={conversationView}
+        onToggleConversationView={setConversationView}
+      />
     </div>
   );
 };
