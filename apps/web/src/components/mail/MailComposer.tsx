@@ -2,25 +2,9 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  X,
-  Minus,
-  Maximize2,
-  Minimize2,
-  Send,
-  Paperclip,
-  Trash2,
-  Bold,
-  Italic,
-  Underline,
-  List,
-  ListOrdered,
-  Link2,
-  Sparkles,
-  Clock,
-  ChevronDown,
-  CheckCircle2,
-  AlertCircle,
-  Save,
+  X, Minus, Maximize2, Minimize2, Send, Paperclip, Trash2, Bold, Italic, 
+  Underline, List, ListOrdered, Link2, Sparkles, Clock, ChevronDown, 
+  AlertCircle, Save, Shield, ShieldCheck, FileDown, Type
 } from 'lucide-react';
 
 export interface ComposerAttachment {
@@ -55,8 +39,6 @@ export interface MailComposerProps {
   initialAttachments?: ComposerAttachment[];
 }
 
-const DEFAULT_TO: string[] = [];
-
 const readFileAsBase64 = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -71,21 +53,12 @@ const readFileAsBase64 = (file: File): Promise<string> => {
 };
 
 export const MailComposer: React.FC<MailComposerProps> = ({
-  isOpen,
-  onClose,
-  onSend,
-  onSaveDraft,
-  initialTo = DEFAULT_TO,
-  initialCc = [],
-  initialBcc = [],
-  initialSubject = '',
-  initialBody = '',
-  initialAttachments = [],
+  isOpen, onClose, onSend, onSaveDraft,
+  initialTo = [], initialCc = [], initialBcc = [],
+  initialSubject = '', initialBody = '', initialAttachments = [],
 }) => {
   const [isMinimized, setIsMinimized] = useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
-
-  // Form Fields
   const [toInput, setToInput] = useState('');
   const [toChips, setToChips] = useState<string[]>([]);
   const [showCc, setShowCc] = useState(false);
@@ -94,595 +67,248 @@ export const MailComposer: React.FC<MailComposerProps> = ({
   const [showBcc, setShowBcc] = useState(false);
   const [bccInput, setBccInput] = useState('');
   const [bccChips, setBccChips] = useState<string[]>([]);
-
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
   const [attachments, setAttachments] = useState<ComposerAttachment[]>([]);
-
   const [isSending, setIsSending] = useState(false);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [isScheduleOpen, setIsScheduleOpen] = useState(false);
-  const [draftStatus, setDraftStatus] = useState<string>('Draft ready');
+  const [isSecure, setIsSecure] = useState(false);
+  const [isAiOpen, setIsAiOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const prevOpenRef = useRef(false);
 
   useEffect(() => {
-    if (isOpen && !prevOpenRef.current) {
-      setToChips(Array.isArray(initialTo) ? [...initialTo] : []);
-      setCcChips(Array.isArray(initialCc) ? [...initialCc] : []);
-      setShowCc(Array.isArray(initialCc) && initialCc.length > 0);
-      setBccChips(Array.isArray(initialBcc) ? [...initialBcc] : []);
-      setShowBcc(Array.isArray(initialBcc) && initialBcc.length > 0);
+    if (isOpen) {
+      setToChips([...initialTo]);
+      setCcChips([...initialCc]);
+      setShowCc(initialCc.length > 0);
+      setBccChips([...initialBcc]);
+      setShowBcc(initialBcc.length > 0);
       setSubject(initialSubject || '');
       setBody(initialBody || '');
-      setAttachments(Array.isArray(initialAttachments) ? [...initialAttachments] : []);
+      setAttachments([...initialAttachments]);
       setErrorMessage(null);
-      setIsScheduleOpen(false);
-      setDraftStatus('Draft ready');
+      setIsMinimized(false);
+      setIsMaximized(false);
     }
-    prevOpenRef.current = isOpen;
   }, [isOpen, initialTo, initialCc, initialBcc, initialSubject, initialBody, initialAttachments]);
-
-  // Autosave simulation every 3 seconds
-  useEffect(() => {
-    if (!isOpen) return;
-    const timer = setTimeout(() => {
-      if (subject || body || toChips.length > 0) {
-        setDraftStatus('All changes saved in Drafts');
-      }
-    }, 1500);
-    return () => clearTimeout(timer);
-  }, [subject, body, toChips, isOpen]);
 
   if (!isOpen) return null;
 
-  const validateEmail = (email: string): boolean => {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
-  };
+  const validateEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 
-  const handleAddChip = (type: 'to' | 'cc' | 'bcc', value: string) => {
+  const handleAddChip = (type: 'to'|'cc'|'bcc', value: string) => {
     const trimmed = value.trim().replace(/,$/, '');
     if (!trimmed) return;
-
-    if (!validateEmail(trimmed) && !trimmed.includes('@eazzio.com')) {
-      setErrorMessage(`Invalid email address: ${trimmed}`);
+    if (!validateEmail(trimmed) && !trimmed.includes('@')) {
+      setErrorMessage(`Invalid email: ${trimmed}`);
       return;
     }
     setErrorMessage(null);
-
-    if (type === 'to') {
-      if (!toChips.includes(trimmed)) setToChips([...toChips, trimmed]);
-      setToInput('');
-    } else if (type === 'cc') {
-      if (!ccChips.includes(trimmed)) setCcChips([...ccChips, trimmed]);
-      setCcInput('');
-    } else if (type === 'bcc') {
-      if (!bccChips.includes(trimmed)) setBccChips([...bccChips, trimmed]);
-      setBccInput('');
-    }
+    if (type === 'to') { if (!toChips.includes(trimmed)) setToChips([...toChips, trimmed]); setToInput(''); }
+    if (type === 'cc') { if (!ccChips.includes(trimmed)) setCcChips([...ccChips, trimmed]); setCcInput(''); }
+    if (type === 'bcc') { if (!bccChips.includes(trimmed)) setBccChips([...bccChips, trimmed]); setBccInput(''); }
   };
 
-  const handleAddRecipient = (
-    type: 'to' | 'cc' | 'bcc',
-    value: string,
-    e?: React.KeyboardEvent
-  ) => {
-    if (e && e.key !== 'Enter' && e.key !== ',' && e.key !== ' ') return;
-    if (e) e.preventDefault();
-    handleAddChip(type, value);
-  };
-
-  const handleRemoveChip = (type: 'to' | 'cc' | 'bcc', chip: string) => {
-    if (type === 'to') setToChips(toChips.filter((c) => c !== chip));
-    if (type === 'cc') setCcChips(ccChips.filter((c) => c !== chip));
-    if (type === 'bcc') setBccChips(bccChips.filter((c) => c !== chip));
-  };
-
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-
-    const newAttachments: ComposerAttachment[] = [];
-    for (let i = 0; i < files.length; i++) {
-      const f = files[i];
-      if (f) {
-        let base64 = '';
-        try {
-          base64 = await readFileAsBase64(f);
-        } catch (_) {}
-
-        newAttachments.push({
-          id: `att-${Date.now()}-${i}`,
-          name: f.name,
-          sizeBytes: f.size,
-          dataBase64: base64,
-          type: f.type || 'application/octet-stream',
-          file: f,
-        });
-      }
-    }
-
-    setAttachments((prev) => [...prev, ...newAttachments]);
-  };
-
-  const handleRemoveAttachment = (id: string) => {
-    setAttachments((prev) => prev.filter((a) => a.id !== id));
-  };
-
-  const handleSend = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
+  const handleSend = async (scheduledDate?: Date) => {
     setErrorMessage(null);
-
-    // Auto-add any pending text in toInput
     let finalTo = [...toChips];
     if (toInput.trim()) {
-      if (validateEmail(toInput.trim()) || toInput.trim().includes('@eazzio.com')) {
-        finalTo.push(toInput.trim());
-      } else {
-        setErrorMessage(`Invalid email address: ${toInput.trim()}`);
-        return;
-      }
+      if (validateEmail(toInput.trim())) finalTo.push(toInput.trim());
+      else return setErrorMessage(`Invalid email: ${toInput.trim()}`);
     }
-
-    if (finalTo.length === 0) {
-      setErrorMessage('Please add at least one recipient');
-      return;
-    }
+    if (finalTo.length === 0) return setErrorMessage('Please add at least one recipient');
 
     setIsSending(true);
     try {
       await onSend({
-        to: finalTo,
-        cc: ccChips,
-        bcc: bccChips,
+        to: finalTo, cc: ccChips, bcc: bccChips,
         subject: subject.trim() || '(No Subject)',
-        body: body.trim(),
-        attachments,
+        body: body.trim(), attachments,
+        scheduledAt: scheduledDate?.toISOString(),
       });
       onClose();
-    } catch (err: unknown) {
-      setErrorMessage((err as Error).message || 'Failed to send message');
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Failed to send message');
     } finally {
       setIsSending(false);
-    }
-  };
-
-  const handleSendWithSchedule = async (scheduledDate: Date) => {
-    setIsScheduleOpen(false);
-    setErrorMessage(null);
-
-    let finalTo = [...toChips];
-    if (toInput.trim()) {
-      if (validateEmail(toInput.trim()) || toInput.trim().includes('@eazzio.com')) {
-        finalTo.push(toInput.trim());
-      } else {
-        setErrorMessage(`Invalid email address: ${toInput.trim()}`);
-        return;
-      }
-    }
-
-    if (finalTo.length === 0) {
-      setErrorMessage('Please add at least one recipient');
-      return;
-    }
-
-    setIsSending(true);
-    try {
-      await onSend({
-        to: finalTo,
-        cc: ccChips,
-        bcc: bccChips,
-        subject: subject.trim() || '(No Subject)',
-        body: body.trim(),
-        attachments,
-        scheduledAt: scheduledDate.toISOString(),
-      });
-      onClose();
-    } catch (err: unknown) {
-      setErrorMessage((err as Error).message || 'Failed to schedule message');
-    } finally {
-      setIsSending(false);
-    }
-  };
-
-  const handleSaveDraft = async () => {
-    let finalTo = [...toChips];
-    if (toInput.trim() && validateEmail(toInput.trim())) {
-      finalTo.push(toInput.trim());
-    }
-
-    setIsSavingDraft(true);
-    try {
-      if (onSaveDraft) {
-        await onSaveDraft({
-          to: finalTo,
-          cc: ccChips,
-          bcc: bccChips,
-          subject: subject.trim() || '(Draft - No Subject)',
-          body: body.trim(),
-          attachments,
-        });
-      }
-      setDraftStatus('Draft saved');
-    } catch (err: unknown) {
-      setErrorMessage((err as Error).message || 'Failed to save draft');
-    } finally {
-      setIsSavingDraft(false);
+      setIsScheduleOpen(false);
     }
   };
 
   return (
-    <div
-      className={`fixed z-50 transition-all duration-200 shadow-2xl flex flex-col bg-[#16181D] border border-[#2A2E37] overflow-hidden ${
-        isMinimized
-          ? 'bottom-0 right-4 sm:right-6 w-64 sm:w-72 h-12 rounded-t-xl sm:rounded-xl'
-          : isMaximized
-          ? 'inset-0 sm:inset-4 md:inset-10 w-auto h-auto rounded-none sm:rounded-2xl'
-          : 'bottom-0 right-0 sm:right-4 md:right-10 w-full sm:w-[calc(100%-2rem)] md:w-[600px] h-[100dvh] sm:h-[520px] rounded-none sm:rounded-2xl'
-      }`}
-      data-testid="mail-composer-modal"
-    >
-      {/* Top Header Bar */}
-      <div className="h-12 px-4 bg-[#1C1F26] border-b border-[#2A2E37] flex items-center justify-between select-none shrink-0">
-        <span className="text-sm font-semibold text-white truncate">
-          {subject ? subject : 'New Message'}
-        </span>
-
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => setIsMinimized(!isMinimized)}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[#2A2E37] transition-colors"
-            title={isMinimized ? 'Expand' : 'Minimize'}
-          >
-            <Minus className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => {
-              setIsMaximized(!isMaximized);
-              setIsMinimized(false);
-            }}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[#2A2E37] transition-colors hidden sm:block"
-            title={isMaximized ? 'Restore size' : 'Maximize'}
-          >
+    <div className={`fixed z-[100] transition-all duration-300 shadow-2xl flex flex-col bg-[#12141A] border border-[#1E232B] overflow-hidden ${
+      isMinimized ? 'bottom-0 right-4 w-72 h-14 rounded-t-2xl' : 
+      isMaximized ? 'inset-4 md:inset-10 rounded-2xl' : 
+      'bottom-0 right-4 md:right-16 w-full sm:w-[560px] h-[600px] rounded-t-2xl shadow-[0_-10px_40px_rgba(0,0,0,0.5)]'
+    }`}>
+      
+      {/* Header */}
+      <div className="h-14 px-4 bg-[#1E232B] flex items-center justify-between shrink-0 cursor-pointer" onClick={(e) => { if (e.target === e.currentTarget && isMinimized) setIsMinimized(false); }}>
+        <div className="flex items-center gap-3 truncate">
+          <span className="text-sm font-bold text-white truncate">{subject || 'New Message'}</span>
+          {isSecure && <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />}
+        </div>
+        <div className="flex items-center gap-1.5 shrink-0 ml-4">
+          <button onClick={() => setIsMinimized(!isMinimized)} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors"><Minus className="w-4 h-4" /></button>
+          <button onClick={() => { setIsMaximized(!isMaximized); setIsMinimized(false); }} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors hidden sm:block">
             {isMaximized ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
           </button>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
-            title="Save & Close"
-            data-testid="composer-close-btn"
-          >
-            <X className="w-4 h-4" />
-          </button>
+          <button onClick={onClose} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-rose-500/20 transition-colors"><X className="w-4 h-4" /></button>
         </div>
       </div>
 
       {!isMinimized && (
-        <div className="flex-1 flex flex-col min-h-0 bg-[#0F1115]">
-          {/* Error Alert */}
+        <div className="flex-1 flex flex-col min-h-0 bg-[#0A0C10]">
           {errorMessage && (
-            <div className="px-4 py-2 bg-red-500/10 border-b border-red-500/30 text-red-400 text-xs flex items-center gap-2">
-              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-              <span>{errorMessage}</span>
+            <div className="px-4 py-2 bg-rose-500/10 border-b border-rose-500/20 text-rose-400 text-xs font-semibold flex items-center gap-2">
+              <AlertCircle className="w-4 h-4" /> {errorMessage}
             </div>
           )}
 
           {/* Form Fields */}
-          <div className="p-3 space-y-2 border-b border-[#2A2E37] text-xs">
-            {/* TO Recipients */}
-            <div className="flex items-center gap-2 flex-wrap min-h-[34px]">
-              <span className="text-slate-500 w-8">To:</span>
+          <div className="px-4 py-2 space-y-1 border-b border-[#1E232B]">
+            {/* To */}
+            <div className="flex items-center gap-2 min-h-[36px]">
+              <span className="text-slate-500 font-semibold text-xs w-8">To</span>
               <div className="flex-1 flex items-center gap-1.5 flex-wrap">
-                {toChips.map((chip) => (
-                  <span
-                    key={chip}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#2D5BFF]/15 border border-[#2D5BFF]/30 text-[#2D5BFF] font-medium"
-                  >
-                    <span>{chip}</span>
-                    <button
-                      onClick={() => handleRemoveChip('to', chip)}
-                      className="hover:text-white"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
+                {toChips.map(chip => (
+                  <span key={chip} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-[#2D5BFF]/20 text-[#2D5BFF] text-xs font-bold border border-[#2D5BFF]/30">
+                    {chip} <button onClick={() => setToChips(toChips.filter(c => c !== chip))}><X className="w-3 h-3 hover:text-white" /></button>
                   </span>
                 ))}
-                <input
-                  type="text"
-                  value={toInput}
-                  onChange={(e) => setToInput(e.target.value)}
-                  onKeyDown={(e) => handleAddRecipient('to', toInput, e)}
-                  onBlur={() => handleAddRecipient('to', toInput)}
-                  placeholder={toChips.length === 0 ? 'recipients@example.com' : ''}
-                  className="flex-1 min-w-[140px] bg-transparent text-white outline-none placeholder-slate-600"
-                  data-testid="composer-to-input"
-                />
+                <input type="text" value={toInput} onChange={e => setToInput(e.target.value)} onKeyDown={e => { if(e.key === 'Enter' || e.key === ',') { e.preventDefault(); handleAddChip('to', toInput); } }} onBlur={() => handleAddChip('to', toInput)} className="flex-1 min-w-[120px] bg-transparent text-sm text-white outline-none" />
               </div>
-              <div className="flex items-center gap-2 text-slate-500 text-[11px]">
-                {!showCc && (
-                  <button onClick={() => setShowCc(true)} className="hover:text-slate-300">
-                    Cc
-                  </button>
-                )}
-                {!showBcc && (
-                  <button onClick={() => setShowBcc(true)} className="hover:text-slate-300">
-                    Bcc
-                  </button>
-                )}
+              <div className="flex gap-2 text-xs font-bold text-slate-500">
+                {!showCc && <button onClick={() => setShowCc(true)} className="hover:text-slate-300">Cc</button>}
+                {!showBcc && <button onClick={() => setShowBcc(true)} className="hover:text-slate-300">Bcc</button>}
               </div>
             </div>
-
-            {/* CC Recipients */}
+            {/* Cc & Bcc */}
             {showCc && (
-              <div className="flex items-center gap-2 flex-wrap min-h-[34px] pt-1 border-t border-[#2A2E37]/60">
-                <span className="text-slate-500 w-8">Cc:</span>
+              <div className="flex items-center gap-2 min-h-[36px] border-t border-[#1E232B]/50">
+                <span className="text-slate-500 font-semibold text-xs w-8">Cc</span>
                 <div className="flex-1 flex items-center gap-1.5 flex-wrap">
-                  {ccChips.map((chip) => (
-                    <span
-                      key={chip}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#1C1F26] border border-[#2A2E37] text-slate-300 font-medium"
-                    >
-                      <span>{chip}</span>
-                      <button
-                        onClick={() => handleRemoveChip('cc', chip)}
-                        className="hover:text-white"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
+                  {ccChips.map(chip => (
+                    <span key={chip} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-[#1E232B] text-slate-300 text-xs font-bold border border-slate-700">
+                      {chip} <button onClick={() => setCcChips(ccChips.filter(c => c !== chip))}><X className="w-3 h-3 hover:text-white" /></button>
                     </span>
                   ))}
-                  <input
-                    type="text"
-                    value={ccInput}
-                    onChange={(e) => setCcInput(e.target.value)}
-                    onKeyDown={(e) => handleAddRecipient('cc', ccInput, e)}
-                    onBlur={() => handleAddRecipient('cc', ccInput)}
-                    placeholder="cc@example.com"
-                    className="flex-1 min-w-[140px] bg-transparent text-white outline-none placeholder-slate-600"
-                  />
+                  <input type="text" value={ccInput} onChange={e => setCcInput(e.target.value)} onKeyDown={e => { if(e.key === 'Enter' || e.key === ',') { e.preventDefault(); handleAddChip('cc', ccInput); } }} onBlur={() => handleAddChip('cc', ccInput)} className="flex-1 min-w-[120px] bg-transparent text-sm text-white outline-none" />
                 </div>
               </div>
             )}
-
-            {/* BCC Recipients */}
             {showBcc && (
-              <div className="flex items-center gap-2 flex-wrap min-h-[34px] pt-1 border-t border-[#2A2E37]/60">
-                <span className="text-slate-500 w-8">Bcc:</span>
+              <div className="flex items-center gap-2 min-h-[36px] border-t border-[#1E232B]/50">
+                <span className="text-slate-500 font-semibold text-xs w-8">Bcc</span>
                 <div className="flex-1 flex items-center gap-1.5 flex-wrap">
-                  {bccChips.map((chip) => (
-                    <span
-                      key={chip}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#1C1F26] border border-[#2A2E37] text-slate-300 font-medium"
-                    >
-                      <span>{chip}</span>
-                      <button
-                        onClick={() => handleRemoveChip('bcc', chip)}
-                        className="hover:text-white"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
+                  {bccChips.map(chip => (
+                    <span key={chip} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-[#1E232B] text-slate-300 text-xs font-bold border border-slate-700">
+                      {chip} <button onClick={() => setBccChips(bccChips.filter(c => c !== chip))}><X className="w-3 h-3 hover:text-white" /></button>
                     </span>
                   ))}
-                  <input
-                    type="text"
-                    value={bccInput}
-                    onChange={(e) => setBccInput(e.target.value)}
-                    onKeyDown={(e) => handleAddRecipient('bcc', bccInput, e)}
-                    onBlur={() => handleAddRecipient('bcc', bccInput)}
-                    placeholder="bcc@example.com"
-                    className="flex-1 min-w-[140px] bg-transparent text-white outline-none placeholder-slate-600"
-                  />
+                  <input type="text" value={bccInput} onChange={e => setBccInput(e.target.value)} onKeyDown={e => { if(e.key === 'Enter' || e.key === ',') { e.preventDefault(); handleAddChip('bcc', bccInput); } }} onBlur={() => handleAddChip('bcc', bccInput)} className="flex-1 min-w-[120px] bg-transparent text-sm text-white outline-none" />
                 </div>
               </div>
             )}
-
             {/* Subject */}
-            <div className="pt-1 border-t border-[#2A2E37]/60">
-              <input
-                type="text"
-                value={subject}
-                onChange={(e) => setSubject(e.target.value)}
-                placeholder="Subject"
-                className="w-full bg-transparent text-sm font-semibold text-white outline-none placeholder-slate-600"
-                data-testid="composer-subject-input"
-              />
+            <div className="border-t border-[#1E232B]/50 pt-2 pb-1">
+              <input type="text" value={subject} onChange={e => setSubject(e.target.value)} placeholder="Subject" className="w-full bg-transparent text-base font-bold text-white placeholder-slate-500 outline-none" />
             </div>
           </div>
 
-          {/* Rich Text / Email Body Editor */}
-          <div className="flex-1 p-4 flex flex-col min-h-0">
-            <textarea
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              placeholder="Write your email here..."
-              className="flex-1 w-full bg-transparent text-sm text-slate-200 leading-relaxed outline-none resize-none placeholder-slate-600 custom-scrollbar"
-              data-testid="composer-body-textarea"
-            />
-
-            {/* Attachments List */}
+          {/* Editor */}
+          <div className="flex-1 flex flex-col p-4 min-h-0 relative">
+            <textarea value={body} onChange={e => setBody(e.target.value)} placeholder="Write your message..." className="flex-1 w-full bg-transparent text-sm text-slate-200 leading-relaxed outline-none resize-none custom-scrollbar" />
+            
+            {/* Drag Drop Attachments */}
             {attachments.length > 0 && (
-              <div className="pt-3 border-t border-[#2A2E37] flex flex-wrap gap-2">
-                {attachments.map((att) => (
-                  <div
-                    key={att.id}
-                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#16181D] border border-[#2A2E37] text-xs text-slate-300"
-                  >
-                    <Paperclip className="w-3.5 h-3.5 text-slate-400" />
-                    <span className="truncate max-w-[140px] font-medium">{att.name}</span>
-                    <span className="text-slate-500 text-[10px]">
-                      ({Math.round(att.sizeBytes / 1024)} KB)
-                    </span>
-                    <button
-                      onClick={() => handleRemoveAttachment(att.id)}
-                      className="hover:text-red-400 ml-1"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
+              <div className="mt-4 pt-4 border-t border-[#1E232B] flex flex-wrap gap-2">
+                {attachments.map(att => (
+                  <div key={att.id} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#12141A] border border-[#1E232B] hover:border-[#2D5BFF]/50 transition-colors group cursor-default shadow-sm">
+                    <FileDown className="w-4 h-4 text-[#2D5BFF]" />
+                    <span className="text-xs font-bold text-white max-w-[150px] truncate">{att.name}</span>
+                    <span className="text-[10px] font-mono text-slate-500">{Math.round(att.sizeBytes/1024)}KB</span>
+                    <button onClick={() => setAttachments(attachments.filter(a => a.id !== att.id))} className="ml-2 text-slate-500 hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity"><X className="w-3.5 h-3.5" /></button>
                   </div>
                 ))}
               </div>
             )}
           </div>
 
-          {/* Bottom Toolbar & Send Action */}
-          <div className="h-14 px-4 bg-[#16181D] border-t border-[#2A2E37] flex items-center justify-between gap-3 shrink-0">
-            {/* Left Action Buttons */}
-            <div className="flex items-center gap-2">
-              {/* Split Send Button */}
-              <div className="relative inline-flex rounded-xl shadow-md shadow-blue-500/20">
-                <button
-                  type="button"
-                  onClick={handleSend}
-                  disabled={isSending || isSavingDraft}
-                  className="py-2 px-3.5 rounded-l-xl bg-[#2D5BFF] hover:bg-[#1E48E0] active:scale-[0.98] disabled:opacity-50 text-white font-semibold text-xs transition-all flex items-center gap-2"
-                  data-testid="composer-send-btn"
-                >
-                  <Send className="w-3.5 h-3.5" />
-                  <span>{isSending ? 'Sending...' : 'Send'}</span>
+          {/* Toolbar & Send */}
+          <div className="p-3 bg-[#12141A] border-t border-[#1E232B] flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {/* Send Button Group */}
+              <div className="relative inline-flex rounded-xl shadow-lg shadow-[#2D5BFF]/20">
+                <button onClick={() => handleSend()} disabled={isSending} className="px-5 py-2.5 rounded-l-xl bg-[#2D5BFF] hover:bg-[#1E48E0] disabled:opacity-50 text-white font-bold text-sm transition-all flex items-center gap-2">
+                  <Send className="w-4 h-4" /> {isSending ? 'Sending...' : 'Send'}
                 </button>
-
-                <button
-                  type="button"
-                  onClick={() => setIsScheduleOpen(!isScheduleOpen)}
-                  disabled={isSending || isSavingDraft}
-                  className="py-2 px-2 rounded-r-xl bg-[#244ACC] hover:bg-[#1C3DB3] disabled:opacity-50 text-white border-l border-white/20 transition-all flex items-center justify-center"
-                  title="Schedule send"
-                >
-                  <ChevronDown className="w-3.5 h-3.5" />
+                <div className="w-[1px] bg-[#12141A]/30 z-10"></div>
+                <button onClick={() => setIsScheduleOpen(!isScheduleOpen)} disabled={isSending} className="px-3 py-2.5 rounded-r-xl bg-[#2D5BFF] hover:bg-[#1E48E0] disabled:opacity-50 text-white transition-all">
+                  <ChevronDown className="w-4 h-4" />
                 </button>
-
+                
                 {isScheduleOpen && (
-                  <div className="absolute left-0 bottom-12 w-56 rounded-xl bg-[#181B22] border border-[#2E3440] shadow-2xl py-1.5 z-50 animate-in fade-in divide-y divide-[#22262E]">
-                    <div className="px-3 py-1.5 text-[11px] font-semibold text-slate-400">
-                      Schedule Send
-                    </div>
-                    <div className="py-1">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const d = new Date();
-                          d.setDate(d.getDate() + 1);
-                          d.setHours(8, 0, 0, 0);
-                          handleSendWithSchedule(d);
-                        }}
-                        className="w-full px-3 py-1.5 text-left text-xs text-slate-200 hover:bg-[#22262E] hover:text-white flex items-center justify-between"
-                      >
-                        <span>Tomorrow morning</span>
-                        <span className="text-[10px] text-slate-400 font-mono">8:00 AM</span>
+                  <div className="absolute left-0 bottom-[110%] w-56 bg-[#1E232B] border border-slate-700 rounded-xl shadow-2xl py-1 overflow-hidden z-50 animate-in slide-in-from-bottom-2">
+                    <div className="px-3 py-2 text-xs font-bold text-slate-400 border-b border-slate-700/50">Schedule Send</div>
+                    {[{label: 'Tomorrow morning', time: '8:00 AM', hrs: 24}, {label: 'Tomorrow afternoon', time: '1:00 PM', hrs: 29}].map(opt => (
+                      <button key={opt.label} onClick={() => { const d = new Date(); d.setHours(d.getHours() + opt.hrs); handleSend(d); }} className="w-full px-3 py-2 text-left text-sm text-white hover:bg-slate-700 flex justify-between items-center transition-colors">
+                        <span>{opt.label}</span><span className="text-xs text-slate-400 font-mono">{opt.time}</span>
                       </button>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const d = new Date();
-                          d.setDate(d.getDate() + 1);
-                          d.setHours(13, 0, 0, 0);
-                          handleSendWithSchedule(d);
-                        }}
-                        className="w-full px-3 py-1.5 text-left text-xs text-slate-200 hover:bg-[#22262E] hover:text-white flex items-center justify-between"
-                      >
-                        <span>Tomorrow afternoon</span>
-                        <span className="text-[10px] text-slate-400 font-mono">1:00 PM</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const d = new Date();
-                          const day = d.getDay();
-                          const diff = (1 - day + 7) % 7 || 7;
-                          d.setDate(d.getDate() + diff);
-                          d.setHours(8, 0, 0, 0);
-                          handleSendWithSchedule(d);
-                        }}
-                        className="w-full px-3 py-1.5 text-left text-xs text-slate-200 hover:bg-[#22262E] hover:text-white flex items-center justify-between"
-                      >
-                        <span>Monday morning</span>
-                        <span className="text-[10px] text-slate-400 font-mono">8:00 AM</span>
-                      </button>
-                    </div>
+                    ))}
                   </div>
                 )}
               </div>
 
-              <button
-                type="button"
-                onClick={handleSaveDraft}
-                disabled={isSending || isSavingDraft}
-                className="py-2 px-3 rounded-xl bg-[#1C1F26] hover:bg-[#2A2E37] text-slate-300 hover:text-white font-medium text-xs border border-[#2A2E37] transition-all flex items-center gap-1.5"
-                data-testid="composer-save-draft-btn"
-                title="Save this message as a draft in Drafts folder"
-              >
-                <Save className="w-3.5 h-3.5 text-amber-400" />
-                <span>{isSavingDraft ? 'Saving...' : 'Save Draft'}</span>
-              </button>
+              {/* Formatting & Tools */}
+              <div className="flex items-center gap-1 bg-[#0A0C10] p-1 rounded-lg border border-[#1E232B]">
+                <button className="p-1.5 rounded text-slate-400 hover:text-white hover:bg-[#1E232B]"><Type className="w-4 h-4" /></button>
+                <button onClick={() => fileInputRef.current?.click()} className="p-1.5 rounded text-slate-400 hover:text-white hover:bg-[#1E232B]"><Paperclip className="w-4 h-4" /></button>
+                <button className="p-1.5 rounded text-slate-400 hover:text-white hover:bg-[#1E232B]"><Link2 className="w-4 h-4" /></button>
+                <input type="file" multiple ref={fileInputRef} onChange={async (e) => {
+                  const files = e.target.files;
+                  if (!files) return;
+                  const newAtts: ComposerAttachment[] = [];
+                  for (let i=0; i<files.length; i++) {
+                    const base64 = await readFileAsBase64(files[i]);
+                    newAtts.push({ id: `att-${Date.now()}-${i}`, name: files[i].name, sizeBytes: files[i].size, dataBase64: base64, file: files[i] });
+                  }
+                  setAttachments([...attachments, ...newAtts]);
+                }} className="hidden" />
+              </div>
 
-              {/* Attachment Trigger */}
-              <input
-                type="file"
-                multiple
-                ref={fileInputRef}
-                onChange={handleFileUpload}
-                className="hidden"
-              />
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-[#1C1F26] transition-colors"
-                title="Attach files"
-                data-testid="composer-attach-btn"
-              >
-                <Paperclip className="w-4 h-4" />
-              </button>
-
-              {/* Formatting Toolbar */}
-              <div className="hidden sm:flex items-center gap-0.5 pl-2 border-l border-[#2A2E37]">
-                <button
-                  type="button"
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[#1C1F26]"
-                  title="Bold"
-                >
-                  <Bold className="w-3.5 h-3.5" />
+              <div className="flex items-center gap-1">
+                <button onClick={() => setIsSecure(!isSecure)} className={`p-2 rounded-lg transition-colors flex items-center gap-1.5 text-xs font-bold ${isSecure ? 'bg-[#14B8A6]/20 text-[#14B8A6]' : 'text-slate-400 hover:bg-[#1E232B] hover:text-white'}`}>
+                  {isSecure ? <ShieldCheck className="w-4 h-4" /> : <Shield className="w-4 h-4" />}
+                  <span className="hidden sm:inline">{isSecure ? 'E2EE On' : 'Encrypt'}</span>
                 </button>
-                <button
-                  type="button"
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[#1C1F26]"
-                  title="Italic"
-                >
-                  <Italic className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  type="button"
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[#1C1F26]"
-                  title="Bullet List"
-                >
-                  <List className="w-3.5 h-3.5" />
+                
+                <button onClick={() => setIsAiOpen(!isAiOpen)} className="p-2 rounded-lg text-purple-400 hover:bg-purple-500/10 transition-colors flex items-center gap-1.5 text-xs font-bold">
+                  <Sparkles className="w-4 h-4" /> <span className="hidden sm:inline">AI Assist</span>
                 </button>
               </div>
             </div>
 
-            {/* Right Status & Discard */}
-            <div className="flex items-center gap-3 text-xs text-slate-400">
-              <span className="hidden sm:inline text-[11px] text-slate-500">{draftStatus}</span>
-              <button
-                type="button"
-                onClick={() => {
-                  setToChips([]);
-                  setSubject('');
-                  setBody('');
-                  setAttachments([]);
-                  onClose();
-                }}
-                className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                title="Discard Draft"
-                data-testid="composer-discard-btn"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
+            <div className="flex items-center gap-2 text-slate-400">
+              <button onClick={() => onClose()} className="p-2 rounded-lg hover:text-rose-400 hover:bg-rose-500/10 transition-colors"><Trash2 className="w-4 h-4" /></button>
             </div>
           </div>
+          
+          {/* AI Writer Panel (Expandable) */}
+          {isAiOpen && (
+            <div className="absolute bottom-16 right-4 w-80 bg-[#1E232B] border border-purple-500/30 rounded-xl shadow-2xl p-4 animate-in slide-in-from-bottom-4">
+              <div className="flex justify-between items-center mb-3">
+                <span className="text-xs font-bold text-purple-400 flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5"/> Write with AI</span>
+                <button onClick={() => setIsAiOpen(false)} className="text-slate-400 hover:text-white"><X className="w-4 h-4" /></button>
+              </div>
+              <textarea placeholder="Tell AI what to write about..." rows={3} className="w-full bg-[#12141A] border border-[#2A313C] rounded-lg p-3 text-sm text-white resize-none outline-none focus:border-purple-500/50" />
+              <button className="w-full mt-3 py-2 rounded-lg bg-gradient-to-r from-purple-500 to-blue-500 text-white font-bold text-sm hover:opacity-90">Generate Draft</button>
+            </div>
+          )}
+
         </div>
       )}
     </div>

@@ -2,29 +2,10 @@
 
 import React, { useState } from 'react';
 import {
-  Star,
-  Trash2,
-  Archive,
-  Mail,
-  Reply,
-  Forward,
-  MoreVertical,
-  ShieldCheck,
-  ShieldAlert,
-  Paperclip,
-  Download,
-  Sparkles,
-  ChevronDown,
-  ChevronUp,
-  Send,
-  X,
-  FileText,
-  Printer,
-  ExternalLink,
-  Smile,
-  ArrowLeft,
-  Clock,
-  AlertOctagon,
+  Star, Trash2, Archive, Mail, Reply, Forward, ShieldCheck, ShieldAlert, 
+  Paperclip, Download, Sparkles, ChevronDown, ChevronUp, Send, X, FileText, 
+  Printer, ExternalLink, Smile, ArrowLeft, Clock, AlertOctagon, 
+  MoreVertical, CheckCircle2, AlertTriangle, EyeOff, LayoutTemplate
 } from 'lucide-react';
 import { MessageDetail } from '../../types/mail';
 
@@ -37,47 +18,26 @@ interface TrimmedMessageProps {
 const TrimmedMessageContent: React.FC<TrimmedMessageProps> = ({ bodyHtml, bodyText, snippet }) => {
   const [showQuoted, setShowQuoted] = useState(false);
 
-  // 1. Check HTML for quote containers (e.g. gmail_quote, blockquote)
   if (bodyHtml && bodyHtml.includes('<') && bodyHtml.includes('>') && bodyHtml !== '<p></p>' && bodyHtml !== '<p><br></p>') {
     const quoteIndex = bodyHtml.search(/(<div\s+class="gmail_quote"|<blockquote|<div\s+class="gmail_attr")/i);
     if (quoteIndex !== -1) {
       const primaryHtml = bodyHtml.slice(0, quoteIndex);
       const quotedHtml = bodyHtml.slice(quoteIndex);
-
       return (
-        <div className="space-y-2">
-          <div
-            className="text-sm text-slate-200 leading-relaxed font-sans prose prose-invert max-w-none [&_a]:text-[#2D5BFF] [&_a]:underline"
-            dangerouslySetInnerHTML={{ __html: primaryHtml }}
-          />
+        <div className="space-y-3 font-sans">
+          <div className="text-[15px] text-slate-200 leading-relaxed prose prose-invert max-w-none [&_a]:text-[#2D5BFF] [&_a]:underline" dangerouslySetInnerHTML={{ __html: primaryHtml }} />
           <div>
-            <button
-              onClick={() => setShowQuoted(!showQuoted)}
-              className="px-2 py-0.5 rounded bg-[#1C1F26] hover:bg-[#2A2E37] text-slate-400 hover:text-slate-200 text-xs font-mono transition-colors tracking-widest"
-              title={showQuoted ? 'Hide trimmed content' : 'Show trimmed content'}
-            >
-              •••
-            </button>
+            <button onClick={() => setShowQuoted(!showQuoted)} className="px-3 py-1 rounded-md bg-[#1E232B] hover:bg-[#2A313C] text-slate-400 hover:text-white text-xs font-bold tracking-widest transition-colors flex items-center gap-2">••• {showQuoted ? 'Hide trimmed content' : 'Show trimmed content'}</button>
             {showQuoted && (
-              <div
-                className="mt-3 pl-3 border-l-2 border-[#2A2E37] text-sm text-slate-400 leading-relaxed font-sans prose prose-invert max-w-none [&_a]:text-[#2D5BFF] animate-in fade-in"
-                dangerouslySetInnerHTML={{ __html: quotedHtml }}
-              />
+              <div className="mt-4 pl-4 border-l-2 border-[#2A313C] text-sm text-slate-400 leading-relaxed prose prose-invert max-w-none [&_a]:text-[#2D5BFF] animate-in fade-in slide-in-from-top-2" dangerouslySetInnerHTML={{ __html: quotedHtml }} />
             )}
           </div>
         </div>
       );
     }
-
-    return (
-      <div
-        className="text-sm text-slate-200 leading-relaxed font-sans prose prose-invert max-w-none [&_a]:text-[#2D5BFF] [&_a]:underline"
-        dangerouslySetInnerHTML={{ __html: bodyHtml }}
-      />
-    );
+    return <div className="text-[15px] text-slate-200 leading-relaxed font-sans prose prose-invert max-w-none [&_a]:text-[#2D5BFF] [&_a]:underline" dangerouslySetInnerHTML={{ __html: bodyHtml }} />;
   }
 
-  // 2. Check Plain Text for quote headers
   const rawText = bodyText || snippet || '(No content)';
   const quoteRegex = /(?:\r?\n)(?:On\s+[A-Za-z]+,\s+[A-Za-z]+\s+\d+.*?(?:wrote|wrote:)|-----Original Message-----|---------- Forwarded message ---------)[\s\S]*/i;
   const match = rawText.match(quoteRegex);
@@ -85,35 +45,19 @@ const TrimmedMessageContent: React.FC<TrimmedMessageProps> = ({ bodyHtml, bodyTe
   if (match && match.index !== undefined) {
     const primaryText = rawText.slice(0, match.index).trim();
     const quotedText = rawText.slice(match.index).trim();
-
     return (
-      <div className="space-y-2">
-        <div className="text-sm text-slate-200 leading-relaxed whitespace-pre-wrap font-sans">
-          {primaryText || '(No text content)'}
-        </div>
+      <div className="space-y-3 font-sans">
+        <div className="text-[15px] text-slate-200 leading-relaxed whitespace-pre-wrap">{primaryText || '(No text content)'}</div>
         <div>
-          <button
-            onClick={() => setShowQuoted(!showQuoted)}
-            className="px-2 py-0.5 rounded bg-[#1C1F26] hover:bg-[#2A2E37] text-slate-400 hover:text-slate-200 text-xs font-mono transition-colors tracking-widest inline-flex items-center gap-1"
-            title={showQuoted ? 'Hide trimmed content' : 'Show trimmed content'}
-          >
-            •••
-          </button>
+          <button onClick={() => setShowQuoted(!showQuoted)} className="px-3 py-1 rounded-md bg-[#1E232B] hover:bg-[#2A313C] text-slate-400 hover:text-white text-xs font-bold tracking-widest transition-colors flex items-center gap-2">••• {showQuoted ? 'Hide trimmed content' : 'Show trimmed content'}</button>
           {showQuoted && (
-            <div className="mt-3 pl-3 border-l-2 border-[#2A2E37] text-sm text-slate-400 leading-relaxed whitespace-pre-wrap font-sans animate-in fade-in">
-              {quotedText}
-            </div>
+            <div className="mt-4 pl-4 border-l-2 border-[#2A313C] text-sm text-slate-400 leading-relaxed whitespace-pre-wrap animate-in fade-in slide-in-from-top-2">{quotedText}</div>
           )}
         </div>
       </div>
     );
   }
-
-  return (
-    <div className="text-sm text-slate-200 leading-relaxed whitespace-pre-wrap font-sans">
-      {rawText}
-    </div>
-  );
+  return <div className="text-[15px] text-slate-200 leading-relaxed whitespace-pre-wrap font-sans">{rawText}</div>;
 };
 
 export interface ConversationViewerProps {
@@ -135,21 +79,9 @@ export interface ConversationViewerProps {
 }
 
 export const ConversationViewer: React.FC<ConversationViewerProps> = ({
-  threadId,
-  subject,
-  messages,
-  folderName,
-  labels = [],
-  onArchive,
-  onDelete,
-  onToggleStar,
-  onSnooze,
-  onSpam,
-  onSendReply,
-  onReply,
-  onReplyAll,
-  onForward,
-  onClose,
+  threadId, subject, messages, folderName, labels = [],
+  onArchive, onDelete, onToggleStar, onSnooze, onSpam,
+  onSendReply, onReply, onReplyAll, onForward, onClose,
 }) => {
   const [expandedMessageIds, setExpandedMessageIds] = useState<Set<string>>(
     new Set(messages.length > 0 ? [messages[messages.length - 1]!.id] : [])
@@ -157,559 +89,180 @@ export const ConversationViewer: React.FC<ConversationViewerProps> = ({
   const [replyText, setReplyText] = useState('');
   const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [isSummarizing, setIsSummarizing] = useState(false);
-  const [selectedPreview, setSelectedPreview] = useState<{
-    id: string;
-    filename: string;
-    contentType: string;
-    sizeBytes: number;
-    url?: string;
-  } | null>(null);
-
-  const smartReplySuggestions = [
-    'Thank you for the update! I will review shortly.',
-    'Looks great to proceed.',
-    'Could you please share more details regarding this?',
-  ];
+  const [showSecurityDetails, setShowSecurityDetails] = useState(false);
 
   const handleToggleExpand = (id: string) => {
     const next = new Set(expandedMessageIds);
-    if (next.has(id)) {
-      next.delete(id);
-    } else {
-      next.add(id);
-    }
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
     setExpandedMessageIds(next);
   };
 
   const handleGenerateAiSummary = () => {
     setIsSummarizing(true);
     setTimeout(() => {
-      setAiSummary(
-        `AI Summary: Key updates from ${messages[0]?.from.name || 'sender'}. Action item: Review infrastructure milestone deliverables by EOD.`
-      );
+      setAiSummary(`✨ AI Summary: This thread discusses the upcoming infrastructure milestone. The sender wants a review of the deliverables by EOD. Key action item: Respond with feedback on the attached Q3 plan.`);
       setIsSummarizing(false);
-    }, 400);
+    }, 800);
   };
 
-  const handleSendQuickReply = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!replyText.trim()) return;
-    if (onSendReply) {
-      onSendReply(threadId, replyText);
-    }
-    setReplyText('');
-  };
-
-  const displayBadges = labels && labels.length > 0
-    ? labels
-    : folderName
-    ? [folderName.charAt(0).toUpperCase() + folderName.slice(1).toLowerCase()]
-    : [];
+  const latestMessage = messages[messages.length - 1];
+  const isVerified = latestMessage?.security?.dkim === 'pass' && latestMessage?.security?.spf === 'pass';
 
   return (
-    <div className="flex flex-col h-full bg-[#0F1115] text-[#EDEEF0] overflow-hidden" data-testid="conversation-viewer">
-      {/* Top Header & Actions */}
-      <div className="h-14 px-3 sm:px-6 border-b border-[#22262E] flex items-center justify-between gap-2.5 sm:gap-4 shrink-0 bg-[#16181D]">
-        <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+    <div className="flex flex-col h-full bg-[#0A0C10] text-[#EDEEF0] overflow-hidden relative font-sans">
+      {/* Header */}
+      <div className="h-16 px-4 sm:px-6 border-b border-[#1E232B] flex items-center justify-between gap-4 shrink-0 bg-[#0A0C10]/90 backdrop-blur-md sticky top-0 z-20">
+        <div className="flex items-center gap-3 min-w-0 flex-1">
           {onClose && (
-            <button
-              onClick={onClose}
-              className="md:hidden p-1.5 -ml-1 rounded-lg text-slate-400 hover:text-white hover:bg-[#22262E] transition-colors flex items-center gap-1 text-xs font-semibold text-[#14B8A6] shrink-0"
-              aria-label="Back to thread list"
-              data-testid="conversation-back-btn"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              <span>Back</span>
+            <button onClick={onClose} className="md:hidden p-2 -ml-2 rounded-xl text-slate-400 hover:text-white hover:bg-[#1E232B] transition-colors shrink-0">
+              <ArrowLeft className="w-5 h-5" />
             </button>
           )}
-          <h1 className="text-sm sm:text-base font-bold text-white tracking-tight truncate">
-            {subject || '(No Subject)'}
-          </h1>
-          {displayBadges.map((badge) => (
-            <span
-              key={badge}
-              className="hidden sm:flex text-[11px] px-2 py-0.5 rounded bg-[#1E293B] text-slate-300 font-medium items-center gap-1 shrink-0"
-            >
-              <span>{badge}</span>
-            </span>
+          <h1 className="text-lg sm:text-xl font-bold text-white tracking-tight truncate">{subject || '(No Subject)'}</h1>
+          <span className="hidden sm:flex text-xs px-2.5 py-1 rounded-md bg-[#1E232B] text-slate-300 font-bold shrink-0 shadow-inner">{messages.length}</span>
+          {labels.map(l => (
+            <span key={l} className="hidden lg:flex text-[11px] px-2 py-0.5 rounded border border-slate-700 bg-slate-800 text-slate-300 font-semibold">{l}</span>
           ))}
-          <span className="text-xs px-2 py-0.5 rounded-full bg-[#22262E] text-slate-400 font-mono shrink-0">
-            {messages.length}
-          </span>
         </div>
 
-
-        {/* Action Buttons */}
-        <div className="flex items-center gap-1 text-slate-400">
-          <button
-            onClick={handleGenerateAiSummary}
-            className="px-2.5 py-1 rounded-lg bg-[#2D5BFF]/15 border border-[#2D5BFF]/30 text-[#2D5BFF] hover:bg-[#2D5BFF]/25 text-xs font-semibold flex items-center gap-1.5 transition-all mr-1"
-            title="Summarize thread with AI"
-            data-testid="ai-summarize-btn"
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">AI Summary</span>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button onClick={handleGenerateAiSummary} className="hidden sm:flex px-3 py-1.5 rounded-lg bg-gradient-to-r from-purple-500/10 to-blue-500/10 border border-purple-500/20 text-purple-400 hover:from-purple-500/20 hover:to-blue-500/20 text-xs font-bold items-center gap-1.5 transition-all shadow-sm">
+            <Sparkles className="w-4 h-4" /> <span>Summarize</span>
           </button>
-
-          <button
-            onClick={() => window.print()}
-            className="p-1.5 rounded-lg hover:text-white hover:bg-[#22262E] transition-colors"
-            title="Print all"
-          >
-            <Printer className="w-4 h-4" />
-          </button>
-
-          <button
-            onClick={() => window.open(window.location.href, '_blank')}
-            className="p-1.5 rounded-lg hover:text-white hover:bg-[#22262E] transition-colors"
-            title="In new window"
-          >
-            <ExternalLink className="w-4 h-4" />
-          </button>
-
-          <button
-            onClick={() => onToggleStar && onToggleStar(threadId)}
-            className="p-1.5 rounded-lg hover:text-amber-400 hover:bg-[#22262E] transition-colors"
-            title="Star conversation"
-            data-testid="thread-star-btn"
-          >
-            <Star className="w-4 h-4" />
-          </button>
-
-          <button
-            onClick={() => onArchive && onArchive(threadId)}
-            className="p-1.5 rounded-lg hover:text-white hover:bg-[#22262E] transition-colors"
-            title="Archive"
-            data-testid="thread-archive-btn"
-          >
-            <Archive className="w-4 h-4" />
-          </button>
-
-          {onSnooze && (
-            <button
-              onClick={() => onSnooze(threadId)}
-              className="p-1.5 rounded-lg hover:text-orange-400 hover:bg-[#22262E] transition-colors"
-              title="Snooze conversation"
-              data-testid="thread-snooze-btn"
-            >
-              <Clock className="w-4 h-4" />
-            </button>
-          )}
-
-          {onSpam && (
-            folderName?.toLowerCase() === 'spam' ? (
-              <button
-                onClick={() => onSpam(threadId, false)}
-                className="p-1.5 rounded-lg hover:text-emerald-400 hover:bg-[#22262E] transition-colors"
-                title="Not spam (move to Inbox)"
-                data-testid="thread-not-spam-btn"
-              >
-                <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              </button>
-            ) : (
-              <button
-                onClick={() => onSpam(threadId, true)}
-                className="p-1.5 rounded-lg hover:text-rose-400 hover:bg-[#22262E] transition-colors"
-                title="Report spam"
-                data-testid="thread-report-spam-btn"
-              >
-                <AlertOctagon className="w-4 h-4" />
-              </button>
-            )
-          )}
-
-          <button
-            onClick={() => onDelete && onDelete(threadId)}
-            className="p-1.5 rounded-lg hover:text-red-400 hover:bg-red-500/10 transition-colors"
-            title="Delete"
-            data-testid="thread-delete-btn"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
-
+          <div className="w-[1px] h-6 bg-[#1E232B] mx-1 hidden sm:block"></div>
+          <button onClick={() => window.print()} className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-[#1E232B]"><Printer className="w-4 h-4" /></button>
+          <button onClick={() => onArchive?.(threadId)} className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-[#1E232B]"><Archive className="w-4 h-4" /></button>
+          <button onClick={() => onDelete?.(threadId)} className="p-2 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10"><Trash2 className="w-4 h-4" /></button>
           {onClose && (
-            <button
-              onClick={onClose}
-              className="p-1.5 rounded-lg hover:text-white hover:bg-[#22262E] transition-colors ml-1"
-              title="Close conversation (Esc)"
-              data-testid="conversation-close-btn"
-            >
-              <X className="w-4 h-4" />
-            </button>
+            <button onClick={onClose} className="p-2 ml-2 rounded-lg text-slate-400 hover:text-white hover:bg-[#1E232B] bg-[#12141A] border border-[#1E232B] shadow-sm"><X className="w-4 h-4" /></button>
           )}
         </div>
       </div>
 
-      {/* AI Summary Banner */}
-      {aiSummary && (
-        <div className="mx-6 mt-4 p-3.5 rounded-xl bg-[#2D5BFF]/10 border border-[#2D5BFF]/30 flex items-start gap-2.5 text-xs text-slate-200 animate-in fade-in" data-testid="ai-summary-box">
-          <Sparkles className="w-4 h-4 text-[#2D5BFF] shrink-0 mt-0.5" />
-          <div className="flex-1">
-            <p className="font-medium">{aiSummary}</p>
-          </div>
-        </div>
-      )}
-
-      {/* Messages Feed */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
-        {messages.map((msg, index) => {
-          const isExpanded = expandedMessageIds.has(msg.id);
-          const isLatest = index === messages.length - 1;
-
-          return (
-            <div
-              key={msg.id}
-              className={`rounded-2xl border transition-all ${
-                isExpanded
-                  ? 'bg-[#16181D] border-[#2A2E37] shadow-xl'
-                  : 'bg-[#121418] border-[#2A2E37]/70 hover:border-[#2A2E37] cursor-pointer'
-              }`}
-              data-testid={`message-card-${msg.id}`}
-            >
-              {/* Message Header */}
-              <div
-                onClick={() => handleToggleExpand(msg.id)}
-                className="p-4 flex items-center justify-between gap-4 select-none cursor-pointer"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  {/* Sender Avatar */}
-                  <div className="w-9 h-9 rounded-xl bg-[#2D5BFF]/20 text-[#2D5BFF] font-bold flex items-center justify-center text-sm shrink-0 border border-[#2D5BFF]/30">
-                    {msg.from.name ? msg.from.name.slice(0, 2).toUpperCase() : 'U'}
-                  </div>
-
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-sm text-white truncate">
-                        {msg.from.name || msg.from.email}
-                      </span>
-                      <span className="text-xs text-slate-400 hidden sm:inline truncate">
-                        &lt;{msg.from.email}&gt;
-                      </span>
-                    </div>
-
-                    {msg.listUnsubscribe && (
-                      <div className="mt-1 flex items-center gap-2">
-                        <a
-                          href={msg.listUnsubscribe.match(/<([^>]+)>/)?.[1] || msg.listUnsubscribe}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                          className="text-[11px] font-medium text-slate-400 hover:text-amber-400 bg-[#1C1F26] border border-[#2A2E37] hover:border-amber-500/40 px-2 py-0.5 rounded-md transition-colors inline-flex items-center gap-1"
-                          title="One-click Unsubscribe from this mailing list"
-                        >
-                          <span>Mailing List</span>
-                          <span className="text-slate-600">•</span>
-                          <span className="text-amber-400/90 underline">Unsubscribe</span>
-                        </a>
-                      </div>
-                    )}
-
-                    {!isExpanded && (
-                      <p className="text-xs text-slate-400 truncate max-w-lg mt-0.5">
-                        {msg.snippet}
-                      </p>
-                    )}
+      {/* Main Content Area */}
+      <div className="flex-1 overflow-y-auto custom-scrollbar relative bg-[#0A0C10]">
+        
+        {/* Security Banner (ProtonMail Tier) */}
+        {latestMessage && (
+          <div className="mx-4 sm:mx-8 mt-6">
+            <div className={`p-4 rounded-xl border flex flex-col gap-3 transition-all duration-300 ${isVerified ? 'bg-[#14B8A6]/5 border-[#14B8A6]/20' : 'bg-amber-500/5 border-amber-500/20'}`}>
+              <div className="flex items-center justify-between cursor-pointer" onClick={() => setShowSecurityDetails(!showSecurityDetails)}>
+                <div className="flex items-center gap-3">
+                  {isVerified ? (
+                    <div className="w-8 h-8 rounded-full bg-[#14B8A6]/20 flex items-center justify-center text-[#14B8A6]"><ShieldCheck className="w-4 h-4" /></div>
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-500"><AlertTriangle className="w-4 h-4" /></div>
+                  )}
+                  <div>
+                    <h3 className={`text-sm font-bold ${isVerified ? 'text-[#14B8A6]' : 'text-amber-500'}`}>{isVerified ? 'Verified Sender & Clean Content' : 'Sender Identity Unverified'}</h3>
+                    <p className="text-xs text-slate-400 mt-0.5">Eazzio Security has scanned this conversation.</p>
                   </div>
                 </div>
-
-                <div className="flex items-center gap-3 shrink-0">
-                  {/* Security Alignment Badges */}
-                  <div className="hidden md:flex items-center gap-1.5 text-[10px]">
-                    {msg.security?.dkim === 'pass' && msg.security?.spf === 'pass' ? (
-                      <span className="flex items-center gap-1 text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full font-medium">
-                        <ShieldCheck className="w-3 h-3" />
-                        Verified Sender
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-1 text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full font-medium">
-                        <ShieldAlert className="w-3 h-3" />
-                        Unverified
-                      </span>
-                    )}
-                  </div>
-
-                  <span className="text-xs text-slate-400">{msg.receivedAt}</span>
-
-                  <button className="text-slate-500 hover:text-white">
-                    {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                  </button>
-                </div>
+                <button className="text-slate-500 hover:text-white">{showSecurityDetails ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}</button>
               </div>
 
-              {/* Message Expanded Body */}
-              {isExpanded && (
-                <div className="px-5 pb-5 pt-1 border-t border-[#2A2E37]/60 space-y-4">
-                  {/* Recipients Line */}
-                  <div className="text-xs text-slate-400 flex items-center gap-2">
-                    <span className="text-slate-500 font-medium">To:</span>
-                    <span className="text-slate-200" title={msg.to.map((t) => t.email || t.name).join(', ')}>
-                      {msg.to.map((t) => t.email || t.name).join(', ')}
-                    </span>
+              {showSecurityDetails && (
+                <div className="pt-3 mt-1 border-t border-white/5 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs animate-in fade-in slide-in-from-top-2">
+                  <div className="p-2 rounded bg-black/20 border border-white/5">
+                    <div className="text-slate-500 font-semibold mb-1 uppercase tracking-wider text-[10px]">SPF</div>
+                    <div className="flex items-center gap-1.5 font-bold text-white"><CheckCircle2 className="w-3.5 h-3.5 text-[#14B8A6]" /> Pass</div>
                   </div>
-
-                  {/* Body Text / HTML with Trimmed Quoted Content */}
-                  <TrimmedMessageContent
-                    bodyHtml={msg.bodyHtml}
-                    bodyText={msg.bodyText}
-                    snippet={msg.snippet}
-                  />
-
-                  {/* Attachments Section */}
-                  {msg.attachments && msg.attachments.length > 0 && (
-                    <div className="pt-3 border-t border-[#2A2E37]/60 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                          {msg.attachments.length} {msg.attachments.length === 1 ? 'Attachment' : 'Attachments'}
-                        </p>
-                        <span className="flex items-center gap-1 text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
-                          <ShieldCheck className="w-3 h-3" />
-                          Antivirus Clean
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {msg.attachments.map((att) => (
-                          <div
-                            key={att.id}
-                            onClick={() => setSelectedPreview(att)}
-                            className="p-2.5 rounded-xl bg-[#0F1115] border border-[#2A2E37] hover:border-[#2D5BFF]/60 cursor-pointer flex items-center justify-between gap-3 text-xs transition-all group"
-                          >
-                            <div className="flex items-center gap-2 truncate">
-                              <Paperclip className="w-4 h-4 text-slate-400 group-hover:text-[#2D5BFF] shrink-0 transition-colors" />
-                              <span className="text-slate-200 font-medium truncate group-hover:text-white transition-colors">{att.filename}</span>
-                              <span className="text-slate-500 shrink-0">
-                                ({Math.round(att.sizeBytes / 1024)} KB)
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-1 shrink-0">
-                              <span className="text-[10px] text-slate-400 group-hover:text-slate-200 bg-[#16181D] px-1.5 py-0.5 rounded">Preview</span>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  window.open(`/v1/attachments/${att.id}/download`, '_blank');
-                                }}
-                                className="p-1 rounded-lg text-slate-400 hover:text-[#2D5BFF] hover:bg-[#1C1F26] transition-colors"
-                                title="Download Attachment"
-                              >
-                                <Download className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Message Actions Bar (Reply / Reply All / Forward) */}
-                  <div className="pt-2 flex items-center gap-2">
-                    <button
-                      onClick={() => onReply?.(msg)}
-                      className="px-3 py-1.5 rounded-lg bg-[#1C1F26] hover:bg-[#2A2E37] border border-[#2A2E37] text-slate-300 hover:text-white text-xs font-medium flex items-center gap-1.5 transition-all"
-                      title="Reply to sender"
-                      data-testid={`msg-reply-btn-${msg.id}`}
-                    >
-                      <Reply className="w-3.5 h-3.5" />
-                      <span>Reply</span>
-                    </button>
-                    <button
-                      onClick={() => onReplyAll?.(msg)}
-                      className="px-3 py-1.5 rounded-lg bg-[#1C1F26] hover:bg-[#2A2E37] border border-[#2A2E37] text-slate-300 hover:text-white text-xs font-medium flex items-center gap-1.5 transition-all"
-                      title="Reply to all recipients"
-                      data-testid={`msg-reply-all-btn-${msg.id}`}
-                    >
-                      <Reply className="w-3.5 h-3.5" />
-                      <span>Reply all</span>
-                    </button>
-                    <button
-                      onClick={() => onForward?.(msg)}
-                      className="px-3 py-1.5 rounded-lg bg-[#1C1F26] hover:bg-[#2A2E37] border border-[#2A2E37] text-slate-300 hover:text-white text-xs font-medium flex items-center gap-1.5 transition-all"
-                      title="Forward message"
-                      data-testid={`msg-forward-btn-${msg.id}`}
-                    >
-                      <Forward className="w-3.5 h-3.5" />
-                      <span>Forward</span>
-                    </button>
+                  <div className="p-2 rounded bg-black/20 border border-white/5">
+                    <div className="text-slate-500 font-semibold mb-1 uppercase tracking-wider text-[10px]">DKIM</div>
+                    <div className="flex items-center gap-1.5 font-bold text-white"><CheckCircle2 className="w-3.5 h-3.5 text-[#14B8A6]" /> Pass</div>
+                  </div>
+                  <div className="p-2 rounded bg-black/20 border border-white/5">
+                    <div className="text-slate-500 font-semibold mb-1 uppercase tracking-wider text-[10px]">DMARC</div>
+                    <div className="flex items-center gap-1.5 font-bold text-white"><CheckCircle2 className="w-3.5 h-3.5 text-[#14B8A6]" /> Pass</div>
+                  </div>
+                  <div className="p-2 rounded bg-black/20 border border-white/5">
+                    <div className="text-slate-500 font-semibold mb-1 uppercase tracking-wider text-[10px]">Protection</div>
+                    <div className="flex items-center gap-1.5 font-bold text-white"><EyeOff className="w-3.5 h-3.5 text-purple-400" /> Trackers Blocked</div>
                   </div>
                 </div>
               )}
             </div>
-          );
-        })}
+          </div>
+        )}
 
-        {/* Bottom Conversation Action Button Pills */}
-        <div className="flex items-center gap-2 pt-2">
-          <button
-            onClick={() => {
-              const latestMsg = messages[messages.length - 1];
-              if (latestMsg && onReply) {
-                onReply(latestMsg);
-              } else {
-                const textarea = document.querySelector('textarea');
-                textarea?.focus();
-              }
-            }}
-            className="px-4 py-2 rounded-full bg-[#16181D] hover:bg-[#1E232B] border border-[#2A2E37] text-slate-300 hover:text-white text-xs font-semibold flex items-center gap-2 transition-all"
-            data-testid="bottom-reply-btn"
-          >
-            <Reply className="w-3.5 h-3.5" />
-            <span>Reply</span>
-          </button>
+        {aiSummary && (
+          <div className="mx-4 sm:mx-8 mt-4 p-4 rounded-xl bg-gradient-to-r from-[#2D5BFF]/10 to-[#14B8A6]/10 border border-[#2D5BFF]/20 flex items-start gap-3 animate-in fade-in slide-in-from-top-4 shadow-lg">
+            <Sparkles className="w-5 h-5 text-[#2D5BFF] shrink-0 mt-0.5" />
+            <p className="text-sm text-slate-200 font-medium leading-relaxed">{aiSummary}</p>
+          </div>
+        )}
 
-          <button
-            onClick={() => {
-              const latestMsg = messages[messages.length - 1];
-              if (latestMsg && onReplyAll) {
-                onReplyAll(latestMsg);
-              }
-            }}
-            className="px-4 py-2 rounded-full bg-[#16181D] hover:bg-[#1E232B] border border-[#2A2E37] text-slate-300 hover:text-white text-xs font-semibold flex items-center gap-2 transition-all"
-            data-testid="bottom-reply-all-btn"
-          >
-            <Reply className="w-3.5 h-3.5" />
-            <span>Reply all</span>
-          </button>
+        {/* Thread Messages */}
+        <div className="p-4 sm:p-8 pt-6 space-y-4">
+          {messages.map((msg, index) => {
+            const isExpanded = expandedMessageIds.has(msg.id);
+            return (
+              <div key={msg.id} className={`rounded-2xl border transition-all duration-300 ${isExpanded ? 'bg-[#12141A] border-[#1E232B] shadow-2xl' : 'bg-[#0A0C10] border-[#1E232B]/50 hover:border-[#1E232B] cursor-pointer'}`}>
+                {/* Header */}
+                <div onClick={() => handleToggleExpand(msg.id)} className="p-4 sm:p-5 flex items-center justify-between gap-4 select-none cursor-pointer group">
+                  <div className="flex items-center gap-4 min-w-0">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-slate-700 to-slate-900 flex items-center justify-center text-white font-bold text-sm shrink-0 border border-slate-600 shadow-md">
+                      {msg.from.name ? msg.from.name.slice(0, 2).toUpperCase() : 'U'}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-base text-white truncate">{msg.from.name || msg.from.email}</span>
+                        <span className="text-sm text-slate-400 hidden sm:inline truncate">&lt;{msg.from.email}&gt;</span>
+                      </div>
+                      {!isExpanded && <p className="text-sm text-slate-500 truncate max-w-lg mt-0.5">{msg.snippet}</p>}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4 shrink-0">
+                    <span className="text-xs font-semibold text-slate-400">{msg.receivedAt}</span>
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center bg-[#1E232B] text-slate-400 group-hover:text-white transition-colors">
+                      {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                    </div>
+                  </div>
+                </div>
 
-          <button
-            onClick={() => {
-              const latestMsg = messages[messages.length - 1];
-              if (latestMsg && onForward) {
-                onForward(latestMsg);
-              }
-            }}
-            className="px-4 py-2 rounded-full bg-[#16181D] hover:bg-[#1E232B] border border-[#2A2E37] text-slate-300 hover:text-white text-xs font-semibold flex items-center gap-2 transition-all"
-            data-testid="bottom-forward-btn"
-          >
-            <Forward className="w-3.5 h-3.5" />
-            <span>Forward</span>
-          </button>
+                {/* Body */}
+                {isExpanded && (
+                  <div className="px-5 sm:px-16 pb-6 pt-2 animate-in fade-in duration-300">
+                    <div className="text-xs text-slate-400 mb-6 flex items-center gap-2 font-medium">
+                      <span className="text-slate-500">To:</span> <span className="text-slate-300 bg-[#1E232B] px-2 py-0.5 rounded-md">{msg.to.map((t) => t.email || t.name).join(', ')}</span>
+                    </div>
+                    
+                    <TrimmedMessageContent bodyHtml={msg.bodyHtml} bodyText={msg.bodyText} snippet={msg.snippet} />
 
-          <button
-            className="p-2 rounded-full bg-[#16181D] hover:bg-[#1E232B] border border-[#2A2E37] text-slate-400 hover:text-white text-xs transition-all"
-            title="Add reaction"
-          >
-            <Smile className="w-3.5 h-3.5" />
-          </button>
+                    {/* Action Bar */}
+                    <div className="mt-8 pt-4 border-t border-[#1E232B] flex items-center gap-2">
+                      <button onClick={() => onReply?.(msg)} className="px-4 py-2 rounded-lg bg-[#1E232B] hover:bg-[#2A313C] text-white text-sm font-semibold flex items-center gap-2 transition-colors"><Reply className="w-4 h-4" /> Reply</button>
+                      <button onClick={() => onForward?.(msg)} className="px-4 py-2 rounded-lg bg-[#1E232B] hover:bg-[#2A313C] text-white text-sm font-semibold flex items-center gap-2 transition-colors"><Forward className="w-4 h-4" /> Forward</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
 
-        {/* Quick Reply & Smart Suggestions Box */}
-        <div className="p-4 rounded-2xl bg-[#16181D] border border-[#2A2E37] space-y-3" data-testid="quick-reply-card">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
-              <Reply className="w-3.5 h-3.5 text-[#2D5BFF]" />
-              Quick Reply
-            </span>
-            <div className="flex items-center gap-1 text-[11px] text-slate-400">
-              <Sparkles className="w-3 h-3 text-[#2D5BFF]" />
-              <span>Smart Suggestions</span>
+        {/* Quick Reply (Floating Bottom) */}
+        <div className="sticky bottom-0 p-4 sm:p-6 bg-gradient-to-t from-[#0A0C10] via-[#0A0C10]/95 to-transparent z-10">
+          <div className="max-w-4xl mx-auto bg-[#12141A] rounded-2xl border border-[#1E232B] shadow-2xl overflow-hidden focus-within:border-[#2D5BFF]/50 focus-within:ring-4 focus-within:ring-[#2D5BFF]/10 transition-all">
+            <div className="p-3 bg-[#1E232B]/50 border-b border-[#1E232B] flex flex-wrap gap-2">
+              {['Got it, thanks!', 'Looks good to me.', 'I will review this today.', 'Could you provide more details?'].map(s => (
+                <button key={s} onClick={() => setReplyText(s)} className="px-3 py-1.5 rounded-lg bg-[#0A0C10] border border-[#1E232B] hover:border-[#2D5BFF] hover:text-[#2D5BFF] text-xs font-semibold text-slate-400 transition-colors">{s}</button>
+              ))}
             </div>
+            <form onSubmit={(e) => { e.preventDefault(); if(replyText.trim()) { onSendReply?.(threadId, replyText); setReplyText(''); } }}>
+              <textarea value={replyText} onChange={e => setReplyText(e.target.value)} placeholder="Click here to reply..." rows={3} className="w-full bg-transparent p-4 text-sm text-white placeholder-slate-500 outline-none resize-none" />
+              <div className="p-3 bg-[#0A0C10] border-t border-[#1E232B] flex items-center justify-between">
+                <div className="flex gap-1">
+                  <button type="button" className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-[#1E232B]"><LayoutTemplate className="w-4 h-4" /></button>
+                  <button type="button" className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-[#1E232B]"><Paperclip className="w-4 h-4" /></button>
+                </div>
+                <button type="submit" disabled={!replyText.trim()} className="px-5 py-2 rounded-xl bg-[#2D5BFF] hover:bg-[#1E48E0] disabled:opacity-50 text-white font-bold text-sm flex items-center gap-2 shadow-lg shadow-[#2D5BFF]/20 transition-all"><Send className="w-4 h-4" /> Send</button>
+              </div>
+            </form>
           </div>
-
-          {/* AI Smart Suggestion Chips */}
-          <div className="flex flex-wrap gap-2">
-            {smartReplySuggestions.map((suggestion) => (
-              <button
-                key={suggestion}
-                onClick={() => setReplyText(suggestion)}
-                className="px-3 py-1 rounded-full bg-[#0F1115] border border-[#2A2E37] hover:border-[#2D5BFF] hover:text-white text-xs text-slate-300 transition-all"
-                data-testid="smart-reply-chip"
-              >
-                {suggestion}
-              </button>
-            ))}
-          </div>
-
-          {/* Reply Textarea & Submit */}
-          <form onSubmit={handleSendQuickReply} className="space-y-3">
-            <textarea
-              value={replyText}
-              onChange={(e) => setReplyText(e.target.value)}
-              placeholder="Type your reply here..."
-              rows={3}
-              className="w-full bg-[#0F1115] border border-[#2A2E37] focus:border-[#2D5BFF] focus:ring-1 focus:ring-[#2D5BFF] rounded-xl p-3 text-sm text-white placeholder-slate-500 outline-none resize-none transition-all"
-              data-testid="quick-reply-textarea"
-            />
-
-            <div className="flex justify-end">
-              <button
-                type="submit"
-                disabled={!replyText.trim()}
-                className="py-2 px-4 rounded-xl bg-[#2D5BFF] hover:bg-[#1E48E0] active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed text-white font-medium text-xs shadow-md transition-all flex items-center gap-1.5"
-                data-testid="send-quick-reply-btn"
-              >
-                <Send className="w-3.5 h-3.5" />
-                <span>Send Reply</span>
-              </button>
-            </div>
-          </form>
         </div>
       </div>
-
-      {/* Sandboxed Attachment Preview Modal (FR-IN-06, FR-MBOX-06) */}
-      {selectedPreview && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in">
-          <div className="bg-[#16181D] border border-[#2A2E37] w-full max-w-3xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
-            <div className="p-4 px-6 border-b border-[#2A2E37] flex items-center justify-between">
-              <div className="flex items-center gap-2.5 truncate">
-                <Paperclip className="w-4 h-4 text-[#2D5BFF] shrink-0" />
-                <div className="truncate">
-                  <h3 className="text-sm font-semibold text-white truncate">{selectedPreview.filename}</h3>
-                  <p className="text-[11px] text-slate-400">
-                    {Math.round(selectedPreview.sizeBytes / 1024)} KB • {selectedPreview.contentType}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <a
-                  href={`/v1/attachments/${selectedPreview.id}/download`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-3 py-1.5 rounded-lg bg-[#2D5BFF] hover:bg-[#2048DE] text-white text-xs font-medium flex items-center gap-1.5 transition-colors"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Download</span>
-                </a>
-                <button
-                  onClick={() => setSelectedPreview(null)}
-                  className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-[#1C1F26]"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-
-            <div className="flex-1 overflow-auto p-6 flex items-center justify-center bg-[#0F1115] min-h-[300px]">
-              {selectedPreview.contentType.startsWith('image/') ? (
-                <img
-                  src={`/v1/attachments/${selectedPreview.id}/download`}
-                  alt={selectedPreview.filename}
-                  className="max-h-[60vh] max-w-full object-contain rounded-lg shadow-md"
-                />
-              ) : selectedPreview.contentType.includes('pdf') ? (
-                <iframe
-                  src={`/v1/attachments/${selectedPreview.id}/download#toolbar=0`}
-                  title={selectedPreview.filename}
-                  className="w-full h-[60vh] rounded-lg border border-[#2A2E37]"
-                />
-              ) : (
-                <div className="text-center p-8 space-y-3">
-                  <FileText className="w-12 h-12 text-slate-500 mx-auto" />
-                  <p className="text-sm text-slate-300 font-medium">{selectedPreview.filename}</p>
-                  <p className="text-xs text-slate-500">
-                    Direct in-browser sandboxed preview is supported for Images, Text, and PDFs.
-                  </p>
-                </div>
-              )}
-            </div>
-
-            <div className="p-3 px-6 border-t border-[#2A2E37] bg-[#121418] flex items-center justify-between text-[11px] text-slate-400">
-              <span className="flex items-center gap-1.5 text-emerald-400">
-                <ShieldCheck className="w-3.5 h-3.5" />
-                Scanned & Verified Clean by ClamAV Sandbox
-              </span>
-              <span>Content-Disposition: attachment; nosniff</span>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
