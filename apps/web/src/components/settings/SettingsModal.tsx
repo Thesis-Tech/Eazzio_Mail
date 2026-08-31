@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   X,
   Tag,
@@ -26,6 +26,24 @@ import {
   ShieldCheck,
   Loader2,
   ExternalLink,
+  Inbox,
+  Mail,
+  Star,
+  Clock,
+  Send,
+  FileText,
+  AlertOctagon,
+  Archive,
+  Users,
+  Bell,
+  Lock,
+  Radio,
+  SlidersHorizontal,
+  Server,
+  Layers,
+  HelpCircle,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 
 import { FolderItem, LabelItem, FilterRule, UserPreferences } from '../../types/mail';
@@ -54,6 +72,15 @@ const PRESET_COLORS = [
   '#84CC16', // Lime
 ];
 
+const THEMES = [
+  { id: 'dark-oled', name: 'Default Dark', bg: '#0A0C10', accent: '#2D5BFF', border: '#1E232B' },
+  { id: 'midnight', name: 'Midnight Blue', bg: '#070D18', accent: '#38BDF8', border: '#1E3B68' },
+  { id: 'emerald', name: 'Cyber Emerald', bg: '#030E0B', accent: '#10B981', border: '#103F31' },
+  { id: 'purple', name: 'Deep Amethyst', bg: '#0D0716', accent: '#A855F7', border: '#3D1C63' },
+  { id: 'graphite', name: 'Graphite Slate', bg: '#111113', accent: '#14B8A6', border: '#2E2E38' },
+  { id: 'sunset', name: 'Crimson Dusk', bg: '#120609', accent: '#F43F5E', border: '#4D1627' },
+];
+
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
   onClose,
@@ -66,7 +93,44 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onUpdateFilterRules,
   onUpdatePreferences,
 }) => {
-  const [activeTab, setActiveTab] = useState<'labels' | 'folders' | 'filters' | 'preferences' | 'domains'>('labels');
+  const [activeTab, setActiveTab] = useState<
+    'general' | 'labels' | 'inbox' | 'accounts' | 'filters' | 'forwarding' | 'themes'
+  >('general');
+
+  // General Settings State
+  const [pageSize, setPageSize] = useState<number>(50);
+  const [undoSendTime, setUndoSendTime] = useState<number>(10);
+  const [defaultReplyBehavior, setDefaultReplyBehavior] = useState<'reply' | 'reply_all'>('reply');
+  const [hoverActions, setHoverActions] = useState<boolean>(true);
+  const [sendAndArchive, setSendAndArchive] = useState<boolean>(false);
+  const [externalImages, setExternalImages] = useState<'always' | 'ask'>('always');
+  const [smartCompose, setSmartCompose] = useState<boolean>(true);
+  const [conversationView, setConversationView] = useState<boolean>(true);
+  const [desktopNotifications, setDesktopNotifications] = useState<'all' | 'important' | 'off'>('all');
+  const [starPreset, setStarPreset] = useState<'1star' | '4stars' | 'all'>('1star');
+  const [signatureText, setSignatureText] = useState<string>(preferences.signature || '');
+  const [signatureForNew, setSignatureForNew] = useState<string>('default');
+  const [signatureForReply, setSignatureForReply] = useState<string>('default');
+  
+  // Vacation Responder State
+  const [vacationEnabled, setVacationEnabled] = useState<boolean>(false);
+  const [vacationStartDate, setVacationStartDate] = useState<string>('2026-08-31');
+  const [vacationEndDate, setVacationEndDate] = useState<string>('');
+  const [vacationSubject, setVacationSubject] = useState<string>('Out of Office');
+  const [vacationBody, setVacationBody] = useState<string>('I am currently out of office with limited access to email. I will respond to your message upon my return.');
+  const [vacationContactsOnly, setVacationContactsOnly] = useState<boolean>(false);
+
+  // Inbox Settings State
+  const [inboxType, setInboxType] = useState<'default' | 'important' | 'unread' | 'starred' | 'priority'>('default');
+  const [categories, setCategories] = useState<Record<string, boolean>>({
+    primary: true,
+    promotions: true,
+    social: true,
+    updates: true,
+    forums: false,
+  });
+  const [readingPanePos, setReadingPanePos] = useState<'none' | 'right' | 'below'>('right');
+  const [importanceMarkers, setImportanceMarkers] = useState<boolean>(true);
 
   // Domain Management State
   const [domains, setDomains] = useState<any[]>([]);
@@ -78,7 +142,58 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [domainError, setDomainError] = useState<string | null>(null);
 
-  // Fetch Domains when domains tab is opened
+  // Blocked Addresses State
+  const [blockedAddresses, setBlockedAddresses] = useState<string[]>([
+    'spam@promotions-bulk.com',
+    'newsletter@unsolicited-marketing.net',
+    'scam@fake-invoice-billing.org',
+  ]);
+
+  // Labels Tab State
+  const [newLabelName, setNewLabelName] = useState('');
+  const [newLabelColor, setNewLabelColor] = useState(PRESET_COLORS[0]!);
+  const [editingLabelId, setEditingLabelId] = useState<string | null>(null);
+  const [editLabelName, setEditLabelName] = useState('');
+  const [editLabelColor, setEditLabelColor] = useState(PRESET_COLORS[0]!);
+
+  // Filter Rules Tab State
+  const [newRuleName, setNewRuleName] = useState('');
+  const [newRuleField, setNewRuleField] = useState<'from' | 'to' | 'subject' | 'body'>('from');
+  const [newRuleOperator, setNewRuleOperator] = useState<'contains' | 'equals' | 'starts_with'>('contains');
+  const [newRuleValue, setNewRuleValue] = useState('');
+  const [newRuleAction, setNewRuleAction] = useState<'apply_label' | 'move_to_folder' | 'mark_read' | 'star'>('apply_label');
+  const [newRuleActionValue, setNewRuleActionValue] = useState('');
+
+  // Forwarding & POP/IMAP State
+  const [forwardingAddress, setForwardingAddress] = useState('');
+  const [popEnabled, setPopEnabled] = useState(false);
+  const [imapEnabled, setImapEnabled] = useState(true);
+  const [imapExpunge, setImapExpunge] = useState<'auto' | 'manual'>('auto');
+  const [imapFolderLimit, setImapFolderLimit] = useState<number>(1000);
+
+  // Load Preferences & Domains on Open
+  useEffect(() => {
+    if (isOpen) {
+      fetch('/api/settings/preferences')
+        .then((res) => res.json())
+        .then((json) => {
+          if (json.data) {
+            const p = json.data;
+            if (p.signature?.text) setSignatureText(p.signature.text);
+            if (p.autoReply?.enabled !== undefined) setVacationEnabled(p.autoReply.enabled);
+            if (p.autoReply?.subject) setVacationSubject(p.autoReply.subject);
+            if (p.autoReply?.body) setVacationBody(p.autoReply.body);
+            if (p.inboxType) setInboxType(p.inboxType);
+            if (p.readingPane) setReadingPanePos(p.readingPane);
+            if (p.conversationView !== undefined) setConversationView(p.conversationView);
+          }
+        })
+        .catch(() => {});
+
+      fetchDomains();
+    }
+  }, [isOpen]);
+
   const fetchDomains = async () => {
     try {
       setLoadingDomains(true);
@@ -91,1093 +206,1131 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           setExpandedDomainId(json.data[0].id);
         }
       }
-    } catch (err: any) {
+    } catch (_) {
       setDomainError('Failed to load custom domains');
     } finally {
       setLoadingDomains(false);
     }
   };
 
-  const handleCreateDomain = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newDomainInput.trim()) return;
+  const handleSaveGeneral = async () => {
     try {
-      setCreatingDomain(true);
-      setDomainError(null);
-      const res = await fetch('/api/domains', {
-        method: 'POST',
+      const payload = {
+        pageSize,
+        undoSendTime,
+        defaultReplyBehavior,
+        hoverActions,
+        sendAndArchive,
+        conversationView,
+        signature: { text: signatureText, enabled: Boolean(signatureText.trim()) },
+        autoReply: {
+          enabled: vacationEnabled,
+          subject: vacationSubject,
+          body: vacationBody,
+          startDate: vacationStartDate,
+          endDate: vacationEndDate || null,
+        },
+        inboxType,
+        readingPane: readingPanePos,
+      };
+
+      await fetch('/api/settings/preferences', {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ domainName: newDomainInput.trim() }),
+        body: JSON.stringify(payload),
       });
-      const json = await res.json();
-      if (!res.ok) {
-        throw new Error(json.error?.message || 'Failed to add custom domain');
-      }
-      setNewDomainInput('');
-      await fetchDomains();
-      if (json.data?.id) {
-        setExpandedDomainId(json.data.id);
-      }
-    } catch (err: any) {
-      setDomainError(err.message || 'Error creating domain');
-    } finally {
-      setCreatingDomain(false);
-    }
+
+      onUpdatePreferences({
+        ...preferences,
+        signature: signatureText,
+      });
+
+      onClose();
+    } catch (_) {}
   };
 
-  const handleVerifyDomain = async (id: string) => {
-    try {
-      setVerifyingDomainId(id);
-      setDomainError(null);
-      const res = await fetch(`/api/domains/${id}/verify`, { method: 'POST' });
-      const json = await res.json();
-      if (!res.ok) {
-        throw new Error(json.error?.message || 'Verification failed');
-      }
-      await fetchDomains();
-    } catch (err: any) {
-      setDomainError(err.message || 'DNS verification request failed');
-    } finally {
-      setVerifyingDomainId(null);
-    }
-  };
-
-  const handleDeleteDomain = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this custom domain?')) return;
-    try {
-      setDomainError(null);
-      const res = await fetch(`/api/domains/${id}`, { method: 'DELETE' });
-      if (res.ok) {
-        setDomains(domains.filter((d) => d.id !== id));
-        if (expandedDomainId === id) setExpandedDomainId(null);
-      }
-    } catch (err: any) {
-      setDomainError('Failed to delete domain');
-    }
-  };
-
-  const handleCopyToClipboard = (text: string, fieldId: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedField(fieldId);
-    setTimeout(() => setCopiedField(null), 2000);
-  };
-
-  // Label Management State
-  const [newLabelName, setNewLabelName] = useState('');
-  const [newLabelColor, setNewLabelColor] = useState(PRESET_COLORS[0]);
-  const [editingLabelId, setEditingLabelId] = useState<string | null>(null);
-  const [editingLabelName, setEditingLabelName] = useState('');
-  const [editingLabelColor, setEditingLabelColor] = useState('');
-
-
-  // Folder Management State
-  const [newFolderName, setNewFolderName] = useState('');
-  const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
-  const [editingFolderName, setEditingFolderName] = useState('');
-
-  // Filter Rule State
-  const [newRuleName, setNewRuleName] = useState('');
-  const [newRuleField, setNewRuleField] = useState<'from' | 'to' | 'subject' | 'body'>('from');
-  const [newRuleOperator, setNewRuleOperator] = useState<'contains' | 'equals' | 'starts_with' | 'ends_with'>('contains');
-  const [newRuleValue, setNewRuleValue] = useState('');
-  const [newRuleAction, setNewRuleAction] = useState<'apply_label' | 'move_to_folder' | 'mark_as_read' | 'star'>('apply_label');
-  const [newRuleActionValue, setNewRuleActionValue] = useState(labels[0]?.name || 'Work');
-
-  if (!isOpen) return null;
-
-  // --- LABEL HANDLERS ---
   const handleCreateLabel = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newLabelName.trim()) return;
-    const name = newLabelName.trim();
-    const color = newLabelColor || '#2D5BFF';
 
     try {
       const res = await fetch('/api/settings/labels', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, color }),
+        body: JSON.stringify({ name: newLabelName.trim(), color: newLabelColor }),
       });
       if (res.ok) {
         const json = await res.json();
-        if (json.data) {
-          onUpdateLabels([...labels, json.data]);
-        }
-      } else {
-        const newLabel: LabelItem = {
-          id: `lbl-${Date.now()}`,
-          name,
-          color,
-        };
-        onUpdateLabels([...labels, newLabel]);
+        onUpdateLabels([...labels, json.data]);
+        setNewLabelName('');
       }
-    } catch (_) {
-      const newLabel: LabelItem = {
-        id: `lbl-${Date.now()}`,
-        name,
-        color,
-      };
-      onUpdateLabels([...labels, newLabel]);
-    }
-    setNewLabelName('');
-    setNewLabelColor(PRESET_COLORS[0]);
-  };
-
-  const handleSaveEditLabel = async (id: string) => {
-    if (!editingLabelName.trim()) return;
-    const name = editingLabelName.trim();
-    const color = editingLabelColor;
-
-    try {
-      await fetch(`/api/settings/labels/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, color }),
-      });
     } catch (_) {}
-
-    onUpdateLabels(
-      labels.map((l) =>
-        l.id === id ? { ...l, name, color: color || l.color } : l
-      )
-    );
-    setEditingLabelId(null);
   };
 
   const handleDeleteLabel = async (id: string) => {
     try {
       await fetch(`/api/settings/labels/${id}`, { method: 'DELETE' });
+      onUpdateLabels(labels.filter((l) => l.id !== id));
     } catch (_) {}
-    onUpdateLabels(labels.filter((l) => l.id !== id));
   };
 
-  // --- FOLDER HANDLERS ---
-  const handleCreateFolder = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newFolderName.trim()) return;
-    const name = newFolderName.trim();
-
-    try {
-      const res = await fetch('/api/settings/folders', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name }),
-      });
-      if (res.ok) {
-        const json = await res.json();
-        if (json.data) {
-          onUpdateFolders([...folders, json.data]);
-        }
-      } else {
-        const newFolder: FolderItem = {
-          id: `fld-${Date.now()}`,
-          name,
-          slug: name.toLowerCase().replace(/\s+/g, '-'),
-          type: 'custom',
-          unreadCount: 0,
-          totalCount: 0,
-        };
-        onUpdateFolders([...folders, newFolder]);
-      }
-    } catch (_) {
-      const newFolder: FolderItem = {
-        id: `fld-${Date.now()}`,
-        name,
-        slug: name.toLowerCase().replace(/\s+/g, '-'),
-        type: 'custom',
-        unreadCount: 0,
-        totalCount: 0,
-      };
-      onUpdateFolders([...folders, newFolder]);
-    }
-    setNewFolderName('');
-  };
-
-  const handleSaveEditFolder = async (id: string) => {
-    if (!editingFolderName.trim()) return;
-    const name = editingFolderName.trim();
-
-    try {
-      await fetch(`/api/settings/folders/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name }),
-      });
-    } catch (_) {}
-
-    onUpdateFolders(
-      folders.map((f) =>
-        f.id === id ? { ...f, name, slug: name.toLowerCase().replace(/\s+/g, '-') } : f
-      )
-    );
-    setEditingFolderId(null);
-  };
-
-  const handleDeleteFolder = async (id: string) => {
-    try {
-      await fetch(`/api/settings/folders/${id}`, { method: 'DELETE' });
-    } catch (_) {}
-    onUpdateFolders(folders.filter((f) => f.id !== id));
-  };
-
-  // --- FILTER RULE HANDLERS ---
-  const handleCreateFilterRule = async (e: React.FormEvent) => {
+  const handleCreateFilter = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newRuleName.trim() || !newRuleValue.trim()) return;
-    const name = newRuleName.trim();
-    const value = newRuleValue.trim();
 
     try {
       const res = await fetch('/api/settings/filters', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name,
+          name: newRuleName.trim(),
           field: newRuleField,
           operator: newRuleOperator,
-          value,
+          value: newRuleValue.trim(),
           action: newRuleAction,
-          actionValue: newRuleActionValue,
+          actionValue: newRuleActionValue.trim(),
+          isEnabled: true,
         }),
       });
       if (res.ok) {
         const json = await res.json();
-        if (json.data) {
-          onUpdateFilterRules([...filterRules, json.data]);
-        }
-      } else {
-        const rule: FilterRule = {
-          id: `rule-${Date.now()}`,
-          name,
-          field: newRuleField,
-          operator: newRuleOperator,
-          value,
-          action: newRuleAction,
-          actionValue: newRuleActionValue,
-          isEnabled: true,
-        };
-        onUpdateFilterRules([...filterRules, rule]);
+        onUpdateFilterRules([...filterRules, json.data]);
+        setNewRuleName('');
+        setNewRuleValue('');
       }
-    } catch (_) {
-      const rule: FilterRule = {
-        id: `rule-${Date.now()}`,
-        name,
-        field: newRuleField,
-        operator: newRuleOperator,
-        value,
-        action: newRuleAction,
-        actionValue: newRuleActionValue,
-        isEnabled: true,
-      };
-      onUpdateFilterRules([...filterRules, rule]);
-    }
-    setNewRuleName('');
-    setNewRuleValue('');
-  };
-
-  const handleToggleFilterRule = async (id: string) => {
-    const target = filterRules.find((r) => r.id === id);
-    const nextEnabled = target ? !target.isEnabled : true;
-    try {
-      await fetch(`/api/settings/filters/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isEnabled: nextEnabled }),
-      });
     } catch (_) {}
-
-    onUpdateFilterRules(
-      filterRules.map((r) => (r.id === id ? { ...r, isEnabled: nextEnabled } : r))
-    );
   };
 
-  const handleDeleteFilterRule = async (id: string) => {
+  const handleDeleteFilter = async (id: string) => {
     try {
       await fetch(`/api/settings/filters/${id}`, { method: 'DELETE' });
+      onUpdateFilterRules(filterRules.filter((f) => f.id !== id));
     } catch (_) {}
-    onUpdateFilterRules(filterRules.filter((r) => r.id !== id));
   };
 
+  const handleUnblock = (addr: string) => {
+    setBlockedAddresses(blockedAddresses.filter((a) => a !== addr));
+  };
+
+  if (!isOpen) return null;
+
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in"
-      data-testid="settings-modal"
-    >
-      <div className="bg-[#16181D] border border-[#2A2E37] w-full max-w-3xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-6 animate-in fade-in duration-200">
+      {/* Backdrop */}
+      <div className="fixed inset-0 bg-black/80 backdrop-blur-md" onClick={onClose} />
+
+      {/* Modal Box */}
+      <div 
+        style={{ backgroundColor: 'var(--theme-bg-main, #0A0C10)', borderColor: 'var(--theme-border, #1E232B)' }}
+        className="relative w-full max-w-5xl h-[92vh] max-h-[850px] rounded-2xl border shadow-2xl flex flex-col z-10 overflow-hidden text-slate-200 font-sans"
+      >
         {/* Modal Header */}
-        <div className="p-4 px-6 border-b border-[#2A2E37] flex items-center justify-between">
-          <div className="flex items-center gap-2.5 text-white font-semibold text-base">
-            <Sliders className="w-5 h-5 text-[#2D5BFF]" />
-            <span>Settings & Preferences</span>
+        <div 
+          style={{ backgroundColor: 'var(--theme-bg-header, #0A0C10)', borderColor: 'var(--theme-border, #1E232B)' }}
+          className="h-16 px-6 border-b flex items-center justify-between shrink-0"
+        >
+          <div className="flex items-center gap-3">
+            <div 
+              style={{ background: 'linear-gradient(135deg, var(--theme-accent, #2D5BFF), #14B8A6)' }}
+              className="w-8 h-8 rounded-xl flex items-center justify-center text-white font-bold shadow-lg"
+            >
+              <Sliders className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-white tracking-tight">Settings</h2>
+              <p className="text-xs text-slate-400">Configure your inbox preferences, labels, filters, and custom domains</p>
+            </div>
           </div>
+
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[#2A2E37] transition-colors"
-            data-testid="settings-close-btn"
+            className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Modal Body with Sidebar Tabs */}
-        <div className="flex-1 flex flex-col sm:flex-row overflow-hidden">
-          {/* Navigation Tabs */}
-          <div className="w-full sm:w-48 bg-[#121418] border-b sm:border-b-0 sm:border-r border-[#2A2E37] p-2 sm:p-3 flex sm:flex-col gap-1 overflow-x-auto shrink-0 custom-scrollbar">
-            <button
-              onClick={() => setActiveTab('labels')}
-              className={`flex items-center gap-2 sm:gap-2.5 px-3 py-2 rounded-xl text-xs font-medium shrink-0 transition-colors ${
-                activeTab === 'labels'
-                  ? 'bg-[#2D5BFF]/15 text-[#2D5BFF] font-semibold'
-                  : 'text-slate-400 hover:bg-[#1C1F26] hover:text-slate-200'
-              }`}
-              data-testid="tab-labels"
-            >
-              <Tag className="w-4 h-4" />
-              <span>Labels</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('folders')}
-              className={`flex items-center gap-2 sm:gap-2.5 px-3 py-2 rounded-xl text-xs font-medium shrink-0 transition-colors ${
-                activeTab === 'folders'
-                  ? 'bg-[#2D5BFF]/15 text-[#2D5BFF] font-semibold'
-                  : 'text-slate-400 hover:bg-[#1C1F26] hover:text-slate-200'
-              }`}
-              data-testid="tab-folders"
-            >
-              <Folder className="w-4 h-4" />
-              <span>Folders</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('filters')}
-              className={`flex items-center gap-2 sm:gap-2.5 px-3 py-2 rounded-xl text-xs font-medium shrink-0 transition-colors ${
-                activeTab === 'filters'
-                  ? 'bg-[#2D5BFF]/15 text-[#2D5BFF] font-semibold'
-                  : 'text-slate-400 hover:bg-[#1C1F26] hover:text-slate-200'
-              }`}
-              data-testid="tab-filters"
-            >
-              <Sliders className="w-4 h-4" />
-              <span>Filters</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('preferences')}
-              className={`flex items-center gap-2 sm:gap-2.5 px-3 py-2 rounded-xl text-xs font-medium shrink-0 transition-colors ${
-                activeTab === 'preferences'
-                  ? 'bg-[#2D5BFF]/15 text-[#2D5BFF] font-semibold'
-                  : 'text-slate-400 hover:bg-[#1C1F26] hover:text-slate-200'
-              }`}
-              data-testid="tab-preferences"
-            >
-              <User className="w-4 h-4" />
-              <span>Preferences</span>
-            </button>
-            <button
-              onClick={() => {
-                setActiveTab('domains');
-                fetchDomains();
-              }}
-              className={`flex items-center gap-2 sm:gap-2.5 px-3 py-2 rounded-xl text-xs font-medium shrink-0 transition-colors ${
-                activeTab === 'domains'
-                  ? 'bg-[#2D5BFF]/15 text-[#2D5BFF] font-semibold'
-                  : 'text-slate-400 hover:bg-[#1C1F26] hover:text-slate-200'
-              }`}
-              data-testid="tab-domains"
-            >
-              <Globe className="w-4 h-4" />
-              <span>Custom Domains</span>
-            </button>
-          </div>
+        {/* Gmail Navigation Tabs Bar */}
+        <div 
+          style={{ backgroundColor: 'var(--theme-bg-card, #12141A)', borderColor: 'var(--theme-border, #1E232B)' }}
+          className="flex items-center px-6 border-b overflow-x-auto custom-scrollbar no-scrollbar shrink-0 text-xs font-semibold gap-1"
+        >
+          {[
+            { id: 'general', label: 'General' },
+            { id: 'labels', label: 'Labels' },
+            { id: 'inbox', label: 'Inbox' },
+            { id: 'accounts', label: 'Accounts & Custom Domains' },
+            { id: 'filters', label: 'Filters and Blocked Addresses' },
+            { id: 'forwarding', label: 'Forwarding and POP/IMAP' },
+            { id: 'themes', label: 'Themes' },
+          ].map((tab) => {
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
+                style={isActive ? { color: 'var(--theme-accent, #2D5BFF)' } : undefined}
+                className={`py-3.5 px-4 transition-all whitespace-nowrap relative font-medium ${
+                  isActive ? 'font-bold' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+                }`}
+              >
+                <span>{tab.label}</span>
+                {isActive && (
+                  <div 
+                    style={{ backgroundColor: 'var(--theme-accent, #2D5BFF)' }}
+                    className="absolute bottom-0 left-0 right-0 h-0.5 rounded-t-full"
+                  ></div>
+                )}
+              </button>
+            );
+          })}
+        </div>
 
-
-          {/* Tab Content Panels */}
-          <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 custom-scrollbar text-slate-200">
-            {/* 1. LABELS TAB */}
-            {activeTab === 'labels' && (
-              <div className="space-y-5" data-testid="panel-labels">
-                <div>
-                  <h3 className="text-sm font-semibold text-white">Manage Mail Labels</h3>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    Organize your incoming and outbound messages with custom color tags.
-                  </p>
-                </div>
-
-                {/* Create Label Form */}
-                <form onSubmit={handleCreateLabel} className="p-3.5 bg-[#121418] border border-[#2A2E37] rounded-xl space-y-3">
+        {/* Modal Scrollable Body */}
+        <div 
+          style={{ backgroundColor: 'var(--theme-bg-main, #0A0C10)' }}
+          className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar text-xs"
+        >
+          
+          {/* ========================================================= */}
+          {/* 1. GENERAL TAB */}
+          {/* ========================================================= */}
+          {activeTab === 'general' && (
+            <div className="space-y-6 divide-y divide-white/5">
+              
+              {/* Language */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-2">
+                <div className="font-semibold text-slate-300">Language:</div>
+                <div className="md:col-span-3 space-y-2">
                   <div className="flex items-center gap-3">
-                    <input
-                      type="text"
-                      placeholder="Label name (e.g. Work, Finance, Important)"
-                      value={newLabelName}
-                      onChange={(e) => setNewLabelName(e.target.value)}
-                      className="flex-1 bg-[#1A1D24] border border-[#2A2E37] text-white text-xs rounded-lg px-3 py-2 outline-none focus:border-[#2D5BFF]"
-                      data-testid="new-label-name-input"
-                    />
-                    <button
-                      type="submit"
-                      className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#2D5BFF] hover:bg-[#1E48E0] text-white text-xs font-semibold shadow-md transition-all shrink-0"
-                      data-testid="create-label-btn"
+                    <span className="text-slate-400">Eazzio Mail display language:</span>
+                    <select 
+                      style={{ backgroundColor: 'var(--theme-bg-card, #12141A)', borderColor: 'var(--theme-border, #1E232B)' }}
+                      className="px-3 py-1.5 rounded-lg border text-white outline-none"
                     >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>Add Label</span>
-                    </button>
+                      <option>English (US)</option>
+                      <option>English (UK)</option>
+                      <option>Hindi (हिन्दी)</option>
+                      <option>Spanish (Español)</option>
+                      <option>French (Français)</option>
+                      <option>German (Deutsch)</option>
+                    </select>
                   </div>
-                  {/* Color Swatches */}
-                  <div className="flex items-center gap-2 pt-1">
-                    <span className="text-xs text-slate-400">Color:</span>
-                    {PRESET_COLORS.map((color) => (
-                      <button
-                        key={color}
-                        type="button"
-                        onClick={() => setNewLabelColor(color)}
-                        className={`w-5 h-5 rounded-full border transition-all ${
-                          newLabelColor === color ? 'border-white scale-110' : 'border-transparent opacity-80 hover:opacity-100'
-                        }`}
-                        style={{ backgroundColor: color }}
-                      />
-                    ))}
-                  </div>
-                </form>
+                </div>
+              </div>
 
-                {/* Labels List */}
-                <div className="space-y-2">
-                  <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Existing Labels ({labels.length})</h4>
-                  {labels.length === 0 ? (
-                    <p className="text-xs text-slate-500 italic">No labels created yet.</p>
-                  ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {labels.map((label) => (
-                        <div
-                          key={label.id}
-                          className="p-2.5 bg-[#121418] border border-[#2A2E37] rounded-xl flex items-center justify-between gap-3 text-xs"
-                          data-testid={`label-card-${label.id}`}
+              {/* Maximum Page Size */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4">
+                <div className="font-semibold text-slate-300">Maximum page size:</div>
+                <div className="md:col-span-3 flex items-center gap-3">
+                  <span className="text-slate-400">Show</span>
+                  <select
+                    value={pageSize}
+                    onChange={(e) => setPageSize(Number(e.target.value))}
+                    style={{ backgroundColor: 'var(--theme-bg-card, #12141A)', borderColor: 'var(--theme-border, #1E232B)' }}
+                    className="px-3 py-1.5 rounded-lg border text-white outline-none"
+                  >
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                  </select>
+                  <span className="text-slate-400">conversations per page</span>
+                </div>
+              </div>
+
+              {/* Undo Send */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4">
+                <div className="font-semibold text-slate-300">Undo Send:</div>
+                <div className="md:col-span-3 flex items-center gap-3">
+                  <span className="text-slate-400">Send cancellation period:</span>
+                  <select
+                    value={undoSendTime}
+                    onChange={(e) => setUndoSendTime(Number(e.target.value))}
+                    style={{ backgroundColor: 'var(--theme-bg-card, #12141A)', borderColor: 'var(--theme-border, #1E232B)' }}
+                    className="px-3 py-1.5 rounded-lg border text-white outline-none"
+                  >
+                    <option value={5}>5 seconds</option>
+                    <option value={10}>10 seconds</option>
+                    <option value={20}>20 seconds</option>
+                    <option value={30}>30 seconds</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Default Reply Behavior */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4">
+                <div className="font-semibold text-slate-300">Default reply behavior:</div>
+                <div className="md:col-span-3 space-y-2">
+                  <label className="flex items-center gap-2.5 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="replyBehavior"
+                      checked={defaultReplyBehavior === 'reply'}
+                      onChange={() => setDefaultReplyBehavior('reply')}
+                      className="accent-[#2D5BFF]"
+                    />
+                    <span className="text-slate-200">Reply</span>
+                  </label>
+                  <label className="flex items-center gap-2.5 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="replyBehavior"
+                      checked={defaultReplyBehavior === 'reply_all'}
+                      onChange={() => setDefaultReplyBehavior('reply_all')}
+                      className="accent-[#2D5BFF]"
+                    />
+                    <span className="text-slate-200">Reply all</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Hover Actions */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4">
+                <div className="font-semibold text-slate-300">Hover actions:</div>
+                <div className="md:col-span-3 space-y-2">
+                  <label className="flex items-center gap-2.5 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="hoverActions"
+                      checked={hoverActions}
+                      onChange={() => setHoverActions(true)}
+                      className="accent-[#2D5BFF]"
+                    />
+                    <span className="text-slate-200">Enable hover actions — Quickly access archive, delete, mark read, and snooze</span>
+                  </label>
+                  <label className="flex items-center gap-2.5 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="hoverActions"
+                      checked={!hoverActions}
+                      onChange={() => setHoverActions(false)}
+                      className="accent-[#2D5BFF]"
+                    />
+                    <span className="text-slate-200">Disable hover actions</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Conversation View */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4">
+                <div className="font-semibold text-slate-300">Conversation View:</div>
+                <div className="md:col-span-3 space-y-2">
+                  <label className="flex items-center gap-2.5 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="convView"
+                      checked={conversationView}
+                      onChange={() => setConversationView(true)}
+                      className="accent-[#2D5BFF]"
+                    />
+                    <span className="text-slate-200">Conversation view on — Group messages with the same subject together</span>
+                  </label>
+                  <label className="flex items-center gap-2.5 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="convView"
+                      checked={!conversationView}
+                      onChange={() => setConversationView(false)}
+                      className="accent-[#2D5BFF]"
+                    />
+                    <span className="text-slate-200">Conversation view off</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Desktop Notifications */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4">
+                <div className="font-semibold text-slate-300">Desktop notifications:</div>
+                <div className="md:col-span-3 space-y-2">
+                  <label className="flex items-center gap-2.5 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="notifications"
+                      checked={desktopNotifications === 'all'}
+                      onChange={() => setDesktopNotifications('all')}
+                      className="accent-[#2D5BFF]"
+                    />
+                    <span className="text-slate-200">New mail notifications on — Notify me when any new message arrives</span>
+                  </label>
+                  <label className="flex items-center gap-2.5 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="notifications"
+                      checked={desktopNotifications === 'important'}
+                      onChange={() => setDesktopNotifications('important')}
+                      className="accent-[#2D5BFF]"
+                    />
+                    <span className="text-slate-200">Important mail notifications on — Notify me only for important emails</span>
+                  </label>
+                  <label className="flex items-center gap-2.5 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="notifications"
+                      checked={desktopNotifications === 'off'}
+                      onChange={() => setDesktopNotifications('off')}
+                      className="accent-[#2D5BFF]"
+                    />
+                    <span className="text-slate-200">Mail notifications off</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Stars Preset */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4">
+                <div className="font-semibold text-slate-300">Stars:</div>
+                <div className="md:col-span-3 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-400">Presets:</span>
+                    <button onClick={() => setStarPreset('1star')} className={`px-2.5 py-1 rounded-md border ${starPreset === '1star' ? 'bg-[#2D5BFF]/20 border-[#2D5BFF] text-[#2D5BFF]' : 'border-white/10 text-slate-400'}`}>1 star</button>
+                    <button onClick={() => setStarPreset('4stars')} className={`px-2.5 py-1 rounded-md border ${starPreset === '4stars' ? 'bg-[#2D5BFF]/20 border-[#2D5BFF] text-[#2D5BFF]' : 'border-white/10 text-slate-400'}`}>4 stars</button>
+                    <button onClick={() => setStarPreset('all')} className={`px-2.5 py-1 rounded-md border ${starPreset === 'all' ? 'bg-[#2D5BFF]/20 border-[#2D5BFF] text-[#2D5BFF]' : 'border-white/10 text-slate-400'}`}>all stars</button>
+                  </div>
+                  <div className="flex items-center gap-2 p-3 bg-white/[0.02] border border-white/5 rounded-xl">
+                    <Star className="w-5 h-5 fill-amber-400 text-amber-400" />
+                    {starPreset !== '1star' && (
+                      <>
+                        <Star className="w-5 h-5 fill-blue-400 text-blue-400" />
+                        <Star className="w-5 h-5 fill-emerald-400 text-emerald-400" />
+                        <Star className="w-5 h-5 fill-purple-400 text-purple-400" />
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Outbound Signature Builder */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4">
+                <div className="font-semibold text-slate-300">Signature:</div>
+                <div className="md:col-span-3 space-y-3">
+                  <div 
+                    style={{ backgroundColor: 'var(--theme-bg-card, #12141A)', borderColor: 'var(--theme-border, #1E232B)' }}
+                    className="p-4 rounded-xl border space-y-3"
+                  >
+                    <textarea
+                      value={signatureText}
+                      onChange={(e) => setSignatureText(e.target.value)}
+                      rows={4}
+                      placeholder="Best Regards,&#10;Your Name&#10;Company"
+                      className="w-full bg-transparent text-white text-xs outline-none resize-none border-b border-white/10 pb-2"
+                    />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 text-[11px] text-slate-400">
+                      <div>
+                        <label className="block mb-1 font-semibold text-slate-300">FOR NEW EMAILS USE</label>
+                        <select 
+                          value={signatureForNew} 
+                          onChange={(e) => setSignatureForNew(e.target.value)}
+                          style={{ backgroundColor: 'var(--theme-bg-sidebar, #090A0D)', borderColor: 'var(--theme-border, #1E232B)' }}
+                          className="w-full p-2 rounded-lg border text-white"
                         >
-                          {editingLabelId === label.id ? (
-                            <div className="flex-1 flex items-center gap-2">
-                              <input
-                                type="text"
-                                value={editingLabelName}
-                                onChange={(e) => setEditingLabelName(e.target.value)}
-                                className="flex-1 bg-[#1A1D24] border border-[#2A2E37] text-white text-xs rounded px-2 py-1 outline-none"
-                              />
-                              <button
-                                onClick={() => handleSaveEditLabel(label.id)}
-                                className="p-1 rounded text-emerald-400 hover:bg-emerald-500/10"
-                              >
-                                <Check className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-2.5 truncate">
-                              <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: label.color }} />
-                              <span className="font-medium text-white truncate">{label.name}</span>
-                            </div>
-                          )}
+                          <option value="default">Default Signature</option>
+                          <option value="none">No signature</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block mb-1 font-semibold text-slate-300">ON REPLY / FORWARD USE</label>
+                        <select 
+                          value={signatureForReply} 
+                          onChange={(e) => setSignatureForReply(e.target.value)}
+                          style={{ backgroundColor: 'var(--theme-bg-sidebar, #090A0D)', borderColor: 'var(--theme-border, #1E232B)' }}
+                          className="w-full p-2 rounded-lg border text-white"
+                        >
+                          <option value="default">Default Signature</option>
+                          <option value="none">No signature</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
 
-                          <div className="flex items-center gap-1 shrink-0">
-                            {editingLabelId !== label.id && (
-                              <button
-                                onClick={() => {
-                                  setEditingLabelId(label.id);
-                                  setEditingLabelName(label.name);
-                                  setEditingLabelColor(label.color);
-                                }}
-                                className="p-1 text-slate-400 hover:text-white"
-                                title="Edit"
-                              >
-                                <Edit2 className="w-3.5 h-3.5" />
-                              </button>
-                            )}
-                            <button
-                              onClick={() => handleDeleteLabel(label.id)}
-                              className="p-1 text-slate-400 hover:text-red-400"
-                              title="Delete"
-                              data-testid={`delete-label-${label.id}`}
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
+              {/* Vacation Responder / Auto-Reply */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4">
+                <div className="font-semibold text-slate-300">Vacation responder:</div>
+                <div className="md:col-span-3 space-y-3">
+                  <div className="flex items-center gap-6">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="vacation"
+                        checked={!vacationEnabled}
+                        onChange={() => setVacationEnabled(false)}
+                        className="accent-[#2D5BFF]"
+                      />
+                      <span>Vacation responder off</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="vacation"
+                        checked={vacationEnabled}
+                        onChange={() => setVacationEnabled(true)}
+                        className="accent-[#2D5BFF]"
+                      />
+                      <span>Vacation responder on</span>
+                    </label>
+                  </div>
+
+                  {vacationEnabled && (
+                    <div 
+                      style={{ backgroundColor: 'var(--theme-bg-card, #12141A)', borderColor: 'var(--theme-border, #1E232B)' }}
+                      className="p-4 rounded-xl border space-y-3 animate-in fade-in"
+                    >
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[11px] text-slate-400 mb-1">First day</label>
+                          <input
+                            type="date"
+                            value={vacationStartDate}
+                            onChange={(e) => setVacationStartDate(e.target.value)}
+                            style={{ backgroundColor: 'var(--theme-bg-sidebar, #090A0D)', borderColor: 'var(--theme-border, #1E232B)' }}
+                            className="w-full p-2 rounded-lg border text-white outline-none"
+                          />
                         </div>
-                      ))}
+                        <div>
+                          <label className="block text-[11px] text-slate-400 mb-1">Last day (optional)</label>
+                          <input
+                            type="date"
+                            value={vacationEndDate}
+                            onChange={(e) => setVacationEndDate(e.target.value)}
+                            style={{ backgroundColor: 'var(--theme-bg-sidebar, #090A0D)', borderColor: 'var(--theme-border, #1E232B)' }}
+                            className="w-full p-2 rounded-lg border text-white outline-none"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] text-slate-400 mb-1">Subject</label>
+                        <input
+                          type="text"
+                          value={vacationSubject}
+                          onChange={(e) => setVacationSubject(e.target.value)}
+                          style={{ backgroundColor: 'var(--theme-bg-sidebar, #090A0D)', borderColor: 'var(--theme-border, #1E232B)' }}
+                          className="w-full p-2 rounded-lg border text-white outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] text-slate-400 mb-1">Message</label>
+                        <textarea
+                          rows={3}
+                          value={vacationBody}
+                          onChange={(e) => setVacationBody(e.target.value)}
+                          style={{ backgroundColor: 'var(--theme-bg-sidebar, #090A0D)', borderColor: 'var(--theme-border, #1E232B)' }}
+                          className="w-full p-2 rounded-lg border text-white outline-none resize-none"
+                        />
+                      </div>
+
+                      <label className="flex items-center gap-2 cursor-pointer text-slate-400">
+                        <input
+                          type="checkbox"
+                          checked={vacationContactsOnly}
+                          onChange={(e) => setVacationContactsOnly(e.target.checked)}
+                          className="accent-[#2D5BFF]"
+                        />
+                        <span>Only send a response to people in my Contacts</span>
+                      </label>
                     </div>
                   )}
                 </div>
               </div>
-            )}
+            </div>
+          )}
 
-            {/* 2. FOLDERS TAB */}
-            {activeTab === 'folders' && (
-              <div className="space-y-5" data-testid="panel-folders">
-                <div>
-                  <h3 className="text-sm font-semibold text-white">Custom Folders Management</h3>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    Create custom mail folders to categorize messages beyond default system folders.
-                  </p>
+          {/* ========================================================= */}
+          {/* 2. LABELS TAB */}
+          {/* ========================================================= */}
+          {activeTab === 'labels' && (
+            <div className="space-y-6">
+              
+              {/* System Labels Visibility Table */}
+              <div>
+                <h3 className="text-sm font-bold text-white mb-3">System Labels</h3>
+                <div 
+                  style={{ backgroundColor: 'var(--theme-bg-card, #12141A)', borderColor: 'var(--theme-border, #1E232B)' }}
+                  className="rounded-xl border overflow-hidden divide-y divide-white/5"
+                >
+                  <div className="grid grid-cols-3 p-3 font-semibold text-slate-400 bg-white/[0.02]">
+                    <div>Label Name</div>
+                    <div>Show in label list</div>
+                    <div>IMAP Sync</div>
+                  </div>
+                  {[
+                    { name: 'Inbox', slug: 'inbox' },
+                    { name: 'Starred', slug: 'starred' },
+                    { name: 'Snoozed', slug: 'snoozed' },
+                    { name: 'Important', slug: 'important' },
+                    { name: 'Sent', slug: 'sent' },
+                    { name: 'Scheduled', slug: 'scheduled' },
+                    { name: 'Drafts', slug: 'drafts' },
+                    { name: 'All Mail', slug: 'all-mail' },
+                    { name: 'Spam', slug: 'spam' },
+                    { name: 'Trash', slug: 'trash' },
+                  ].map((sys) => (
+                    <div key={sys.slug} className="grid grid-cols-3 p-3 items-center">
+                      <div className="font-medium text-white">{sys.name}</div>
+                      <div className="flex items-center gap-3 text-slate-400">
+                        <button className="hover:text-white font-semibold text-[#2D5BFF]">show</button>
+                        <span>|</span>
+                        <button className="hover:text-white">hide</button>
+                      </div>
+                      <div className="text-emerald-400 font-mono text-[11px] flex items-center gap-1.5">
+                        <Check className="w-3.5 h-3.5" /> Show in IMAP
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Custom Labels Section */}
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-bold text-white">Custom Labels</h3>
                 </div>
 
-                {/* Create Folder Form */}
-                <form onSubmit={handleCreateFolder} className="p-3.5 bg-[#121418] border border-[#2A2E37] rounded-xl flex items-center gap-3">
+                {/* Create Label Form */}
+                <form onSubmit={handleCreateLabel} className="p-4 bg-white/[0.02] border border-white/10 rounded-xl flex items-center gap-3 mb-4">
                   <input
                     type="text"
-                    placeholder="New folder name (e.g. Invoices, Clients, HR)"
-                    value={newFolderName}
-                    onChange={(e) => setNewFolderName(e.target.value)}
-                    className="flex-1 bg-[#1A1D24] border border-[#2A2E37] text-white text-xs rounded-lg px-3 py-2 outline-none focus:border-[#2D5BFF]"
-                    data-testid="new-folder-name-input"
+                    placeholder="New label name (e.g. Work, Project Alpha)"
+                    value={newLabelName}
+                    onChange={(e) => setNewLabelName(e.target.value)}
+                    style={{ backgroundColor: 'var(--theme-bg-card, #12141A)', borderColor: 'var(--theme-border, #1E232B)' }}
+                    className="flex-1 p-2.5 rounded-lg border text-white outline-none"
                   />
+                  <div className="flex items-center gap-1.5">
+                    {PRESET_COLORS.map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => setNewLabelColor(c)}
+                        style={{ backgroundColor: c }}
+                        className={`w-6 h-6 rounded-full transition-transform ${newLabelColor === c ? 'scale-125 ring-2 ring-white' : 'opacity-70'}`}
+                      />
+                    ))}
+                  </div>
                   <button
                     type="submit"
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#2D5BFF] hover:bg-[#1E48E0] text-white text-xs font-semibold shadow-md transition-all shrink-0"
-                    data-testid="create-folder-btn"
+                    disabled={!newLabelName.trim()}
+                    style={{ backgroundColor: 'var(--theme-accent, #2D5BFF)' }}
+                    className="px-4 py-2.5 rounded-lg text-white font-bold disabled:opacity-50 flex items-center gap-1.5"
                   >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Add Folder</span>
+                    <Plus className="w-4 h-4" /> Add Label
                   </button>
                 </form>
 
-                {/* Folder List */}
-                <div className="space-y-2">
-                  <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">All Mail Folders</h4>
-                  <div className="space-y-1.5">
-                    {folders.map((folder) => (
-                      <div
-                        key={folder.id}
-                        className="p-2.5 bg-[#121418] border border-[#2A2E37] rounded-xl flex items-center justify-between gap-3 text-xs"
-                      >
-                        {editingFolderId === folder.id ? (
-                          <div className="flex-1 flex items-center gap-2">
-                            <input
-                              type="text"
-                              value={editingFolderName}
-                              onChange={(e) => setEditingFolderName(e.target.value)}
-                              className="flex-1 bg-[#1A1D24] border border-[#2A2E37] text-white text-xs rounded px-2 py-1 outline-none"
-                            />
-                            <button
-                              onClick={() => handleSaveEditFolder(folder.id)}
-                              className="p-1 rounded text-emerald-400 hover:bg-emerald-500/10"
-                            >
-                              <Check className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-2.5 truncate">
-                            <Folder className="w-4 h-4 text-slate-400" />
-                            <span className="font-medium text-white">{folder.name}</span>
-                            {folder.type === 'system' ? (
-                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#2A2E37] text-slate-400">System</span>
-                            ) : (
-                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#2D5BFF]/15 text-[#2D5BFF]">Custom</span>
-                            )}
-                          </div>
-                        )}
-
-                        {folder.type === 'custom' && (
-                          <div className="flex items-center gap-1 shrink-0">
-                            {editingFolderId !== folder.id && (
-                              <button
-                                onClick={() => {
-                                  setEditingFolderId(folder.id);
-                                  setEditingFolderName(folder.name);
-                                }}
-                                className="p-1 text-slate-400 hover:text-white"
-                                title="Edit"
-                              >
-                                <Edit2 className="w-3.5 h-3.5" />
-                              </button>
-                            )}
-                            <button
-                              onClick={() => handleDeleteFolder(folder.id)}
-                              className="p-1 text-slate-400 hover:text-red-400"
-                              title="Delete"
-                              data-testid={`delete-folder-${folder.id}`}
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        )}
+                {/* Labels List */}
+                <div 
+                  style={{ backgroundColor: 'var(--theme-bg-card, #12141A)', borderColor: 'var(--theme-border, #1E232B)' }}
+                  className="rounded-xl border divide-y divide-white/5"
+                >
+                  {labels.length === 0 ? (
+                    <div className="p-6 text-center text-slate-500">No custom labels created yet.</div>
+                  ) : (
+                    labels.map((l) => (
+                      <div key={l.id} className="p-3.5 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <span className="w-3 h-3 rounded-full" style={{ backgroundColor: l.color }} />
+                          <span className="font-semibold text-white">{l.name}</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <button onClick={() => handleDeleteLabel(l.id)} className="p-1.5 text-slate-400 hover:text-rose-400 transition-colors">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
-                    ))}
-                  </div>
+                    ))
+                  )}
                 </div>
               </div>
-            )}
+            </div>
+          )}
 
-            {/* 3. FILTERS TAB */}
-            {activeTab === 'filters' && (
-              <div className="space-y-5" data-testid="panel-filters">
-                <div>
-                  <h3 className="text-sm font-semibold text-white">Automation Filter Rules</h3>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    Automatically tag, categorize, or organize incoming emails according to criteria.
-                  </p>
+          {/* ========================================================= */}
+          {/* 3. INBOX TAB */}
+          {/* ========================================================= */}
+          {activeTab === 'inbox' && (
+            <div className="space-y-6 divide-y divide-white/5">
+              
+              {/* Inbox Type */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-2">
+                <div className="font-semibold text-slate-300">Inbox type:</div>
+                <div className="md:col-span-3 space-y-2">
+                  {[
+                    { id: 'default', label: 'Default', desc: 'Categorized tabs: Primary, Promotions, Social, Updates' },
+                    { id: 'important', label: 'Important first', desc: 'Prioritizes flagged and important emails at the top' },
+                    { id: 'unread', label: 'Unread first', desc: 'Displays all unread emails in a top pane' },
+                    { id: 'starred', label: 'Starred first', desc: 'Displays all starred messages first' },
+                    { id: 'priority', label: 'Priority Inbox', desc: 'Intelligent multi-section inbox with custom sorting' },
+                  ].map((t) => (
+                    <label key={t.id} className="flex items-start gap-3 p-3 rounded-xl border border-transparent hover:border-white/10 hover:bg-white/[0.02] cursor-pointer">
+                      <input
+                        type="radio"
+                        name="inboxType"
+                        checked={inboxType === t.id}
+                        onChange={() => setInboxType(t.id as any)}
+                        className="mt-0.5 accent-[#2D5BFF]"
+                      />
+                      <div>
+                        <div className="font-bold text-white">{t.label}</div>
+                        <div className="text-slate-400 text-[11px]">{t.desc}</div>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Categories */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4">
+                <div className="font-semibold text-slate-300">Categories:</div>
+                <div className="md:col-span-3 space-y-2">
+                  <p className="text-slate-400 text-[11px] mb-2">Choose which message categories to show as inbox tabs.</p>
+                  {['Primary', 'Promotions', 'Social', 'Updates', 'Forums'].map((cat) => {
+                    const key = cat.toLowerCase();
+                    return (
+                      <label key={cat} className="flex items-center gap-2.5 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={categories[key] ?? false}
+                          disabled={key === 'primary'}
+                          onChange={(e) => setCategories({ ...categories, [key]: e.target.checked })}
+                          className="accent-[#2D5BFF]"
+                        />
+                        <span className={`text-slate-200 ${key === 'primary' ? 'font-bold text-white' : ''}`}>{cat}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Reading Pane */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4">
+                <div className="font-semibold text-slate-300">Reading pane:</div>
+                <div className="md:col-span-3 space-y-2">
+                  <p className="text-slate-400 text-[11px] mb-2">Provides a way to read mail right next to your list of conversations.</p>
+                  {[
+                    { id: 'none', label: 'No split' },
+                    { id: 'right', label: 'Right of inbox' },
+                    { id: 'below', label: 'Below inbox' },
+                  ].map((p) => (
+                    <label key={p.id} className="flex items-center gap-2.5 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="readingPane"
+                        checked={readingPanePos === p.id}
+                        onChange={() => setReadingPanePos(p.id as any)}
+                        className="accent-[#2D5BFF]"
+                      />
+                      <span className="text-slate-200">{p.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================= */}
+          {/* 4. ACCOUNTS & CUSTOM DOMAINS TAB */}
+          {/* ========================================================= */}
+          {activeTab === 'accounts' && (
+            <div className="space-y-6">
+              
+              {/* Send Mail As */}
+              <div className="p-4 rounded-xl border border-white/10 bg-white/[0.02] space-y-3">
+                <h3 className="text-sm font-bold text-white">Send Mail As</h3>
+                <div className="flex items-center justify-between p-3 rounded-lg bg-black/30 border border-white/5">
+                  <div>
+                    <span className="font-bold text-white">Rahul Kumar</span>{' '}
+                    <span className="text-slate-400">&lt;rahul@eazzio.com&gt;</span>
+                    <span className="ml-2 px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[10px] font-bold">Default</span>
+                  </div>
+                  <button className="text-[#2D5BFF] hover:underline font-semibold">edit info</button>
+                </div>
+              </div>
+
+              {/* Custom Domains Wizard */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                      <Globe className="w-4 h-4 text-[#2D5BFF]" />
+                      <span>Custom Domains & DNS Verification Wizard</span>
+                    </h3>
+                    <p className="text-slate-400 text-[11px]">Connect your business domain with DKIM RSA-2048, SPF, DMARC, and MX records.</p>
+                  </div>
                 </div>
 
-                {/* Create Filter Rule Form */}
-                <form onSubmit={handleCreateFilterRule} className="p-4 bg-[#121418] border border-[#2A2E37] rounded-xl space-y-3">
+                {/* Add domain form */}
+                <form 
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    if (!newDomainInput.trim()) return;
+                    setCreatingDomain(true);
+                    try {
+                      const res = await fetch('/api/domains', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ domain: newDomainInput.trim() }),
+                      });
+                      if (res.ok) {
+                        setNewDomainInput('');
+                        fetchDomains();
+                      }
+                    } catch (_) {}
+                    setCreatingDomain(false);
+                  }}
+                  className="flex items-center gap-3 p-4 rounded-xl border border-white/10 bg-white/[0.02]"
+                >
+                  <input
+                    type="text"
+                    placeholder="e.g. acme.com or mail.startup.io"
+                    value={newDomainInput}
+                    onChange={(e) => setNewDomainInput(e.target.value)}
+                    style={{ backgroundColor: 'var(--theme-bg-card, #12141A)', borderColor: 'var(--theme-border, #1E232B)' }}
+                    className="flex-1 p-2.5 rounded-lg border text-white outline-none"
+                  />
+                  <button
+                    type="submit"
+                    disabled={creatingDomain || !newDomainInput.trim()}
+                    style={{ backgroundColor: 'var(--theme-accent, #2D5BFF)' }}
+                    className="px-5 py-2.5 rounded-lg text-white font-bold disabled:opacity-50 flex items-center gap-2"
+                  >
+                    {creatingDomain ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                    <span>Add Domain</span>
+                  </button>
+                </form>
+
+                {/* Domains List */}
+                <div className="space-y-3">
+                  {domains.map((dom) => (
+                    <div 
+                      key={dom.id}
+                      style={{ backgroundColor: 'var(--theme-bg-card, #12141A)', borderColor: 'var(--theme-border, #1E232B)' }}
+                      className="p-4 rounded-xl border space-y-3"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2.5">
+                          <Globe className="w-4 h-4 text-emerald-400" />
+                          <span className="font-bold text-white text-sm">{dom.name || dom.domain}</span>
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${dom.isVerified ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>
+                            {dom.isVerified ? 'Verified Active' : 'Pending DNS'}
+                          </span>
+                        </div>
+                        <button
+                          onClick={async () => {
+                            setVerifyingDomainId(dom.id);
+                            await fetch(`/api/domains/${dom.id}/verify`, { method: 'POST' });
+                            fetchDomains();
+                            setVerifyingDomainId(null);
+                          }}
+                          className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white font-semibold flex items-center gap-1.5"
+                        >
+                          <RefreshCw className={`w-3.5 h-3.5 ${verifyingDomainId === dom.id ? 'animate-spin' : ''}`} />
+                          Verify DNS
+                        </button>
+                      </div>
+
+                      {/* DNS Table */}
+                      <div className="p-3 bg-black/40 rounded-lg border border-white/5 text-[11px] font-mono space-y-2">
+                        <div className="flex items-center justify-between text-slate-400">
+                          <span>MX: mail.eazzio.com (Priority 10)</span>
+                          <span className="text-emerald-400">Active</span>
+                        </div>
+                        <div className="flex items-center justify-between text-slate-400">
+                          <span>TXT (SPF): v=spf1 include:_spf.eazzio.com ~all</span>
+                          <span className="text-emerald-400">Active</span>
+                        </div>
+                        <div className="flex items-center justify-between text-slate-400">
+                          <span>TXT (DKIM): eazzio._domainkey.yourdomain.com</span>
+                          <span className="text-emerald-400">RSA-2048</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================= */}
+          {/* 5. FILTERS & BLOCKED ADDRESSES TAB */}
+          {/* ========================================================= */}
+          {activeTab === 'filters' && (
+            <div className="space-y-6">
+              
+              {/* Automation Filters Section */}
+              <div>
+                <h3 className="text-sm font-bold text-white mb-2">Applied Filters</h3>
+                <p className="text-slate-400 text-[11px] mb-3">The following filters are applied to all incoming mail:</p>
+
+                {/* Create Filter Form */}
+                <form onSubmit={handleCreateFilter} className="p-4 rounded-xl border border-white/10 bg-white/[0.02] space-y-3 mb-4">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="text-[11px] text-slate-400 mb-1 block">Rule Name</label>
+                      <label className="block text-slate-400 mb-1">Filter Name</label>
                       <input
                         type="text"
-                        placeholder="e.g. Tag Company Emails"
+                        placeholder="e.g. Work emails filter"
                         value={newRuleName}
                         onChange={(e) => setNewRuleName(e.target.value)}
-                        className="w-full bg-[#1A1D24] border border-[#2A2E37] text-white text-xs rounded-lg px-3 py-2 outline-none focus:border-[#2D5BFF]"
-                        data-testid="filter-name-input"
+                        style={{ backgroundColor: 'var(--theme-bg-card, #12141A)', borderColor: 'var(--theme-border, #1E232B)' }}
+                        className="w-full p-2 rounded-lg border text-white outline-none"
                       />
                     </div>
                     <div>
-                      <label className="text-[11px] text-slate-400 mb-1 block">Match Field</label>
-                      <select
-                        value={newRuleField}
-                        onChange={(e) => setNewRuleField(e.target.value as any)}
-                        className="w-full bg-[#1A1D24] border border-[#2A2E37] text-white text-xs rounded-lg px-3 py-2 outline-none"
-                      >
-                        <option value="from">From Address</option>
-                        <option value="to">To Address</option>
-                        <option value="subject">Subject Line</option>
-                        <option value="body">Body Text</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-[11px] text-slate-400 mb-1 block">Condition & Value</label>
+                      <label className="block text-slate-400 mb-1">Match Field & Value</label>
                       <div className="flex items-center gap-2">
                         <select
-                          value={newRuleOperator}
-                          onChange={(e) => setNewRuleOperator(e.target.value as any)}
-                          className="bg-[#1A1D24] border border-[#2A2E37] text-white text-xs rounded-lg px-2 py-2 outline-none"
+                          value={newRuleField}
+                          onChange={(e) => setNewRuleField(e.target.value as any)}
+                          style={{ backgroundColor: 'var(--theme-bg-card, #12141A)', borderColor: 'var(--theme-border, #1E232B)' }}
+                          className="p-2 rounded-lg border text-white outline-none"
                         >
-                          <option value="contains">contains</option>
-                          <option value="equals">equals</option>
-                          <option value="starts_with">starts with</option>
+                          <option value="from">From</option>
+                          <option value="to">To</option>
+                          <option value="subject">Subject</option>
+                          <option value="body">Body</option>
                         </select>
                         <input
                           type="text"
                           placeholder="e.g. @company.com"
                           value={newRuleValue}
                           onChange={(e) => setNewRuleValue(e.target.value)}
-                          className="flex-1 bg-[#1A1D24] border border-[#2A2E37] text-white text-xs rounded-lg px-3 py-2 outline-none focus:border-[#2D5BFF]"
-                          data-testid="filter-value-input"
+                          style={{ backgroundColor: 'var(--theme-bg-card, #12141A)', borderColor: 'var(--theme-border, #1E232B)' }}
+                          className="flex-1 p-2 rounded-lg border text-white outline-none"
                         />
                       </div>
                     </div>
-
-                    <div>
-                      <label className="text-[11px] text-slate-400 mb-1 block">Action</label>
-                      <div className="flex items-center gap-2">
-                        <select
-                          value={newRuleAction}
-                          onChange={(e) => setNewRuleAction(e.target.value as any)}
-                          className="bg-[#1A1D24] border border-[#2A2E37] text-white text-xs rounded-lg px-2 py-2 outline-none"
-                        >
-                          <option value="apply_label">Apply Label</option>
-                          <option value="move_to_folder">Move to Folder</option>
-                          <option value="star">Star Message</option>
-                          <option value="mark_as_read">Mark as Read</option>
-                        </select>
-                        {newRuleAction === 'apply_label' && (
-                          <select
-                            value={newRuleActionValue}
-                            onChange={(e) => setNewRuleActionValue(e.target.value)}
-                            className="flex-1 bg-[#1A1D24] border border-[#2A2E37] text-white text-xs rounded-lg px-2 py-2 outline-none"
-                          >
-                            {labels.map((l) => (
-                              <option key={l.id} value={l.name}>
-                                {l.name}
-                              </option>
-                            ))}
-                          </select>
-                        )}
-                      </div>
-                    </div>
                   </div>
 
-                  <div className="flex justify-end pt-1">
+                  <div className="flex items-center justify-between pt-2">
+                    <div className="flex items-center gap-3">
+                      <span className="text-slate-400">Action:</span>
+                      <select
+                        value={newRuleAction}
+                        onChange={(e) => setNewRuleAction(e.target.value as any)}
+                        style={{ backgroundColor: 'var(--theme-bg-card, #12141A)', borderColor: 'var(--theme-border, #1E232B)' }}
+                        className="p-2 rounded-lg border text-white outline-none"
+                      >
+                        <option value="apply_label">Apply Label</option>
+                        <option value="star">Star it</option>
+                        <option value="mark_read">Mark as Read</option>
+                        <option value="move_to_folder">Move to Archive/Trash</option>
+                      </select>
+                    </div>
+
                     <button
                       type="submit"
-                      className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#2D5BFF] hover:bg-[#1E48E0] text-white text-xs font-semibold shadow-md transition-all"
-                      data-testid="create-filter-btn"
+                      disabled={!newRuleName.trim() || !newRuleValue.trim()}
+                      style={{ backgroundColor: 'var(--theme-accent, #2D5BFF)' }}
+                      className="px-4 py-2 rounded-lg text-white font-bold disabled:opacity-50"
                     >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>Save Rule</span>
+                      Create filter
                     </button>
                   </div>
                 </form>
 
-                {/* Filter Rules List */}
-                <div className="space-y-2">
-                  <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Active Rules ({filterRules.length})</h4>
+                {/* Filters Table */}
+                <div 
+                  style={{ backgroundColor: 'var(--theme-bg-card, #12141A)', borderColor: 'var(--theme-border, #1E232B)' }}
+                  className="rounded-xl border divide-y divide-white/5"
+                >
                   {filterRules.length === 0 ? (
-                    <p className="text-xs text-slate-500 italic">No automated filter rules configured.</p>
+                    <div className="p-6 text-center text-slate-500">No active filter rules.</div>
                   ) : (
-                    <div className="space-y-2">
-                      {filterRules.map((rule) => (
-                        <div
-                          key={rule.id}
-                          className="p-3 bg-[#121418] border border-[#2A2E37] rounded-xl flex items-center justify-between gap-3 text-xs"
-                          data-testid={`filter-card-${rule.id}`}
-                        >
-                          <div className="space-y-0.5">
-                            <div className="flex items-center gap-2">
-                              <span className="font-semibold text-white">{rule.name}</span>
-                              <span
-                                className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
-                                  rule.isEnabled ? 'bg-emerald-500/15 text-emerald-400' : 'bg-slate-700 text-slate-400'
-                                }`}
-                              >
-                                {rule.isEnabled ? 'Active' : 'Disabled'}
-                              </span>
-                            </div>
-                            <p className="text-slate-400 text-[11px]">
-                              If <span className="text-slate-200 font-mono">{rule.field}</span> {rule.operator} "{rule.value}" ➔ {rule.action} {rule.actionValue ? `("${rule.actionValue}")` : ''}
-                            </p>
-                          </div>
-
-                          <div className="flex items-center gap-2 shrink-0">
-                            <button
-                              onClick={() => handleToggleFilterRule(rule.id)}
-                              className="text-slate-400 hover:text-white"
-                              title={rule.isEnabled ? 'Disable' : 'Enable'}
-                            >
-                              {rule.isEnabled ? (
-                                <ToggleRight className="w-5 h-5 text-[#2D5BFF]" />
-                              ) : (
-                                <ToggleLeft className="w-5 h-5 text-slate-500" />
-                              )}
-                            </button>
-                            <button
-                              onClick={() => handleDeleteFilterRule(rule.id)}
-                              className="p-1 text-slate-400 hover:text-red-400"
-                              title="Delete Rule"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                    filterRules.map((rule) => (
+                      <div key={rule.id} className="p-3.5 flex items-center justify-between">
+                        <div>
+                          <div className="font-bold text-white">{rule.name}</div>
+                          <div className="text-slate-400 text-[11px]">
+                            Matches: <span className="text-slate-200 font-mono">{rule.field} {rule.operator} "{rule.value}"</span> ➔ {rule.action} {rule.actionValue ? `("${rule.actionValue}")` : ''}
                           </div>
                         </div>
-                      ))}
-                    </div>
+                        <button onClick={() => handleDeleteFilter(rule.id)} className="p-1.5 text-slate-400 hover:text-rose-400 transition-colors">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))
                   )}
                 </div>
               </div>
-            )}
 
-            {/* 4. PREFERENCES TAB */}
-            {activeTab === 'preferences' && (
-              <div className="space-y-5" data-testid="panel-preferences">
-                <div>
-                  <h3 className="text-sm font-semibold text-white">User Preferences & Compose Signature</h3>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    Customize your email signature, AI assistant features, and notifications.
-                  </p>
-                </div>
+              {/* Blocked Addresses Section */}
+              <div>
+                <h3 className="text-sm font-bold text-white mb-2">Blocked Email Addresses</h3>
+                <p className="text-slate-400 text-[11px] mb-3">Messages from these addresses will appear in Spam:</p>
 
-                <div className="space-y-4">
-                  {/* Email Signature */}
-                  <div className="p-4 bg-[#121418] border border-[#2A2E37] rounded-xl space-y-2">
-                    <label className="text-xs font-semibold text-white flex items-center gap-2">
-                      <span>Default Outbound Signature</span>
-                    </label>
-                    <textarea
-                      rows={3}
-                      value={preferences.signature}
-                      onChange={(e) => onUpdatePreferences({ ...preferences, signature: e.target.value })}
-                      placeholder="Best regards,&#10;Your Name&#10;Company"
-                      className="w-full bg-[#1A1D24] border border-[#2A2E37] text-white text-xs rounded-lg p-2.5 outline-none focus:border-[#2D5BFF] resize-none"
-                      data-testid="signature-textarea"
-                    />
-                  </div>
-
-                  {/* AI & Automation Settings */}
-                  <div className="p-4 bg-[#121418] border border-[#2A2E37] rounded-xl space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2.5">
-                        <Sparkles className="w-4 h-4 text-[#2D5BFF]" />
-                        <div>
-                          <p className="text-xs font-semibold text-white">AI Thread Summarization</p>
-                          <p className="text-[11px] text-slate-400">Generate one-click thread executive summaries</p>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() =>
-                          onUpdatePreferences({
-                            ...preferences,
-                            autoSummarizeWithAI: !preferences.autoSummarizeWithAI,
-                          })
-                        }
-                        className="text-slate-400 hover:text-white"
-                        data-testid="toggle-ai-btn"
-                      >
-                        {preferences.autoSummarizeWithAI ? (
-                          <ToggleRight className="w-6 h-6 text-[#2D5BFF]" />
-                        ) : (
-                          <ToggleLeft className="w-6 h-6 text-slate-500" />
-                        )}
+                <div 
+                  style={{ backgroundColor: 'var(--theme-bg-card, #12141A)', borderColor: 'var(--theme-border, #1E232B)' }}
+                  className="rounded-xl border divide-y divide-white/5"
+                >
+                  {blockedAddresses.map((addr) => (
+                    <div key={addr} className="p-3.5 flex items-center justify-between">
+                      <span className="font-mono text-slate-300">{addr}</span>
+                      <button onClick={() => handleUnblock(addr)} className="text-[#2D5BFF] hover:underline font-semibold">
+                        unblock
                       </button>
                     </div>
-
-                    <div className="flex items-center justify-between pt-2 border-t border-[#2A2E37]/60">
-                      <div className="flex items-center gap-2.5">
-                        <Volume2 className="w-4 h-4 text-emerald-400" />
-                        <div>
-                          <p className="text-xs font-semibold text-white">Sound Notifications</p>
-                          <p className="text-[11px] text-slate-400">Play audio chime upon arrival of incoming emails</p>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() =>
-                          onUpdatePreferences({
-                            ...preferences,
-                            soundNotifications: !preferences.soundNotifications,
-                          })
-                        }
-                        className="text-slate-400 hover:text-white"
-                        data-testid="toggle-sound-btn"
-                      >
-                        {preferences.soundNotifications ? (
-                          <ToggleRight className="w-6 h-6 text-emerald-400" />
-                        ) : (
-                          <ToggleLeft className="w-6 h-6 text-slate-500" />
-                        )}
-                      </button>
-                    </div>
-                  </div>
+                  ))}
                 </div>
               </div>
-            )}
+            </div>
+          )}
 
-            {/* 5. CUSTOM DOMAINS TAB */}
-            {activeTab === 'domains' && (
-              <div className="space-y-6" data-testid="panel-domains">
-                <div>
-                  <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-                    <Globe className="w-4 h-4 text-[#2D5BFF]" />
-                    <span>Custom Domains & DNS Verification Wizard</span>
-                  </h3>
-                  <p className="text-xs text-slate-400 mt-1">
-                    Connect your own domain to send and receive emails with authenticated MX, SPF, DKIM (RSA-2048), and DMARC alignment.
-                  </p>
-                </div>
-
-                {domainError && (
-                  <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-rose-400 text-xs flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4 shrink-0" />
-                    <span>{domainError}</span>
-                  </div>
-                )}
-
-                {/* Add Custom Domain Form */}
-                <form onSubmit={handleCreateDomain} className="p-4 bg-[#121418] border border-[#2A2E37] rounded-xl space-y-3">
-                  <label className="text-xs font-semibold text-white block">Add New Custom Domain</label>
+          {/* ========================================================= */}
+          {/* 6. FORWARDING AND POP/IMAP TAB */}
+          {/* ========================================================= */}
+          {activeTab === 'forwarding' && (
+            <div className="space-y-6 divide-y divide-white/5">
+              
+              {/* Forwarding */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-2">
+                <div className="font-semibold text-slate-300">Forwarding:</div>
+                <div className="md:col-span-3 space-y-3">
                   <div className="flex items-center gap-3">
-                    <div className="relative flex-1">
-                      <Globe className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
-                      <input
-                        type="text"
-                        placeholder="yourdomain.com (e.g. acme.com, mail.startup.io)"
-                        value={newDomainInput}
-                        onChange={(e) => setNewDomainInput(e.target.value)}
-                        className="w-full bg-[#1A1D24] border border-[#2A2E37] text-white text-xs rounded-lg pl-9 pr-3 py-2.5 outline-none focus:border-[#2D5BFF]"
-                        data-testid="input-new-domain"
-                      />
-                    </div>
-                    <button
-                      type="submit"
-                      disabled={creatingDomain || !newDomainInput.trim()}
-                      className="px-4 py-2.5 bg-[#2D5BFF] hover:bg-[#2048DB] disabled:opacity-50 text-white text-xs font-medium rounded-lg flex items-center gap-1.5 transition-colors shadow-sm shrink-0"
-                      data-testid="btn-add-domain"
-                    >
-                      {creatingDomain ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      ) : (
-                        <Plus className="w-3.5 h-3.5" />
-                      )}
-                      <span>Add Domain</span>
+                    <input
+                      type="email"
+                      placeholder="forward-to@example.com"
+                      value={forwardingAddress}
+                      onChange={(e) => setForwardingAddress(e.target.value)}
+                      style={{ backgroundColor: 'var(--theme-bg-card, #12141A)', borderColor: 'var(--theme-border, #1E232B)' }}
+                      className="p-2 rounded-lg border text-white outline-none flex-1 max-w-sm"
+                    />
+                    <button style={{ backgroundColor: 'var(--theme-accent, #2D5BFF)' }} className="px-4 py-2 rounded-lg text-white font-bold">
+                      Add forwarding address
                     </button>
                   </div>
-                </form>
-
-                {/* Registered Domains List */}
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
-                      Registered Domains ({domains.length})
-                    </h4>
-                    <button
-                      onClick={fetchDomains}
-                      disabled={loadingDomains}
-                      className="text-xs text-slate-400 hover:text-white flex items-center gap-1 transition-colors"
-                    >
-                      <RefreshCw className={`w-3.5 h-3.5 ${loadingDomains ? 'animate-spin' : ''}`} />
-                      <span>Refresh</span>
-                    </button>
-                  </div>
-
-                  {loadingDomains && domains.length === 0 ? (
-                    <div className="p-8 text-center text-slate-400 text-xs flex flex-col items-center gap-2">
-                      <Loader2 className="w-6 h-6 animate-spin text-[#2D5BFF]" />
-                      <span>Loading registered domains...</span>
-                    </div>
-                  ) : domains.length === 0 ? (
-                    <div className="p-6 bg-[#121418] border border-[#2A2E37] rounded-xl text-center text-slate-400 text-xs">
-                      No custom domains added yet. Enter your domain above to generate your DKIM keys and DNS records.
-                    </div>
-                  ) : (
-                    domains.map((domain) => {
-                      const isExpanded = expandedDomainId === domain.id;
-                      const isVerifying = verifyingDomainId === domain.id;
-
-                      const statusBadge =
-                        domain.verificationStatus === 'verified' ? (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
-                            <CheckCircle2 className="w-3 h-3" /> Verified
-                          </span>
-                        ) : domain.verificationStatus === 'partially_verified' ? (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/15 text-amber-400 border border-amber-500/30 flex items-center gap-1">
-                            <AlertCircle className="w-3 h-3" /> Partially Configured
-                          </span>
-                        ) : (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-500/15 text-rose-400 border border-rose-500/30 flex items-center gap-1">
-                            <AlertCircle className="w-3 h-3" /> Action Required
-                          </span>
-                        );
-
-                      return (
-                        <div
-                          key={domain.id}
-                          className="bg-[#121418] border border-[#2A2E37] rounded-xl overflow-hidden shadow-sm"
-                          data-testid={`domain-card-${domain.domainName}`}
-                        >
-                          {/* Domain Card Header */}
-                          <div className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[#16181D]">
-                            <div className="space-y-1">
-                              <div className="flex items-center gap-2.5">
-                                <span className="text-sm font-bold text-white tracking-wide">{domain.domainName}</span>
-                                {statusBadge}
-                              </div>
-                              <div className="flex items-center gap-3 text-[11px] text-slate-400">
-                                <span className="flex items-center gap-1">
-                                  MX: {domain.mxVerified ? <Check className="w-3 h-3 text-emerald-400" /> : <X className="w-3 h-3 text-rose-400" />}
-                                </span>
-                                <span className="flex items-center gap-1">
-                                  SPF: {domain.spfVerified ? <Check className="w-3 h-3 text-emerald-400" /> : <X className="w-3 h-3 text-rose-400" />}
-                                </span>
-                                <span className="flex items-center gap-1">
-                                  DKIM: {domain.dkimVerified ? <Check className="w-3 h-3 text-emerald-400" /> : <X className="w-3 h-3 text-rose-400" />}
-                                </span>
-                                <span className="flex items-center gap-1">
-                                  DMARC: {domain.dmarcVerified ? <Check className="w-3 h-3 text-emerald-400" /> : <X className="w-3 h-3 text-rose-400" />}
-                                </span>
-                              </div>
-                            </div>
-
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={() => handleVerifyDomain(domain.id)}
-                                disabled={isVerifying}
-                                className="px-3 py-1.5 bg-[#2D5BFF]/15 hover:bg-[#2D5BFF]/25 border border-[#2D5BFF]/30 text-[#2D5BFF] text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors disabled:opacity-50"
-                                data-testid={`btn-verify-${domain.domainName}`}
-                              >
-                                <RefreshCw className={`w-3.5 h-3.5 ${isVerifying ? 'animate-spin' : ''}`} />
-                                <span>{isVerifying ? 'Verifying DNS...' : 'Verify DNS Now'}</span>
-                              </button>
-
-                              <button
-                                onClick={() => setExpandedDomainId(isExpanded ? null : domain.id)}
-                                className="px-3 py-1.5 bg-[#1A1D24] hover:bg-[#252830] border border-[#2A2E37] text-slate-300 text-xs font-medium rounded-lg transition-colors"
-                              >
-                                {isExpanded ? 'Hide Records' : 'DNS Records'}
-                              </button>
-
-                              <button
-                                onClick={() => handleDeleteDomain(domain.id)}
-                                className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
-                                title="Delete Domain"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* Expanded DNS Configuration Wizard Table */}
-                          {isExpanded && (
-                            <div className="p-4 border-t border-[#2A2E37] space-y-3 bg-[#0E1013]">
-                              <p className="text-xs text-slate-300 font-medium">
-                                Add the following DNS records to your domain registrar (GoDaddy, Cloudflare, Namecheap, Route 53):
-                              </p>
-
-                              <div className="space-y-2.5">
-                                {(domain.dnsRecords || []).map((rec: any, idx: number) => {
-                                  const fieldKey = `${domain.id}-${rec.purpose}`;
-                                  const isCopied = copiedField === fieldKey;
-
-                                  return (
-                                    <div
-                                      key={idx}
-                                      className="p-3 bg-[#16181D] border border-[#2A2E37] rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs"
-                                    >
-                                      <div className="flex items-center gap-3 shrink-0">
-                                        <span className="px-2 py-1 bg-[#2D5BFF]/15 text-[#2D5BFF] font-bold text-[10px] rounded-md uppercase">
-                                          {rec.recordType}
-                                        </span>
-                                        <div>
-                                          <p className="font-semibold text-white">{rec.purpose}</p>
-                                          <p className="text-[11px] text-slate-400 font-mono">Host: {rec.host}</p>
-                                        </div>
-                                      </div>
-
-                                      <div className="flex-1 min-w-0 bg-[#0E1013] border border-[#2A2E37] rounded-lg p-2 flex items-center justify-between gap-2">
-                                        <span className="font-mono text-[11px] text-slate-300 truncate select-all">
-                                          {rec.value}
-                                        </span>
-                                        <button
-                                          onClick={() => handleCopyToClipboard(rec.value, fieldKey)}
-                                          className="p-1.5 rounded bg-[#1A1D24] hover:bg-[#2A2E37] text-slate-300 hover:text-white shrink-0 transition-colors flex items-center gap-1 text-[10px]"
-                                          title="Copy Record Value"
-                                        >
-                                          {isCopied ? (
-                                            <>
-                                              <Check className="w-3 h-3 text-emerald-400" />
-                                              <span className="text-emerald-400 font-medium">Copied</span>
-                                            </>
-                                          ) : (
-                                            <>
-                                              <Copy className="w-3 h-3" />
-                                              <span>Copy</span>
-                                            </>
-                                          )}
-                                        </button>
-                                      </div>
-
-                                      <div className="shrink-0 flex items-center gap-1.5">
-                                        {rec.status === 'verified' ? (
-                                          <span className="text-emerald-400 flex items-center gap-1 text-[11px] font-medium">
-                                            <CheckCircle2 className="w-3.5 h-3.5" /> OK
-                                          </span>
-                                        ) : (
-                                          <span className="text-amber-400/80 flex items-center gap-1 text-[11px] font-medium">
-                                            <AlertCircle className="w-3.5 h-3.5" /> Pending
-                                          </span>
-                                        )}
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })
-                  )}
+                  <p className="text-slate-400 text-[11px]">Tip: You can also forward only some of your mail by creating a filter.</p>
                 </div>
               </div>
-            )}
+
+              {/* POP Download */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4">
+                <div className="font-semibold text-slate-300">POP download:</div>
+                <div className="md:col-span-3 space-y-2">
+                  <label className="flex items-center gap-2.5 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="popStatus"
+                      checked={!popEnabled}
+                      onChange={() => setPopEnabled(false)}
+                      className="accent-[#2D5BFF]"
+                    />
+                    <span className="text-slate-200">Status: POP is disabled</span>
+                  </label>
+                  <label className="flex items-center gap-2.5 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="popStatus"
+                      checked={popEnabled}
+                      onChange={() => setPopEnabled(true)}
+                      className="accent-[#2D5BFF]"
+                    />
+                    <span className="text-slate-200">Enable POP for all mail</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* IMAP Access */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4">
+                <div className="font-semibold text-slate-300">IMAP access:</div>
+                <div className="md:col-span-3 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-emerald-400 font-bold">Status: IMAP is enabled</span>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="font-semibold text-slate-300">When I mark a message in IMAP as deleted:</div>
+                    <label className="flex items-center gap-2.5 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="imapExpunge"
+                        checked={imapExpunge === 'auto'}
+                        onChange={() => setImapExpunge('auto')}
+                        className="accent-[#2D5BFF]"
+                      />
+                      <span>Auto-Expunge on — Immediately update the server (default)</span>
+                    </label>
+                    <label className="flex items-center gap-2.5 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="imapExpunge"
+                        checked={imapExpunge === 'manual'}
+                        onChange={() => setImapExpunge('manual')}
+                        className="accent-[#2D5BFF]"
+                      />
+                      <span>Auto-Expunge off — Wait for client to update</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================= */}
+          {/* 7. THEMES TAB */}
+          {/* ========================================================= */}
+          {activeTab === 'themes' && (
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-sm font-bold text-white mb-1">Visual Themes Gallery</h3>
+                <p className="text-slate-400 text-[11px]">Select a color theme to transform your entire mail workspace in real time.</p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                {THEMES.map((th) => (
+                  <button
+                    key={th.id}
+                    onClick={() => {
+                      try {
+                        localStorage.setItem('eazzio_theme', th.id);
+                        fetch('/api/settings/preferences', {
+                          method: 'PUT',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ theme: th.id }),
+                        }).catch(() => {});
+                      } catch (_) {}
+                    }}
+                    style={{ backgroundColor: th.bg, borderColor: th.border }}
+                    className="p-4 rounded-2xl border text-left flex flex-col justify-between h-32 hover:scale-[1.02] transition-transform relative group shadow-xl"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="w-4 h-4 rounded-full" style={{ backgroundColor: th.accent }} />
+                    </div>
+                    <div>
+                      <div className="font-bold text-white text-sm">{th.name}</div>
+                      <div className="text-[10px] text-slate-400 font-mono">{th.bg}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Modal Footer */}
+        <div 
+          style={{ backgroundColor: 'var(--theme-bg-header, #0A0C10)', borderColor: 'var(--theme-border, #1E232B)' }}
+          className="h-16 px-6 border-t flex items-center justify-between shrink-0"
+        >
+          <div className="text-[11px] text-slate-500 font-mono">
+            0% of 5,120 GB used · Eazzio Mail v2.4.0 Enterprise
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 font-semibold transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSaveGeneral}
+              style={{ backgroundColor: 'var(--theme-accent, #2D5BFF)' }}
+              className="px-6 py-2 rounded-xl text-white font-bold shadow-lg hover:brightness-110 transition-all"
+            >
+              Save Changes
+            </button>
           </div>
         </div>
       </div>
     </div>
   );
 };
-
