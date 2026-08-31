@@ -935,9 +935,19 @@ messagesRouter.post('/compose', async (req: AuthenticatedRequest, res: Response,
     // 3. Resolve Sent folder
     const sentFolderId = await getFolderId(mailboxId, 'sent');
 
-    // 4. Enqueue into outbound service pipeline
+    // 4. Determine local domains for direct delivery
+    const localDomains = (process.env.LOCAL_DOMAINS || 'eazzio.com').split(',').map(d => d.trim().toLowerCase());
+    const isLocalRecipient = (addr: string) => {
+      const domain = addr.split('@')[1]?.toLowerCase();
+      return domain && localDomains.includes(domain);
+    };
+
+    const localRecipients = normalizedTo.filter(isLocalRecipient);
+    const externalRecipients = normalizedTo.filter(r => !isLocalRecipient(r));
+
+    // 4a. LOCAL DELIVERY — deliver directly into recipient's inbox (no SMTP relay)
     const domainName = senderAddress.split('@')[1] || 'eazzio.com';
-    const { messageId, queueIds } = await outboundService.enqueueOutbound({
+    const { rawMime: composedMime, messageId: composedMessageId } = OutboundService.composeAndSign({
       fromAddress: senderAddress,
       to: normalizedTo,
       cc: normalizedCc.length > 0 ? normalizedCc : undefined,
@@ -950,7 +960,111 @@ messagesRouter.post('/compose', async (req: AuthenticatedRequest, res: Response,
       folderId: sentFolderId,
     });
 
-    // 5. Persist recipient records for UI lookup
+    let messageId = composedMessageId;
+    let queueIds: string[] = [];
+
+    // Store sender's copy in Sent folder
+    const senderMsgId = crypto.randomUUID();
+    const senderRawKey = `mailboxes/${mailboxId}/messages/${senderMsgId}/raw.eml`;
+    await storage.put(senderRawKey, composedMime, 'message/rfc822');
+    if (messageRepo) {
+      const { Message: MsgCtor } = await import('@eazzio/domain');
+      const senderMsg = new MsgCtor({
+        id: senderMsgId,
+        mailboxId,
+        folderId: sentFolderId,
+        messageIdHeader: messageId,
+        fromAddress: senderAddress,
+        subject: subject || '(No Subject)',
+        snippet: (bodyText || bodyHtml || '').slice(0, 200).replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim(),
+        sizeBytes: composedMime.length,
+        rawObjectKey: senderRawKey,
+        isRead: true,
+        isStarred: false,
+        isImportant: false,
+        direction: 'outbound' as any,
+        deliveryState: localRecipients.length > 0 ? 'delivered' : 'queued',
+        receivedAt: new Date(),
+      });
+      await messageRepo.save(senderMsg);
+    }
+
+    // Deliver to each local recipient's inbox
+    for (const localAddr of localRecipients) {
+      try {
+        // Find or create recipient user & mailbox
+        const recipientUserRows = (await defaultDb.query(
+          `SELECT id FROM users WHERE LOWER(email) = $1 LIMIT 1`,
+          [localAddr.toLowerCase()]
+        )) as any[];
+
+        let recipientUserId: string;
+        if (recipientUserRows.length > 0) {
+          recipientUserId = recipientUserRows[0].id;
+        } else {
+          // Auto-create user for local address
+          recipientUserId = crypto.randomUUID();
+          await defaultDb.query(
+            `INSERT INTO users (id, email, password_hash, display_name) VALUES ($1, $2, 'pending_registration', $3) ON CONFLICT (email) DO NOTHING`,
+            [recipientUserId, localAddr, localAddr.split('@')[0]]
+          );
+        }
+
+        const recipientMailbox = await getOrCreateUserMailbox(recipientUserId, localAddr);
+        const recipientInboxId = await getFolderId(recipientMailbox.mailboxId, 'inbox');
+
+        // Store message in recipient's inbox
+        const inboxMsgId = crypto.randomUUID();
+        const recipientRawKey = `mailboxes/${recipientMailbox.mailboxId}/messages/${inboxMsgId}/raw.eml`;
+        await storage.put(recipientRawKey, composedMime, 'message/rfc822');
+
+        await defaultDb.query(
+          `INSERT INTO messages (id, mailbox_id, folder_id, message_id_header, from_address, subject, snippet, size_bytes, raw_object_key, is_read, is_starred, is_important, direction, delivery_state, received_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, false, false, false, 'inbound', 'delivered', NOW())`,
+          [
+            inboxMsgId,
+            recipientMailbox.mailboxId,
+            recipientInboxId,
+            messageId,
+            senderAddress,
+            subject || '(No Subject)',
+            (bodyText || bodyHtml || '').slice(0, 200).replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim(),
+            composedMime.length,
+            recipientRawKey,
+          ]
+        );
+
+        // Add recipient record
+        await defaultDb.query(
+          `INSERT INTO message_recipients (id, message_id, kind, address) VALUES (gen_random_uuid(), $1, 'to', $2)`,
+          [inboxMsgId, localAddr]
+        );
+
+        console.log(`[Eazzio Mail] ✅ Local delivery: ${senderAddress} → ${localAddr} (inbox: ${recipientMailbox.mailboxId})`);
+      } catch (localErr) {
+        console.error(`[Eazzio Mail] ❌ Local delivery failed for ${localAddr}:`, localErr);
+      }
+    }
+
+    // 4b. EXTERNAL DELIVERY — enqueue for SMTP relay (Brevo)
+    if (externalRecipients.length > 0) {
+      const result = await outboundService.enqueueOutbound({
+        fromAddress: senderAddress,
+        to: externalRecipients,
+        cc: normalizedCc.length > 0 ? normalizedCc : undefined,
+        bcc: normalizedBcc.length > 0 ? normalizedBcc : undefined,
+        subject: subject || '(No Subject)',
+        bodyText: bodyText || '',
+        bodyHtml: bodyHtml || `<p>${(bodyText || '').replace(/\n/g, '<br>')}</p>`,
+        domainName,
+        mailboxId,
+        folderId: sentFolderId,
+      });
+      messageId = result.messageId;
+      queueIds = result.queueIds;
+    }
+
+    // 5. Persist recipient records for external queue entries
     for (const qId of queueIds) {
       const qRows = (await defaultDb.query(`SELECT message_id, recipient_address FROM outbound_queue WHERE id = $1`, [qId])) as any[];
       if (qRows.length > 0) {
@@ -963,20 +1077,11 @@ messagesRouter.post('/compose', async (req: AuthenticatedRequest, res: Response,
 
     // 5b. Persist message attachments if present
     const rawAttachments = req.body.attachments;
-    let actualMsgUuid: string | undefined;
+    let actualMsgUuid: string | undefined = senderMsgId;
     if (queueIds.length > 0) {
       const qCheck = (await defaultDb.query(`SELECT message_id FROM outbound_queue WHERE id = $1`, [queueIds[0]])) as any[];
       if (qCheck.length > 0) {
         actualMsgUuid = qCheck[0].message_id;
-      }
-    }
-    if (!actualMsgUuid) {
-      const mCheck = (await defaultDb.query(`SELECT id FROM messages WHERE message_id_header = $1 OR id::text = $2 LIMIT 1`, [
-        messageId,
-        messageId.replace(/[<>]/g, '').split('@')[0],
-      ])) as any[];
-      if (mCheck.length > 0) {
-        actualMsgUuid = mCheck[0].id;
       }
     }
 
@@ -1036,8 +1141,8 @@ messagesRouter.post('/compose', async (req: AuthenticatedRequest, res: Response,
           [scheduledDate, queueIds]
         );
       }
-    } else {
-      // Trigger Queue Runner immediately for standard delivery
+    } else if (externalRecipients.length > 0) {
+      // Trigger Queue Runner immediately for external delivery only
       setImmediate(() => {
         getQueueRunner()
           .processNextBatch(10)
