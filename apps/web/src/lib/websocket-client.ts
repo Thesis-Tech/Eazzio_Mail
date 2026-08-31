@@ -49,12 +49,14 @@ export class RealtimeClient {
     if (process.env.NEXT_PUBLIC_WS_URL) {
       urls.push(process.env.NEXT_PUBLIC_WS_URL);
     }
-    // Main API server WebSocket endpoint
-    urls.push(`${protocol}//${hostname}:8080/ws`);
-    // Standalone notification service endpoint
-    urls.push(`${protocol}//${hostname}:8081`);
-    // Current host /ws (for reverse proxies)
+    // 1. Current host /ws (standard reverse-proxied endpoint on port 80 / 443)
     urls.push(`${protocol}//${window.location.host}/ws`);
+
+    // 2. Direct local development ports fallback (if not behind reverse proxy)
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      urls.push(`${protocol}//${hostname}:8080/ws`);
+      urls.push(`${protocol}//${hostname}:8081`);
+    }
 
     return Array.from(new Set(urls));
   }
