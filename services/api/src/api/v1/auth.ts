@@ -453,7 +453,7 @@ authRouter.post('/forgot-password', async (req: Request, res: Response, next: Ne
           const updatesRes = await fetch(`https://api.telegram.org/bot${telegramBotToken}/getUpdates`, {
             signal: AbortSignal.timeout(5000),
           });
-          const updatesData = await updatesRes.json();
+          const updatesData = await updatesRes.json() as any;
           if (updatesData.ok && Array.isArray(updatesData.result) && updatesData.result.length > 0) {
             const cleanInput = deliveryTarget.replace(/^[@+]/g, '').replace(/[^0-9a-zA-Z]/g, '').toLowerCase();
             const found = updatesData.result.slice().reverse().find((u: any) => {
