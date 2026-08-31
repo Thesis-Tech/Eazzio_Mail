@@ -52,7 +52,8 @@ const initialPreferences: UserPreferences = {
   autoSummarizeWithAI: true,
   soundNotifications: true,
   theme: 'dark',
-};
+// Stable folder slug resolver
+const getFolderSlug = (folderId: string) => folderId.replace('fld-', '');
 
 export function MailDashboardPage({ 
   initialFolder = 'fld-inbox',
