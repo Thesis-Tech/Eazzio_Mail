@@ -48,6 +48,108 @@ const defaultLabels: LabelItem[] = [
   { id: 'lbl-urgent', name: 'Urgent', color: '#EF4444' },
 ];
 
+export interface ThemeConfig {
+  id: string;
+  name: string;
+  bgMain: string;
+  bgSidebar: string;
+  bgHeader: string;
+  bgCard: string;
+  bgHover: string;
+  border: string;
+  accent: string;
+  accentHover: string;
+  accentBg: string;
+  accentGlow: string;
+}
+
+export const THEME_CONFIGS: Record<string, ThemeConfig> = {
+  'dark-oled': {
+    id: 'dark-oled',
+    name: 'Default Dark',
+    bgMain: '#0A0C10',
+    bgSidebar: '#090A0D',
+    bgHeader: '#0A0C10',
+    bgCard: '#12141A',
+    bgHover: '#15181F',
+    border: '#1E232B',
+    accent: '#2D5BFF',
+    accentHover: '#1E48E0',
+    accentBg: 'rgba(45, 91, 255, 0.12)',
+    accentGlow: 'rgba(45, 91, 255, 0.3)',
+  },
+  'emerald': {
+    id: 'emerald',
+    name: 'Cyber Emerald',
+    bgMain: '#030E0B',
+    bgSidebar: '#020806',
+    bgHeader: '#030E0B',
+    bgCard: '#071F17',
+    bgHover: '#0C2B21',
+    border: '#103F31',
+    accent: '#10B981',
+    accentHover: '#059669',
+    accentBg: 'rgba(16, 185, 129, 0.15)',
+    accentGlow: 'rgba(16, 185, 129, 0.35)',
+  },
+  'midnight': {
+    id: 'midnight',
+    name: 'Midnight Blue',
+    bgMain: '#070D18',
+    bgSidebar: '#040810',
+    bgHeader: '#070D18',
+    bgCard: '#0E1B33',
+    bgHover: '#142747',
+    border: '#1E3B68',
+    accent: '#38BDF8',
+    accentHover: '#0284C7',
+    accentBg: 'rgba(56, 189, 248, 0.15)',
+    accentGlow: 'rgba(56, 189, 248, 0.35)',
+  },
+  'purple': {
+    id: 'purple',
+    name: 'Deep Amethyst',
+    bgMain: '#0D0716',
+    bgSidebar: '#08040E',
+    bgHeader: '#0D0716',
+    bgCard: '#1A0E2E',
+    bgHover: '#251540',
+    border: '#3D1C63',
+    accent: '#A855F7',
+    accentHover: '#9333EA',
+    accentBg: 'rgba(168, 85, 247, 0.15)',
+    accentGlow: 'rgba(168, 85, 247, 0.35)',
+  },
+  'graphite': {
+    id: 'graphite',
+    name: 'Graphite Slate',
+    bgMain: '#111113',
+    bgSidebar: '#0B0B0D',
+    bgHeader: '#111113',
+    bgCard: '#1C1C21',
+    bgHover: '#24242B',
+    border: '#2E2E38',
+    accent: '#14B8A6',
+    accentHover: '#0D9488',
+    accentBg: 'rgba(20, 184, 166, 0.15)',
+    accentGlow: 'rgba(20, 184, 166, 0.35)',
+  },
+  'sunset': {
+    id: 'sunset',
+    name: 'Crimson Dusk',
+    bgMain: '#120609',
+    bgSidebar: '#0B0305',
+    bgHeader: '#120609',
+    bgCard: '#240B13',
+    bgHover: '#33101C',
+    border: '#4D1627',
+    accent: '#F43F5E',
+    accentHover: '#E11D48',
+    accentBg: 'rgba(244, 63, 94, 0.15)',
+    accentGlow: 'rgba(244, 63, 94, 0.35)',
+  },
+};
+
 export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   children,
   activeFolderId = 'fld-inbox',
@@ -77,6 +179,22 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   const [readingPane, setReadingPane] = useState<'none' | 'right' | 'below'>('right');
   const [conversationView, setConversationView] = useState(true);
 
+  // Active theme configuration
+  const currentTheme = THEME_CONFIGS[theme] || THEME_CONFIGS['dark-oled']!;
+
+  // Handle Theme Change with instant persistence
+  const handleThemeChange = (newTheme: string) => {
+    setTheme(newTheme);
+    try {
+      localStorage.setItem('eazzio_theme', newTheme);
+      fetch('/api/settings/preferences', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ theme: newTheme, density, inboxType, readingPane, conversationView }),
+      }).catch(() => {});
+    } catch (_) {}
+  };
+
   const primaryFolders = customFolders.filter(f => ['inbox', 'starred', 'snoozed', 'sent', 'drafts'].includes(f.slug.toLowerCase()));
   const secondaryFolders = customFolders.filter(f => !['inbox', 'starred', 'snoozed', 'sent', 'drafts'].includes(f.slug.toLowerCase()));
   const isSecondaryActive = secondaryFolders.some(f => f.id === activeFolderId || f.slug.toLowerCase() === activeFolderId.replace('fld-', '').toLowerCase());
@@ -95,6 +213,24 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
     setCurrentUser(user);
     if (token) realtimeClient.setToken(token);
     realtimeClient.connect();
+
+    // Restore saved theme from local storage or backend
+    try {
+      const savedTheme = localStorage.getItem('eazzio_theme');
+      if (savedTheme && THEME_CONFIGS[savedTheme]) {
+        setTheme(savedTheme);
+      } else {
+        fetch('/api/settings/preferences')
+          .then((res) => res.json())
+          .then((json) => {
+            if (json.data?.theme && THEME_CONFIGS[json.data.theme]) {
+              setTheme(json.data.theme);
+              localStorage.setItem('eazzio_theme', json.data.theme);
+            }
+          })
+          .catch(() => {});
+      }
+    } catch (_) {}
 
     const unsubscribeAuth = AuthStore.subscribe((state) => {
       setCurrentUser(state.user);
@@ -149,22 +285,39 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   };
 
   const renderSidebarContent = () => (
-    <div className="flex flex-col h-full bg-[#090A0D] border-r border-[#1E232B] text-slate-300 transition-all duration-300 ease-in-out w-64 overflow-hidden">
+    <div 
+      style={{ backgroundColor: currentTheme.bgSidebar, borderColor: currentTheme.border }}
+      className="flex flex-col h-full border-r text-slate-300 transition-all duration-300 ease-in-out w-64 overflow-hidden"
+    >
       {/* Brand */}
-      <div className="h-16 px-5 flex items-center gap-3 border-b border-[#1E232B] shrink-0 group cursor-pointer hover:bg-[#121419] transition-colors">
-        <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#2D5BFF] to-[#14B8A6] flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-[#2D5BFF]/20 group-hover:scale-105 transition-transform">E</div>
+      <div 
+        style={{ borderColor: currentTheme.border }}
+        className="h-16 px-5 flex items-center gap-3 border-b shrink-0 group cursor-pointer hover:bg-white/5 transition-colors"
+      >
+        <div 
+          style={{ background: `linear-gradient(135deg, ${currentTheme.accent}, #14B8A6)` }}
+          className="w-8 h-8 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-lg group-hover:scale-105 transition-transform"
+        >
+          E
+        </div>
         <div className="flex flex-col">
           <span className="font-bold text-white text-base tracking-tight leading-none">Eazzio</span>
-          <span className="text-[10px] uppercase font-bold tracking-widest text-[#14B8A6]">Mail</span>
+          <span style={{ color: currentTheme.accent }} className="text-[10px] uppercase font-bold tracking-widest">Mail</span>
         </div>
       </div>
 
       {/* Compose */}
       <div className="p-4">
         <button onClick={() => { setIsMobileDrawerOpen(false); onOpenCompose?.(); }} className="w-full relative group">
-          <div className="absolute -inset-0.5 bg-gradient-to-r from-[#2D5BFF] to-[#14B8A6] rounded-2xl blur opacity-30 group-hover:opacity-70 transition duration-300"></div>
-          <div className="relative flex items-center gap-3 bg-[#111318] hover:bg-[#15181F] text-white py-3 px-5 rounded-xl border border-white/10 transition-colors shadow-xl">
-            <Edit3 className="w-5 h-5 text-[#14B8A6]" />
+          <div 
+            style={{ background: `linear-gradient(135deg, ${currentTheme.accent}, #14B8A6)` }}
+            className="absolute -inset-0.5 rounded-2xl blur opacity-30 group-hover:opacity-70 transition duration-300"
+          ></div>
+          <div 
+            style={{ backgroundColor: currentTheme.bgCard, borderColor: currentTheme.border }}
+            className="relative flex items-center gap-3 hover:brightness-110 text-white py-3 px-5 rounded-xl border transition-colors shadow-xl"
+          >
+            <Edit3 style={{ color: currentTheme.accent }} className="w-5 h-5" />
             <span className="font-semibold text-sm">Compose</span>
           </div>
         </button>
@@ -175,13 +328,25 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         {primaryFolders.map(folder => {
           const isActive = activeFolderId === folder.id;
           return (
-            <button key={folder.id} onClick={() => handleFolderSelect(folder.id)} className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 group ${isActive ? 'bg-[#2D5BFF]/10 text-[#2D5BFF]' : 'hover:bg-[#15181F] hover:text-white'}`}>
+            <button 
+              key={folder.id} 
+              onClick={() => handleFolderSelect(folder.id)} 
+              style={isActive ? { backgroundColor: currentTheme.accentBg, color: currentTheme.accent } : undefined}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 group ${isActive ? 'font-semibold' : 'hover:bg-white/5 hover:text-white'}`}
+            >
               <div className="flex items-center gap-3">
-                <span className={`${isActive ? 'text-[#2D5BFF]' : 'text-slate-500 group-hover:text-slate-300'}`}>{getFolderIcon(folder.slug)}</span>
+                <span style={isActive ? { color: currentTheme.accent } : undefined} className={isActive ? '' : 'text-slate-500 group-hover:text-slate-300'}>
+                  {getFolderIcon(folder.slug)}
+                </span>
                 <span>{folder.name}</span>
               </div>
               {folder.unreadCount > 0 && (
-                <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${isActive ? 'bg-[#2D5BFF] text-white' : 'bg-[#1E232B] text-slate-300 group-hover:bg-[#2A313C]'}`}>{folder.unreadCount}</span>
+                <span 
+                  style={isActive ? { backgroundColor: currentTheme.accent, color: '#fff' } : { borderColor: currentTheme.border }}
+                  className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${isActive ? '' : 'bg-white/10 text-slate-300 group-hover:bg-white/20'}`}
+                >
+                  {folder.unreadCount}
+                </span>
               )}
             </button>
           );
@@ -198,8 +363,15 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                 {secondaryFolders.map(folder => {
                   const isActive = activeFolderId === folder.id;
                   return (
-                    <button key={folder.id} onClick={() => handleFolderSelect(folder.id)} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 group ${isActive ? 'bg-[#2D5BFF]/10 text-[#2D5BFF]' : 'hover:bg-[#15181F] hover:text-white'}`}>
-                      <span className={`${isActive ? 'text-[#2D5BFF]' : 'text-slate-500 group-hover:text-slate-300'}`}>{getFolderIcon(folder.slug)}</span>
+                    <button 
+                      key={folder.id} 
+                      onClick={() => handleFolderSelect(folder.id)} 
+                      style={isActive ? { backgroundColor: currentTheme.accentBg, color: currentTheme.accent } : undefined}
+                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 group ${isActive ? 'font-semibold' : 'hover:bg-white/5 hover:text-white'}`}
+                    >
+                      <span style={isActive ? { color: currentTheme.accent } : undefined} className={isActive ? '' : 'text-slate-500 group-hover:text-slate-300'}>
+                        {getFolderIcon(folder.slug)}
+                      </span>
                       <span>{folder.name}</span>
                     </button>
                   );
@@ -218,7 +390,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
             {customLabels.map(label => {
               const isActive = activeLabelId === label.id;
               return (
-                <button key={label.id} onClick={() => handleLabelSelect(label.id)} className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 group ${isActive ? 'bg-white/5 text-white' : 'hover:bg-[#15181F] hover:text-white'}`}>
+                <button key={label.id} onClick={() => handleLabelSelect(label.id)} className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 group ${isActive ? 'bg-white/10 text-white' : 'hover:bg-white/5 hover:text-white'}`}>
                   <div className="flex items-center gap-3">
                     <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: label.color }}></span>
                     <span>{label.name}</span>
@@ -231,20 +403,26 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
       </div>
 
       {/* Storage Gauge */}
-      <div className="p-4 border-t border-[#1E232B] bg-[#0C0E12]">
+      <div style={{ borderColor: currentTheme.border, backgroundColor: currentTheme.bgSidebar }} className="p-4 border-t">
         <div className="flex items-center justify-between text-xs font-semibold mb-2">
           <span className="text-slate-400">Storage</span>
           <span className="text-white">4.2 GB / 15 GB</span>
         </div>
-        <div className="h-1.5 w-full bg-[#1E232B] rounded-full overflow-hidden">
-          <div className="h-full bg-gradient-to-r from-[#2D5BFF] to-[#14B8A6] rounded-full" style={{ width: '28%' }}></div>
+        <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
+          <div 
+            style={{ width: '28%', background: `linear-gradient(90deg, ${currentTheme.accent}, #14B8A6)` }}
+            className="h-full rounded-full" 
+          ></div>
         </div>
       </div>
     </div>
   );
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-[#0A0C10] text-[#EDEEF0] relative font-sans selection:bg-[#2D5BFF]/30">
+    <div 
+      style={{ backgroundColor: currentTheme.bgMain }}
+      className="flex h-screen w-screen overflow-hidden text-[#EDEEF0] relative font-sans transition-colors duration-300"
+    >
       
       {/* Desktop Left Sidebar */}
       <div className="hidden md:flex h-full z-10 shadow-2xl">
@@ -255,7 +433,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
       {isMobileDrawerOpen && (
         <div className="fixed inset-0 z-50 md:hidden flex animate-in fade-in duration-200">
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setIsMobileDrawerOpen(false)} />
-          <div className="relative w-64 h-full bg-[#090A0D] shadow-2xl z-10 flex flex-col animate-in slide-in-from-left duration-300">
+          <div className="relative w-64 h-full shadow-2xl z-10 flex flex-col animate-in slide-in-from-left duration-300">
             {renderSidebarContent()}
           </div>
         </div>
@@ -265,16 +443,19 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
         
         {/* Header */}
-        <header className="h-16 px-4 md:px-6 bg-[#0A0C10]/90 backdrop-blur-md border-b border-[#1E232B] flex items-center justify-between gap-4 z-20">
+        <header 
+          style={{ backgroundColor: currentTheme.bgHeader, borderColor: currentTheme.border }}
+          className="h-16 px-4 md:px-6 backdrop-blur-md border-b flex items-center justify-between gap-4 z-20 transition-colors duration-300"
+        >
           <div className="flex items-center gap-3 md:gap-4 flex-1">
-            <button onClick={() => setIsMobileDrawerOpen(true)} className="md:hidden p-2 -ml-2 rounded-lg text-slate-400 hover:text-white hover:bg-[#1E232B]">
+            <button onClick={() => setIsMobileDrawerOpen(true)} className="md:hidden p-2 -ml-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/10">
               <Menu className="w-5 h-5" />
             </button>
             
             {/* Search Bar & Advanced Filter Popover */}
             <div className="max-w-2xl w-full flex-1 relative group">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Search className="w-4 h-4 text-slate-500 group-focus-within:text-[#2D5BFF] transition-colors" />
+                <Search style={{ color: currentTheme.accent }} className="w-4 h-4 opacity-70 group-focus-within:opacity-100 transition-opacity" />
               </div>
               <input 
                 id="global-search"
@@ -282,22 +463,24 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                 value={searchQuery}
                 onChange={(e) => { setSearchQuery(e.target.value); onSearch?.(e.target.value); }}
                 placeholder="Search mail, people, or settings..." 
-                className="w-full bg-[#12141A] border border-[#1E232B] text-sm text-white rounded-xl pl-10 pr-20 py-2.5 outline-none focus:border-[#2D5BFF]/50 focus:bg-[#151821] focus:ring-4 focus:ring-[#2D5BFF]/10 transition-all placeholder:text-slate-500 shadow-inner"
+                style={{ backgroundColor: currentTheme.bgCard, borderColor: currentTheme.border }}
+                className="w-full border text-sm text-white rounded-xl pl-10 pr-20 py-2.5 outline-none focus:ring-2 focus:ring-white/20 transition-all placeholder:text-slate-500 shadow-inner"
               />
               <div className="absolute inset-y-0 right-0 pr-2.5 flex items-center gap-1.5">
                 <button
                   type="button"
                   onClick={() => setIsAdvancedSearchOpen(!isAdvancedSearchOpen)}
+                  style={isAdvancedSearchOpen ? { backgroundColor: currentTheme.accentBg, color: currentTheme.accent } : undefined}
                   className={`p-1 rounded-lg transition-colors ${
                     isAdvancedSearchOpen
-                      ? 'text-[#2D5BFF] bg-[#2D5BFF]/20'
-                      : 'text-slate-400 hover:text-white hover:bg-[#1E232B]'
+                      ? ''
+                      : 'text-slate-400 hover:text-white hover:bg-white/10'
                   }`}
                   title="Show search options"
                 >
                   <SlidersHorizontal className="w-4 h-4" />
                 </button>
-                <div className="hidden sm:flex items-center gap-0.5 text-[10px] font-bold text-slate-500 bg-[#1E232B] px-1.5 py-0.5 rounded border border-slate-700/50 shadow-sm pointer-events-none">
+                <div className="hidden sm:flex items-center gap-0.5 text-[10px] font-bold text-slate-500 bg-white/5 px-1.5 py-0.5 rounded border border-white/10 shadow-sm pointer-events-none">
                   <Command className="w-3 h-3" />
                   <span>K</span>
                 </div>
@@ -442,7 +625,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         density={density}
         onChangeDensity={setDensity}
         theme={theme}
-        onChangeTheme={setTheme}
+        onChangeTheme={handleThemeChange}
         inboxType={inboxType}
         onChangeInboxType={setInboxType}
         readingPane={readingPane}
