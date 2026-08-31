@@ -26,31 +26,71 @@ async function resolveMailbox(userId: string, email?: string): Promise<{ id: str
   return rows[0];
 }
 
-// Ensure user_preferences table exists gracefully
+// Ensure user_preferences table and comprehensive columns exist gracefully
 let isPrefsTableEnsured = false;
 async function ensurePrefsTable() {
   if (isPrefsTableEnsured) return;
   await defaultDb.query(`
     CREATE TABLE IF NOT EXISTS user_preferences (
-      user_id               UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-      density               TEXT NOT NULL DEFAULT 'default',
-      theme                 TEXT NOT NULL DEFAULT 'dark-oled',
-      inbox_type            TEXT NOT NULL DEFAULT 'default',
-      reading_pane          TEXT NOT NULL DEFAULT 'right',
-      conversation_view     BOOLEAN NOT NULL DEFAULT true,
-      signature_text        TEXT NOT NULL DEFAULT '',
-      signature_enabled     BOOLEAN NOT NULL DEFAULT false,
-      auto_reply_enabled    BOOLEAN NOT NULL DEFAULT false,
-      auto_reply_subject    TEXT NOT NULL DEFAULT '',
-      auto_reply_body       TEXT NOT NULL DEFAULT '',
-      auto_reply_start_date TIMESTAMPTZ,
-      auto_reply_end_date   TIMESTAMPTZ,
-      notifications_enabled BOOLEAN NOT NULL DEFAULT true,
-      sound_enabled         BOOLEAN NOT NULL DEFAULT true,
-      spam_threshold        NUMERIC(3,2) NOT NULL DEFAULT 0.85,
-      created_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
-      updated_at            TIMESTAMPTZ NOT NULL DEFAULT now()
-    )
+      user_id                UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      density                TEXT NOT NULL DEFAULT 'default',
+      theme                  TEXT NOT NULL DEFAULT 'dark-oled',
+      language               TEXT NOT NULL DEFAULT 'en_US',
+      page_size              INTEGER NOT NULL DEFAULT 50,
+      undo_send_time         INTEGER NOT NULL DEFAULT 10,
+      default_reply_behavior TEXT NOT NULL DEFAULT 'reply',
+      hover_actions          BOOLEAN NOT NULL DEFAULT true,
+      send_and_archive       BOOLEAN NOT NULL DEFAULT false,
+      inbox_type             TEXT NOT NULL DEFAULT 'default',
+      reading_pane           TEXT NOT NULL DEFAULT 'right',
+      conversation_view      BOOLEAN NOT NULL DEFAULT true,
+      desktop_notifications  TEXT NOT NULL DEFAULT 'all',
+      star_preset            TEXT NOT NULL DEFAULT '1star',
+      signature_text         TEXT NOT NULL DEFAULT '',
+      signature_enabled      BOOLEAN NOT NULL DEFAULT false,
+      signature_for_new      TEXT NOT NULL DEFAULT 'default',
+      signature_for_reply    TEXT NOT NULL DEFAULT 'default',
+      auto_reply_enabled     BOOLEAN NOT NULL DEFAULT false,
+      auto_reply_subject     TEXT NOT NULL DEFAULT '',
+      auto_reply_body        TEXT NOT NULL DEFAULT '',
+      auto_reply_start_date  TIMESTAMPTZ,
+      auto_reply_end_date    TIMESTAMPTZ,
+      vacation_contacts_only BOOLEAN NOT NULL DEFAULT false,
+      categories             JSONB NOT NULL DEFAULT '{"primary":true,"promotions":true,"social":true,"updates":true,"forums":false}',
+      importance_markers     BOOLEAN NOT NULL DEFAULT true,
+      forwarding_address     TEXT NOT NULL DEFAULT '',
+      pop_enabled            BOOLEAN NOT NULL DEFAULT false,
+      imap_enabled           BOOLEAN NOT NULL DEFAULT true,
+      imap_expunge           TEXT NOT NULL DEFAULT 'auto',
+      imap_folder_limit      INTEGER NOT NULL DEFAULT 1000,
+      blocked_addresses      JSONB NOT NULL DEFAULT '[]',
+      notifications_enabled  BOOLEAN NOT NULL DEFAULT true,
+      sound_enabled          BOOLEAN NOT NULL DEFAULT true,
+      spam_threshold         NUMERIC(3,2) NOT NULL DEFAULT 0.85,
+      created_at             TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at             TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+
+    -- Ensure individual columns exist if table was previously created with older schema
+    ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS language TEXT NOT NULL DEFAULT 'en_US';
+    ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS page_size INTEGER NOT NULL DEFAULT 50;
+    ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS undo_send_time INTEGER NOT NULL DEFAULT 10;
+    ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS default_reply_behavior TEXT NOT NULL DEFAULT 'reply';
+    ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS hover_actions BOOLEAN NOT NULL DEFAULT true;
+    ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS send_and_archive BOOLEAN NOT NULL DEFAULT false;
+    ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS desktop_notifications TEXT NOT NULL DEFAULT 'all';
+    ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS star_preset TEXT NOT NULL DEFAULT '1star';
+    ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS signature_for_new TEXT NOT NULL DEFAULT 'default';
+    ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS signature_for_reply TEXT NOT NULL DEFAULT 'default';
+    ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS vacation_contacts_only BOOLEAN NOT NULL DEFAULT false;
+    ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS categories JSONB NOT NULL DEFAULT '{"primary":true,"promotions":true,"social":true,"updates":true,"forums":false}';
+    ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS importance_markers BOOLEAN NOT NULL DEFAULT true;
+    ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS forwarding_address TEXT NOT NULL DEFAULT '';
+    ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS pop_enabled BOOLEAN NOT NULL DEFAULT false;
+    ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS imap_enabled BOOLEAN NOT NULL DEFAULT true;
+    ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS imap_expunge TEXT NOT NULL DEFAULT 'auto';
+    ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS imap_folder_limit INTEGER NOT NULL DEFAULT 1000;
+    ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS blocked_addresses JSONB NOT NULL DEFAULT '[]';
   `);
   isPrefsTableEnsured = true;
 }
@@ -75,20 +115,45 @@ settingsRouter.get('/preferences', async (req: AuthenticatedRequest, res: Respon
       const defaultPrefs = {
         density: 'default',
         theme: 'dark-oled',
+        language: 'en_US',
+        pageSize: 50,
+        undoSendTime: 10,
+        defaultReplyBehavior: 'reply',
+        hoverActions: true,
+        sendAndArchive: false,
         inboxType: 'default',
         readingPane: 'right',
         conversationView: true,
+        desktopNotifications: 'all',
+        starPreset: '1star',
         signature: {
           text: '',
           enabled: false,
+          forNew: 'default',
+          forReply: 'default',
         },
         autoReply: {
           enabled: false,
-          subject: '',
+          subject: 'Out of Office',
           body: '',
           startDate: null,
           endDate: null,
+          contactsOnly: false,
         },
+        categories: {
+          primary: true,
+          promotions: true,
+          social: true,
+          updates: true,
+          forums: false,
+        },
+        importanceMarkers: true,
+        forwardingAddress: '',
+        popEnabled: false,
+        imapEnabled: true,
+        imapExpunge: 'auto',
+        imapFolderLimit: 1000,
+        blockedAddresses: [],
         notifications: {
           enabled: true,
           sound: true,
@@ -106,12 +171,22 @@ settingsRouter.get('/preferences', async (req: AuthenticatedRequest, res: Respon
       data: {
         density: row.density || 'default',
         theme: row.theme || 'dark-oled',
+        language: row.language || 'en_US',
+        pageSize: Number(row.page_size || 50),
+        undoSendTime: Number(row.undo_send_time || 10),
+        defaultReplyBehavior: row.default_reply_behavior || 'reply',
+        hoverActions: row.hover_actions ?? true,
+        sendAndArchive: row.send_and_archive ?? false,
         inboxType: row.inbox_type || 'default',
         readingPane: row.reading_pane || 'right',
         conversationView: row.conversation_view ?? true,
+        desktopNotifications: row.desktop_notifications || 'all',
+        starPreset: row.star_preset || '1star',
         signature: {
           text: row.signature_text || '',
           enabled: Boolean(row.signature_enabled),
+          forNew: row.signature_for_new || 'default',
+          forReply: row.signature_for_reply || 'default',
         },
         autoReply: {
           enabled: Boolean(row.auto_reply_enabled),
@@ -119,7 +194,16 @@ settingsRouter.get('/preferences', async (req: AuthenticatedRequest, res: Respon
           body: row.auto_reply_body || '',
           startDate: row.auto_reply_start_date,
           endDate: row.auto_reply_end_date,
+          contactsOnly: Boolean(row.vacation_contacts_only),
         },
+        categories: typeof row.categories === 'object' ? row.categories : { primary: true, promotions: true, social: true, updates: true, forums: false },
+        importanceMarkers: row.importance_markers ?? true,
+        forwardingAddress: row.forwarding_address || '',
+        popEnabled: Boolean(row.pop_enabled),
+        imapEnabled: row.imap_enabled ?? true,
+        imapExpunge: row.imap_expunge || 'auto',
+        imapFolderLimit: Number(row.imap_folder_limit || 1000),
+        blockedAddresses: Array.isArray(row.blocked_addresses) ? row.blocked_addresses : [],
         notifications: {
           enabled: Boolean(row.notifications_enabled),
           sound: Boolean(row.sound_enabled),
@@ -140,45 +224,102 @@ settingsRouter.put('/preferences', async (req: AuthenticatedRequest, res: Respon
     const {
       density = 'default',
       theme = 'dark-oled',
+      language = 'en_US',
+      pageSize = 50,
+      undoSendTime = 10,
+      defaultReplyBehavior = 'reply',
+      hoverActions = true,
+      sendAndArchive = false,
       inboxType = 'default',
       readingPane = 'right',
       conversationView = true,
+      desktopNotifications = 'all',
+      starPreset = '1star',
       signature = {},
       autoReply = {},
+      categories = { primary: true, promotions: true, social: true, updates: true, forums: false },
+      importanceMarkers = true,
+      forwardingAddress = '',
+      popEnabled = false,
+      imapEnabled = true,
+      imapExpunge = 'auto',
+      imapFolderLimit = 1000,
+      blockedAddresses = [],
       notifications = {},
       spamThreshold = 0.85,
     } = req.body;
 
     const signatureText = signature.text || '';
-    const signatureEnabled = Boolean(signature.enabled);
+    const signatureEnabled = Boolean(signature.enabled ?? signatureText.trim().length > 0);
+    const signatureForNew = signature.forNew || 'default';
+    const signatureForReply = signature.forReply || 'default';
+
     const autoReplyEnabled = Boolean(autoReply.enabled);
     const autoReplySubject = autoReply.subject || '';
     const autoReplyBody = autoReply.body || '';
     const autoReplyStartDate = autoReply.startDate ? new Date(autoReply.startDate) : null;
     const autoReplyEndDate = autoReply.endDate ? new Date(autoReply.endDate) : null;
+    const vacationContactsOnly = Boolean(autoReply.contactsOnly);
+
     const notificationsEnabled = notifications.enabled !== undefined ? Boolean(notifications.enabled) : true;
     const soundEnabled = notifications.sound !== undefined ? Boolean(notifications.sound) : true;
 
     await defaultDb.query(
       `INSERT INTO user_preferences (
-        user_id, density, theme, inbox_type, reading_pane, conversation_view,
-        signature_text, signature_enabled, auto_reply_enabled, auto_reply_subject,
+        user_id, density, theme, language, page_size, undo_send_time,
+        default_reply_behavior, hover_actions, send_and_archive,
+        inbox_type, reading_pane, conversation_view, desktop_notifications,
+        star_preset, signature_text, signature_enabled, signature_for_new,
+        signature_for_reply, auto_reply_enabled, auto_reply_subject,
         auto_reply_body, auto_reply_start_date, auto_reply_end_date,
-        notifications_enabled, sound_enabled, spam_threshold, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, now())
+        vacation_contacts_only, categories, importance_markers,
+        forwarding_address, pop_enabled, imap_enabled, imap_expunge,
+        imap_folder_limit, blocked_addresses, notifications_enabled,
+        sound_enabled, spam_threshold, updated_at
+      ) VALUES (
+        $1, $2, $3, $4, $5, $6,
+        $7, $8, $9,
+        $10, $11, $12, $13,
+        $14, $15, $16, $17,
+        $18, $19, $20,
+        $21, $22, $23,
+        $24, $25, $26,
+        $27, $28, $29, $30,
+        $31, $32, $33,
+        $34, $35, now()
+      )
       ON CONFLICT (user_id) DO UPDATE SET
         density = EXCLUDED.density,
         theme = EXCLUDED.theme,
+        language = EXCLUDED.language,
+        page_size = EXCLUDED.page_size,
+        undo_send_time = EXCLUDED.undo_send_time,
+        default_reply_behavior = EXCLUDED.default_reply_behavior,
+        hover_actions = EXCLUDED.hover_actions,
+        send_and_archive = EXCLUDED.send_and_archive,
         inbox_type = EXCLUDED.inbox_type,
         reading_pane = EXCLUDED.reading_pane,
         conversation_view = EXCLUDED.conversation_view,
+        desktop_notifications = EXCLUDED.desktop_notifications,
+        star_preset = EXCLUDED.star_preset,
         signature_text = EXCLUDED.signature_text,
         signature_enabled = EXCLUDED.signature_enabled,
+        signature_for_new = EXCLUDED.signature_for_new,
+        signature_for_reply = EXCLUDED.signature_for_reply,
         auto_reply_enabled = EXCLUDED.auto_reply_enabled,
         auto_reply_subject = EXCLUDED.auto_reply_subject,
         auto_reply_body = EXCLUDED.auto_reply_body,
         auto_reply_start_date = EXCLUDED.auto_reply_start_date,
         auto_reply_end_date = EXCLUDED.auto_reply_end_date,
+        vacation_contacts_only = EXCLUDED.vacation_contacts_only,
+        categories = EXCLUDED.categories,
+        importance_markers = EXCLUDED.importance_markers,
+        forwarding_address = EXCLUDED.forwarding_address,
+        pop_enabled = EXCLUDED.pop_enabled,
+        imap_enabled = EXCLUDED.imap_enabled,
+        imap_expunge = EXCLUDED.imap_expunge,
+        imap_folder_limit = EXCLUDED.imap_folder_limit,
+        blocked_addresses = EXCLUDED.blocked_addresses,
         notifications_enabled = EXCLUDED.notifications_enabled,
         sound_enabled = EXCLUDED.sound_enabled,
         spam_threshold = EXCLUDED.spam_threshold,
@@ -187,16 +328,35 @@ settingsRouter.put('/preferences', async (req: AuthenticatedRequest, res: Respon
         userId,
         density,
         theme,
+        language,
+        pageSize,
+        undoSendTime,
+        defaultReplyBehavior,
+        hoverActions,
+        sendAndArchive,
         inboxType,
         readingPane,
-        Boolean(conversationView),
+        conversationView,
+        desktopNotifications,
+        starPreset,
         signatureText,
         signatureEnabled,
+        signatureForNew,
+        signatureForReply,
         autoReplyEnabled,
         autoReplySubject,
         autoReplyBody,
         autoReplyStartDate,
         autoReplyEndDate,
+        vacationContactsOnly,
+        JSON.stringify(categories),
+        importanceMarkers,
+        forwardingAddress,
+        popEnabled,
+        imapEnabled,
+        imapExpunge,
+        imapFolderLimit,
+        JSON.stringify(blockedAddresses),
         notificationsEnabled,
         soundEnabled,
         spamThreshold,
@@ -214,7 +374,91 @@ settingsRouter.put('/preferences', async (req: AuthenticatedRequest, res: Respon
 });
 
 // ==========================================
-// 2. LABELS ENDPOINTS
+// 2. BLOCKED ADDRESSES ENDPOINTS
+// ==========================================
+
+// GET /v1/settings/blocked
+settingsRouter.get('/blocked', async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    await ensurePrefsTable();
+    const userId = req.user!.userId;
+
+    const rows = (await defaultDb.query(
+      `SELECT blocked_addresses FROM user_preferences WHERE user_id = $1`,
+      [userId]
+    )) as any[];
+
+    const blocked = rows.length > 0 && Array.isArray(rows[0].blocked_addresses) ? rows[0].blocked_addresses : [];
+    res.json({ success: true, data: blocked });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /v1/settings/blocked
+settingsRouter.post('/blocked', async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    await ensurePrefsTable();
+    const userId = req.user!.userId;
+    const { email } = req.body;
+
+    if (!email || !email.trim()) {
+      throw new AppError('VALIDATION_ERROR', 'Email address is required', 400);
+    }
+
+    const normalized = email.trim().toLowerCase();
+    const rows = (await defaultDb.query(
+      `SELECT blocked_addresses FROM user_preferences WHERE user_id = $1`,
+      [userId]
+    )) as any[];
+
+    let currentBlocked: string[] = rows.length > 0 && Array.isArray(rows[0].blocked_addresses) ? rows[0].blocked_addresses : [];
+    if (!currentBlocked.includes(normalized)) {
+      currentBlocked.push(normalized);
+    }
+
+    await defaultDb.query(
+      `INSERT INTO user_preferences (user_id, blocked_addresses, updated_at)
+       VALUES ($1, $2, now())
+       ON CONFLICT (user_id) DO UPDATE SET blocked_addresses = $2, updated_at = now()`,
+      [userId, JSON.stringify(currentBlocked)]
+    );
+
+    res.status(201).json({ success: true, data: currentBlocked });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// DELETE /v1/settings/blocked/:email
+settingsRouter.delete('/blocked/:email', async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    await ensurePrefsTable();
+    const userId = req.user!.userId;
+    const emailParam = (req.params.email as string) || '';
+    const emailToUnblock = decodeURIComponent(emailParam).toLowerCase();
+
+    const rows = (await defaultDb.query(
+      `SELECT blocked_addresses FROM user_preferences WHERE user_id = $1`,
+      [userId]
+    )) as any[];
+
+    let currentBlocked: string[] = rows.length > 0 && Array.isArray(rows[0].blocked_addresses) ? rows[0].blocked_addresses : [];
+    currentBlocked = currentBlocked.filter((e) => e.toLowerCase() !== emailToUnblock);
+
+    await defaultDb.query(
+      `UPDATE user_preferences SET blocked_addresses = $1, updated_at = now() WHERE user_id = $2`,
+      [JSON.stringify(currentBlocked), userId]
+    );
+
+    res.json({ success: true, message: 'Address unblocked successfully', data: currentBlocked });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ==========================================
+// 3. LABELS ENDPOINTS
 // ==========================================
 
 // GET /v1/settings/labels
@@ -319,7 +563,7 @@ settingsRouter.delete('/labels/:id', async (req: AuthenticatedRequest, res: Resp
 });
 
 // ==========================================
-// 3. FOLDERS ENDPOINTS
+// 4. FOLDERS ENDPOINTS
 // ==========================================
 
 // GET /v1/settings/folders
@@ -455,7 +699,7 @@ settingsRouter.delete('/folders/:id', async (req: AuthenticatedRequest, res: Res
 });
 
 // ==========================================
-// 4. FILTER RULES ENDPOINTS
+// 5. FILTER RULES ENDPOINTS
 // ==========================================
 
 // GET /v1/settings/filters
