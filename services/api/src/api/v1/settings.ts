@@ -30,68 +30,79 @@ async function resolveMailbox(userId: string, email?: string): Promise<{ id: str
 let isPrefsTableEnsured = false;
 async function ensurePrefsTable() {
   if (isPrefsTableEnsured) return;
-  await defaultDb.query(`
-    CREATE TABLE IF NOT EXISTS user_preferences (
-      user_id                UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-      density                TEXT NOT NULL DEFAULT 'default',
-      theme                  TEXT NOT NULL DEFAULT 'dark-oled',
-      language               TEXT NOT NULL DEFAULT 'en_US',
-      page_size              INTEGER NOT NULL DEFAULT 50,
-      undo_send_time         INTEGER NOT NULL DEFAULT 10,
-      default_reply_behavior TEXT NOT NULL DEFAULT 'reply',
-      hover_actions          BOOLEAN NOT NULL DEFAULT true,
-      send_and_archive       BOOLEAN NOT NULL DEFAULT false,
-      inbox_type             TEXT NOT NULL DEFAULT 'default',
-      reading_pane           TEXT NOT NULL DEFAULT 'right',
-      conversation_view      BOOLEAN NOT NULL DEFAULT true,
-      desktop_notifications  TEXT NOT NULL DEFAULT 'all',
-      star_preset            TEXT NOT NULL DEFAULT '1star',
-      signature_text         TEXT NOT NULL DEFAULT '',
-      signature_enabled      BOOLEAN NOT NULL DEFAULT false,
-      signature_for_new      TEXT NOT NULL DEFAULT 'default',
-      signature_for_reply    TEXT NOT NULL DEFAULT 'default',
-      auto_reply_enabled     BOOLEAN NOT NULL DEFAULT false,
-      auto_reply_subject     TEXT NOT NULL DEFAULT '',
-      auto_reply_body        TEXT NOT NULL DEFAULT '',
-      auto_reply_start_date  TIMESTAMPTZ,
-      auto_reply_end_date    TIMESTAMPTZ,
-      vacation_contacts_only BOOLEAN NOT NULL DEFAULT false,
-      categories             JSONB NOT NULL DEFAULT '{"primary":true,"promotions":true,"social":true,"updates":true,"forums":false}',
-      importance_markers     BOOLEAN NOT NULL DEFAULT true,
-      forwarding_address     TEXT NOT NULL DEFAULT '',
-      pop_enabled            BOOLEAN NOT NULL DEFAULT false,
-      imap_enabled           BOOLEAN NOT NULL DEFAULT true,
-      imap_expunge           TEXT NOT NULL DEFAULT 'auto',
-      imap_folder_limit      INTEGER NOT NULL DEFAULT 1000,
-      blocked_addresses      JSONB NOT NULL DEFAULT '[]',
-      notifications_enabled  BOOLEAN NOT NULL DEFAULT true,
-      sound_enabled          BOOLEAN NOT NULL DEFAULT true,
-      spam_threshold         NUMERIC(3,2) NOT NULL DEFAULT 0.85,
-      created_at             TIMESTAMPTZ NOT NULL DEFAULT now(),
-      updated_at             TIMESTAMPTZ NOT NULL DEFAULT now()
-    );
+  try {
+    await defaultDb.query(`
+      CREATE TABLE IF NOT EXISTS user_preferences (
+        user_id                TEXT PRIMARY KEY,
+        density                TEXT NOT NULL DEFAULT 'default',
+        theme                  TEXT NOT NULL DEFAULT 'dark-oled',
+        language               TEXT NOT NULL DEFAULT 'en_US',
+        page_size              INTEGER NOT NULL DEFAULT 50,
+        undo_send_time         INTEGER NOT NULL DEFAULT 10,
+        default_reply_behavior TEXT NOT NULL DEFAULT 'reply',
+        hover_actions          BOOLEAN NOT NULL DEFAULT true,
+        send_and_archive       BOOLEAN NOT NULL DEFAULT false,
+        inbox_type             TEXT NOT NULL DEFAULT 'default',
+        reading_pane           TEXT NOT NULL DEFAULT 'right',
+        conversation_view      BOOLEAN NOT NULL DEFAULT true,
+        desktop_notifications  TEXT NOT NULL DEFAULT 'all',
+        star_preset            TEXT NOT NULL DEFAULT '1star',
+        signature_text         TEXT NOT NULL DEFAULT '',
+        signature_enabled      BOOLEAN NOT NULL DEFAULT false,
+        signature_for_new      TEXT NOT NULL DEFAULT 'default',
+        signature_for_reply    TEXT NOT NULL DEFAULT 'default',
+        auto_reply_enabled     BOOLEAN NOT NULL DEFAULT false,
+        auto_reply_subject     TEXT NOT NULL DEFAULT '',
+        auto_reply_body        TEXT NOT NULL DEFAULT '',
+        auto_reply_start_date  TIMESTAMPTZ,
+        auto_reply_end_date    TIMESTAMPTZ,
+        vacation_contacts_only BOOLEAN NOT NULL DEFAULT false,
+        categories             JSONB NOT NULL DEFAULT '{"primary":true,"promotions":true,"social":true,"updates":true,"forums":false}',
+        importance_markers     BOOLEAN NOT NULL DEFAULT true,
+        forwarding_address     TEXT NOT NULL DEFAULT '',
+        pop_enabled            BOOLEAN NOT NULL DEFAULT false,
+        imap_enabled           BOOLEAN NOT NULL DEFAULT true,
+        imap_expunge           TEXT NOT NULL DEFAULT 'auto',
+        imap_folder_limit      INTEGER NOT NULL DEFAULT 1000,
+        blocked_addresses      JSONB NOT NULL DEFAULT '[]',
+        notifications_enabled  BOOLEAN NOT NULL DEFAULT true,
+        sound_enabled          BOOLEAN NOT NULL DEFAULT true,
+        spam_threshold         NUMERIC(3,2) NOT NULL DEFAULT 0.85,
+        created_at             TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at             TIMESTAMPTZ NOT NULL DEFAULT now()
+      );
+    `);
 
-    -- Ensure individual columns exist if table was previously created with older schema
-    ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS language TEXT NOT NULL DEFAULT 'en_US';
-    ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS page_size INTEGER NOT NULL DEFAULT 50;
-    ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS undo_send_time INTEGER NOT NULL DEFAULT 10;
-    ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS default_reply_behavior TEXT NOT NULL DEFAULT 'reply';
-    ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS hover_actions BOOLEAN NOT NULL DEFAULT true;
-    ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS send_and_archive BOOLEAN NOT NULL DEFAULT false;
-    ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS desktop_notifications TEXT NOT NULL DEFAULT 'all';
-    ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS star_preset TEXT NOT NULL DEFAULT '1star';
-    ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS signature_for_new TEXT NOT NULL DEFAULT 'default';
-    ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS signature_for_reply TEXT NOT NULL DEFAULT 'default';
-    ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS vacation_contacts_only BOOLEAN NOT NULL DEFAULT false;
-    ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS categories JSONB NOT NULL DEFAULT '{"primary":true,"promotions":true,"social":true,"updates":true,"forums":false}';
-    ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS importance_markers BOOLEAN NOT NULL DEFAULT true;
-    ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS forwarding_address TEXT NOT NULL DEFAULT '';
-    ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS pop_enabled BOOLEAN NOT NULL DEFAULT false;
-    ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS imap_enabled BOOLEAN NOT NULL DEFAULT true;
-    ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS imap_expunge TEXT NOT NULL DEFAULT 'auto';
-    ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS imap_folder_limit INTEGER NOT NULL DEFAULT 1000;
-    ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS blocked_addresses JSONB NOT NULL DEFAULT '[]';
-  `);
+    const columnUpdates = [
+      "ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS language TEXT NOT NULL DEFAULT 'en_US'",
+      "ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS page_size INTEGER NOT NULL DEFAULT 50",
+      "ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS undo_send_time INTEGER NOT NULL DEFAULT 10",
+      "ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS default_reply_behavior TEXT NOT NULL DEFAULT 'reply'",
+      "ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS hover_actions BOOLEAN NOT NULL DEFAULT true",
+      "ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS send_and_archive BOOLEAN NOT NULL DEFAULT false",
+      "ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS desktop_notifications TEXT NOT NULL DEFAULT 'all'",
+      "ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS star_preset TEXT NOT NULL DEFAULT '1star'",
+      "ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS signature_for_new TEXT NOT NULL DEFAULT 'default'",
+      "ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS signature_for_reply TEXT NOT NULL DEFAULT 'default'",
+      "ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS vacation_contacts_only BOOLEAN NOT NULL DEFAULT false",
+      "ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS categories JSONB NOT NULL DEFAULT '{\"primary\":true,\"promotions\":true,\"social\":true,\"updates\":true,\"forums\":false}'",
+      "ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS importance_markers BOOLEAN NOT NULL DEFAULT true",
+      "ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS forwarding_address TEXT NOT NULL DEFAULT ''",
+      "ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS pop_enabled BOOLEAN NOT NULL DEFAULT false",
+      "ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS imap_enabled BOOLEAN NOT NULL DEFAULT true",
+      "ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS imap_expunge TEXT NOT NULL DEFAULT 'auto'",
+      "ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS imap_folder_limit INTEGER NOT NULL DEFAULT 1000",
+      "ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS blocked_addresses JSONB NOT NULL DEFAULT '[]'",
+    ];
+
+    for (const sql of columnUpdates) {
+      try {
+        await defaultDb.query(sql);
+      } catch (_) {}
+    }
+  } catch (err) {
+    console.error('ensurePrefsTable notice:', err);
+  }
   isPrefsTableEnsured = true;
 }
 
