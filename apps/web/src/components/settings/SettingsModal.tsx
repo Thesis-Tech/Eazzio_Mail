@@ -186,89 +186,215 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   if (!isOpen) return null;
 
   // --- LABEL HANDLERS ---
-  const handleCreateLabel = (e: React.FormEvent) => {
+  const handleCreateLabel = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newLabelName.trim()) return;
-    const newLabel: LabelItem = {
-      id: `lbl-${Date.now()}`,
-      name: newLabelName.trim(),
-      color: newLabelColor || '#2D5BFF',
-    };
-    onUpdateLabels([...labels, newLabel]);
+    const name = newLabelName.trim();
+    const color = newLabelColor || '#2D5BFF';
+
+    try {
+      const res = await fetch('/api/settings/labels', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, color }),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.data) {
+          onUpdateLabels([...labels, json.data]);
+        }
+      } else {
+        const newLabel: LabelItem = {
+          id: `lbl-${Date.now()}`,
+          name,
+          color,
+        };
+        onUpdateLabels([...labels, newLabel]);
+      }
+    } catch (_) {
+      const newLabel: LabelItem = {
+        id: `lbl-${Date.now()}`,
+        name,
+        color,
+      };
+      onUpdateLabels([...labels, newLabel]);
+    }
     setNewLabelName('');
     setNewLabelColor(PRESET_COLORS[0]);
   };
 
-  const handleSaveEditLabel = (id: string) => {
+  const handleSaveEditLabel = async (id: string) => {
     if (!editingLabelName.trim()) return;
+    const name = editingLabelName.trim();
+    const color = editingLabelColor;
+
+    try {
+      await fetch(`/api/settings/labels/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, color }),
+      });
+    } catch (_) {}
+
     onUpdateLabels(
       labels.map((l) =>
-        l.id === id ? { ...l, name: editingLabelName.trim(), color: editingLabelColor || l.color } : l
+        l.id === id ? { ...l, name, color: color || l.color } : l
       )
     );
     setEditingLabelId(null);
   };
 
-  const handleDeleteLabel = (id: string) => {
+  const handleDeleteLabel = async (id: string) => {
+    try {
+      await fetch(`/api/settings/labels/${id}`, { method: 'DELETE' });
+    } catch (_) {}
     onUpdateLabels(labels.filter((l) => l.id !== id));
   };
 
   // --- FOLDER HANDLERS ---
-  const handleCreateFolder = (e: React.FormEvent) => {
+  const handleCreateFolder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newFolderName.trim()) return;
-    const newFolder: FolderItem = {
-      id: `fld-${Date.now()}`,
-      name: newFolderName.trim(),
-      slug: newFolderName.trim().toLowerCase().replace(/\s+/g, '-'),
-      type: 'custom',
-      unreadCount: 0,
-      totalCount: 0,
-    };
-    onUpdateFolders([...folders, newFolder]);
+    const name = newFolderName.trim();
+
+    try {
+      const res = await fetch('/api/settings/folders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.data) {
+          onUpdateFolders([...folders, json.data]);
+        }
+      } else {
+        const newFolder: FolderItem = {
+          id: `fld-${Date.now()}`,
+          name,
+          slug: name.toLowerCase().replace(/\s+/g, '-'),
+          type: 'custom',
+          unreadCount: 0,
+          totalCount: 0,
+        };
+        onUpdateFolders([...folders, newFolder]);
+      }
+    } catch (_) {
+      const newFolder: FolderItem = {
+        id: `fld-${Date.now()}`,
+        name,
+        slug: name.toLowerCase().replace(/\s+/g, '-'),
+        type: 'custom',
+        unreadCount: 0,
+        totalCount: 0,
+      };
+      onUpdateFolders([...folders, newFolder]);
+    }
     setNewFolderName('');
   };
 
-  const handleSaveEditFolder = (id: string) => {
+  const handleSaveEditFolder = async (id: string) => {
     if (!editingFolderName.trim()) return;
+    const name = editingFolderName.trim();
+
+    try {
+      await fetch(`/api/settings/folders/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      });
+    } catch (_) {}
+
     onUpdateFolders(
       folders.map((f) =>
-        f.id === id ? { ...f, name: editingFolderName.trim(), slug: editingFolderName.trim().toLowerCase().replace(/\s+/g, '-') } : f
+        f.id === id ? { ...f, name, slug: name.toLowerCase().replace(/\s+/g, '-') } : f
       )
     );
     setEditingFolderId(null);
   };
 
-  const handleDeleteFolder = (id: string) => {
+  const handleDeleteFolder = async (id: string) => {
+    try {
+      await fetch(`/api/settings/folders/${id}`, { method: 'DELETE' });
+    } catch (_) {}
     onUpdateFolders(folders.filter((f) => f.id !== id));
   };
 
   // --- FILTER RULE HANDLERS ---
-  const handleCreateFilterRule = (e: React.FormEvent) => {
+  const handleCreateFilterRule = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newRuleName.trim() || !newRuleValue.trim()) return;
-    const rule: FilterRule = {
-      id: `rule-${Date.now()}`,
-      name: newRuleName.trim(),
-      field: newRuleField,
-      operator: newRuleOperator,
-      value: newRuleValue.trim(),
-      action: newRuleAction,
-      actionValue: newRuleActionValue,
-      isEnabled: true,
-    };
-    onUpdateFilterRules([...filterRules, rule]);
+    const name = newRuleName.trim();
+    const value = newRuleValue.trim();
+
+    try {
+      const res = await fetch('/api/settings/filters', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          field: newRuleField,
+          operator: newRuleOperator,
+          value,
+          action: newRuleAction,
+          actionValue: newRuleActionValue,
+        }),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.data) {
+          onUpdateFilterRules([...filterRules, json.data]);
+        }
+      } else {
+        const rule: FilterRule = {
+          id: `rule-${Date.now()}`,
+          name,
+          field: newRuleField,
+          operator: newRuleOperator,
+          value,
+          action: newRuleAction,
+          actionValue: newRuleActionValue,
+          isEnabled: true,
+        };
+        onUpdateFilterRules([...filterRules, rule]);
+      }
+    } catch (_) {
+      const rule: FilterRule = {
+        id: `rule-${Date.now()}`,
+        name,
+        field: newRuleField,
+        operator: newRuleOperator,
+        value,
+        action: newRuleAction,
+        actionValue: newRuleActionValue,
+        isEnabled: true,
+      };
+      onUpdateFilterRules([...filterRules, rule]);
+    }
     setNewRuleName('');
     setNewRuleValue('');
   };
 
-  const handleToggleFilterRule = (id: string) => {
+  const handleToggleFilterRule = async (id: string) => {
+    const target = filterRules.find((r) => r.id === id);
+    const nextEnabled = target ? !target.isEnabled : true;
+    try {
+      await fetch(`/api/settings/filters/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isEnabled: nextEnabled }),
+      });
+    } catch (_) {}
+
     onUpdateFilterRules(
-      filterRules.map((r) => (r.id === id ? { ...r, isEnabled: !r.isEnabled } : r))
+      filterRules.map((r) => (r.id === id ? { ...r, isEnabled: nextEnabled } : r))
     );
   };
 
-  const handleDeleteFilterRule = (id: string) => {
+  const handleDeleteFilterRule = async (id: string) => {
+    try {
+      await fetch(`/api/settings/filters/${id}`, { method: 'DELETE' });
+    } catch (_) {}
     onUpdateFilterRules(filterRules.filter((r) => r.id !== id));
   };
 
