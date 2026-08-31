@@ -131,15 +131,17 @@ export const MailComposer: React.FC<MailComposerProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
+  const prevIsOpenRef = useRef(false);
+
   useEffect(() => {
-    if (isOpen) {
-      setToChips([...initialTo]);
-      setCcChips([...initialCc]);
-      setShowCc(initialCc.length > 0);
-      setBccChips([...initialBcc]);
-      setShowBcc(initialBcc.length > 0);
+    if (isOpen && !prevIsOpenRef.current) {
+      setToChips([...(initialTo || [])]);
+      setCcChips([...(initialCc || [])]);
+      setShowCc((initialCc || []).length > 0);
+      setBccChips([...(initialBcc || [])]);
+      setShowBcc((initialBcc || []).length > 0);
       setSubject(initialSubject || '');
-      setAttachments([...initialAttachments]);
+      setAttachments([...(initialAttachments || [])]);
       setErrorMessage(null);
       setIsMinimized(false);
       setIsMaximized(false);
@@ -157,7 +159,8 @@ export const MailComposer: React.FC<MailComposerProps> = ({
         }
       }, 50);
     }
-  }, [isOpen, initialTo, initialCc, initialBcc, initialSubject, initialBody, initialAttachments]);
+    prevIsOpenRef.current = isOpen;
+  }, [isOpen, initialSubject, initialBody]);
 
   if (!isOpen) return null;
 
