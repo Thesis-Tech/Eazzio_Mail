@@ -57,7 +57,15 @@ const initialPreferences: UserPreferences = {
 // Stable folder slug resolver
 const getFolderSlug = (folderId: string) => folderId.replace('fld-', '');
 
-export function MailDashboardPage({ initialFolder = 'fld-inbox' }: { initialFolder?: string }) {
+export function MailDashboardPage({ 
+  initialFolder = 'fld-inbox',
+  initialSettingsOpen = false,
+  initialSettingsTab = 'general',
+}: { 
+  initialFolder?: string;
+  initialSettingsOpen?: boolean;
+  initialSettingsTab?: 'general' | 'labels' | 'inbox' | 'accounts' | 'filters' | 'forwarding' | 'themes';
+}) {
   const [activeFolderId, setActiveFolderId] = useState(initialFolder);
   const [activeLabelId, setActiveLabelId] = useState<string | undefined>();
   const [threads, setThreads] = useState<ThreadSummary[]>([]);
@@ -72,7 +80,7 @@ export function MailDashboardPage({ initialFolder = 'fld-inbox' }: { initialFold
     body?: string;
     attachments?: ComposerAttachment[];
   }>({});
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(initialSettingsOpen);
   const [isSnoozeModalOpen, setIsSnoozeModalOpen] = useState(false);
   const [snoozeTargetThreadIds, setSnoozeTargetThreadIds] = useState<string[]>([]);
   const [folders, setFolders] = useState<FolderItem[]>(initialFolders);
@@ -80,7 +88,7 @@ export function MailDashboardPage({ initialFolder = 'fld-inbox' }: { initialFold
   const [filterRules, setFilterRules] = useState<FilterRule[]>(initialFilters);
   const [preferences, setPreferences] = useState<UserPreferences>(initialPreferences);
   const [density, setDensity] = useState<'default' | 'comfortable' | 'compact'>('default');
-  const [settingsTab, setSettingsTab] = useState<'general' | 'labels' | 'inbox' | 'accounts' | 'filters' | 'forwarding' | 'themes'>('general');
+  const [settingsTab, setSettingsTab] = useState<'general' | 'labels' | 'inbox' | 'accounts' | 'filters' | 'forwarding' | 'themes'>(initialSettingsTab);
   const [readingPane, setReadingPane] = useState<'none' | 'right' | 'below'>('none');
   const [toasts, setToasts] = useState<ToastNotification[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
