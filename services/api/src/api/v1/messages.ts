@@ -941,23 +941,36 @@ messagesRouter.post('/compose', async (req: AuthenticatedRequest, res: Response,
 
     // 2. Validate / Resolve Mailbox ownership
     let mailboxId = requestedMailboxId;
-    let senderAddress = req.user!.email;
+    
+    // Fetch authoritative user record
+    const userRows = (await defaultDb.query(
+      `SELECT email FROM users WHERE id = $1 LIMIT 1`,
+      [userId]
+    )) as any[];
+    const userEmail = (userRows[0]?.email || req.user?.email || '').trim().toLowerCase();
+    
+    const allowedMailboxes = await mailboxRepo.findByOwnerId(userId);
+    const requestedFrom = (req.body.from as string | undefined)?.trim()?.toLowerCase();
+    let senderAddress = requestedFrom || userEmail;
 
-    if (req.body.from && typeof req.body.from === 'string') {
-      const allowedMailboxes = await mailboxRepo.findByOwnerId(userId);
-      const isOwner = allowedMailboxes.some((m) => m.address.toLowerCase() === req.body.from.toLowerCase());
-      if (!isOwner && req.body.from.toLowerCase() !== req.user!.email.toLowerCase()) {
+    if (requestedFrom) {
+      const isOwner =
+        requestedFrom === userEmail ||
+        allowedMailboxes.some((m) => m.address.toLowerCase() === requestedFrom);
+
+      if (!isOwner) {
         throw new AppError('FORBIDDEN', `User is not authorized to send as '${req.body.from}'`, 403);
       }
-      senderAddress = req.body.from;
     }
 
-    if (mailboxId) {
-      const mailbox = await mailboxRepo.findById(mailboxId);
-      if (!mailbox || mailbox.ownerUserId !== userId) {
-        throw new AppError('FORBIDDEN', 'User is not authorized to send from the specified mailbox', 403);
-      }
-      senderAddress = mailbox.address;
+    // Match or create mailbox for the sender
+    const matchedMailbox = allowedMailboxes.find(
+      (m) => m.address.toLowerCase() === senderAddress.toLowerCase()
+    );
+
+    if (matchedMailbox) {
+      mailboxId = matchedMailbox.id;
+      senderAddress = matchedMailbox.address;
     } else {
       const mbx = await getOrCreateUserMailbox(userId, senderAddress);
       mailboxId = mbx.mailboxId;
