@@ -27,6 +27,7 @@ export interface ThreadListProps {
   pageSize?: number;
   onPageChange?: (newPage: number) => void;
   isSplitView?: boolean;
+  density?: 'default' | 'comfortable' | 'compact';
 }
 
 const CATEGORIES = [
@@ -54,6 +55,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
   pageSize = 50,
   onPageChange,
   isSplitView = true,
+  density = 'default',
 }) => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isSelectMenuOpen, setIsSelectMenuOpen] = useState(false);
@@ -254,6 +256,17 @@ export const ThreadList: React.FC<ThreadListProps> = ({
               const isChecked = selectedIds.has(thread.id);
               const unread = thread.isUnread;
 
+              // Density variants
+              const rowPadding = 
+                density === 'compact' 
+                  ? 'py-1 sm:py-1.5 px-2 sm:px-3' 
+                  : density === 'comfortable' 
+                  ? 'py-3.5 sm:py-4 px-3 sm:px-5' 
+                  : 'py-2 sm:py-2.5 px-2 sm:px-4'; // default
+
+              const fontSizeSender = density === 'compact' ? 'text-xs' : 'text-sm';
+              const fontSizeSubject = density === 'compact' ? 'text-xs' : 'text-sm';
+
               return (
                 <div
                   key={thread.id}
@@ -268,28 +281,32 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                       : 'var(--theme-bg-main, #0A0C10)',
                     borderLeftColor: isSelected ? 'var(--theme-accent, #2D5BFF)' : 'transparent',
                   }}
-                  className="group relative flex items-center px-2 sm:px-4 py-2 sm:py-2.5 transition-all cursor-pointer border-l-[3px] hover:brightness-110"
+                  className={`group relative flex items-center ${rowPadding} transition-all cursor-pointer border-l-[3px] hover:brightness-110`}
                 >
                   {/* Left Controls */}
-                  <div className="flex items-center gap-2 sm:gap-3 shrink-0 mr-3">
+                  <div className={`flex items-center ${density === 'compact' ? 'gap-1.5 mr-2' : 'gap-2 sm:gap-3 mr-3'} shrink-0`}>
                     <button onClick={(e) => handleToggleSelectOne(thread.id, e)} className="text-slate-500 hover:text-white transition-colors">
-                      {isChecked ? <CheckSquare style={{ color: 'var(--theme-accent, #2D5BFF)' }} className="w-4.5 h-4.5" /> : <Square className="w-4.5 h-4.5 opacity-40 group-hover:opacity-100" />}
+                      {isChecked ? (
+                        <CheckSquare style={{ color: 'var(--theme-accent, #2D5BFF)' }} className={`${density === 'compact' ? 'w-3.5 h-3.5' : 'w-4.5 h-4.5'}`} />
+                      ) : (
+                        <Square className={`${density === 'compact' ? 'w-3.5 h-3.5' : 'w-4.5 h-4.5'} opacity-40 group-hover:opacity-100`} />
+                      )}
                     </button>
                     <button onClick={(e) => { e.stopPropagation(); onToggleStar?.(thread.id); }} className={`transition-colors ${thread.isStarred ? 'text-amber-400' : 'text-slate-600 hover:text-slate-300 opacity-40 group-hover:opacity-100'}`}>
-                      <Star className={`w-4.5 h-4.5 ${thread.isStarred ? 'fill-amber-400' : ''}`} />
+                      <Star className={`${density === 'compact' ? 'w-3.5 h-3.5' : 'w-4.5 h-4.5'} ${thread.isStarred ? 'fill-amber-400' : ''}`} />
                     </button>
                   </div>
 
                   {/* Sender */}
-                  <div className={`w-32 sm:w-48 shrink-0 truncate mr-3 ${unread ? 'font-bold text-white' : 'font-medium text-slate-300'}`}>
+                  <div className={`${density === 'compact' ? 'w-28 sm:w-40 mr-2' : 'w-32 sm:w-48 mr-3'} shrink-0 truncate ${unread ? 'font-bold text-white' : 'font-medium text-slate-300'} ${fontSizeSender}`}>
                     {thread.sender.name || thread.sender.email}
                     {thread.messageCount && thread.messageCount > 1 && (
                       <span style={{ backgroundColor: 'var(--theme-border, #1E232B)' }} className="text-[10px] text-slate-400 ml-1 font-mono px-1.5 py-0.5 rounded-full">{thread.messageCount}</span>
                     )}
                   </div>
 
-                  {/* Subject & Snippet */}
-                  <div className="flex-1 min-w-0 flex items-center gap-2 text-sm pr-4">
+                  {/* Subject & Snippet & Attachment Chips (Default density) */}
+                  <div className={`flex-1 min-w-0 flex items-center gap-2 ${fontSizeSubject} pr-4`}>
                     {thread.labels && thread.labels.map(lbl => (
                       <span key={lbl} className="hidden sm:inline-flex px-1.5 py-0.5 rounded bg-slate-800 text-[10px] text-slate-300 font-medium whitespace-nowrap border border-slate-700">{lbl}</span>
                     ))}
@@ -300,13 +317,21 @@ export const ThreadList: React.FC<ThreadListProps> = ({
                     <span className="truncate text-slate-400 font-normal">
                       {thread.snippet}
                     </span>
+
+                    {/* Default Density Attachment Chip Preview */}
+                    {density === 'default' && thread.hasAttachments && (
+                      <div className="hidden md:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-[10px] text-slate-300 shrink-0 ml-2">
+                        <Paperclip className="w-2.5 h-2.5 text-emerald-400" />
+                        <span>Attachment</span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Meta / Hover Actions */}
                   <div className="flex items-center justify-end shrink-0 w-24 relative">
                     <div className="flex items-center gap-2 transition-opacity duration-200 group-hover:opacity-0">
-                      {thread.hasAttachments && <Paperclip className="w-3.5 h-3.5 text-slate-500" />}
-                      <span className={`text-[11px] font-mono ${unread ? 'font-bold text-white' : 'text-slate-400'}`}>
+                      {thread.hasAttachments && <Paperclip className={`${density === 'compact' ? 'w-3 h-3' : 'w-3.5 h-3.5'} text-slate-500`} />}
+                      <span className={`${density === 'compact' ? 'text-[10px]' : 'text-[11px]'} font-mono ${unread ? 'font-bold text-white' : 'text-slate-400'}`}>
                         {thread.lastMessageAt}
                       </span>
                     </div>

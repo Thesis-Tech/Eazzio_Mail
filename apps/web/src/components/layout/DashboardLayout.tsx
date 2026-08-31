@@ -30,6 +30,8 @@ export interface DashboardLayoutProps {
   availableThreads?: ThreadSummary[];
   customFolders?: FolderItem[];
   customLabels?: LabelItem[];
+  density?: 'default' | 'comfortable' | 'compact';
+  onDensityChange?: (density: 'default' | 'comfortable' | 'compact') => void;
 }
 
 const defaultFolders: FolderItem[] = [
@@ -162,6 +164,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   availableThreads = [],
   customFolders = defaultFolders,
   customLabels = defaultLabels,
+  density: propDensity,
+  onDensityChange,
 }) => {
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
@@ -173,7 +177,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isQuickSettingsOpen, setIsQuickSettingsOpen] = useState(false);
   const [isAdvancedSearchOpen, setIsAdvancedSearchOpen] = useState(false);
-  const [density, setDensity] = useState<'default' | 'comfortable' | 'compact'>('default');
+  const [internalDensity, setInternalDensity] = useState<'default' | 'comfortable' | 'compact'>('default');
+  const activeDensity = propDensity || internalDensity;
   const [theme, setTheme] = useState('dark-oled');
   const [inboxType, setInboxType] = useState<'default' | 'important' | 'unread' | 'starred' | 'priority'>('default');
   const [readingPane, setReadingPane] = useState<'none' | 'right' | 'below'>('right');
@@ -181,6 +186,20 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 
   // Active theme configuration
   const currentTheme = THEME_CONFIGS[theme] || THEME_CONFIGS['dark-oled']!;
+
+  // Handle Density Change with instant persistence
+  const handleDensityChange = (newDensity: 'default' | 'comfortable' | 'compact') => {
+    setInternalDensity(newDensity);
+    if (onDensityChange) onDensityChange(newDensity);
+    try {
+      localStorage.setItem('eazzio_density', newDensity);
+      fetch('/api/settings/preferences', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ density: newDensity, theme, inboxType, readingPane, conversationView }),
+      }).catch(() => {});
+    } catch (_) {}
+  };
 
   // Handle Theme Change with instant persistence
   const handleThemeChange = (newTheme: string) => {
@@ -190,7 +209,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
       fetch('/api/settings/preferences', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ theme: newTheme, density, inboxType, readingPane, conversationView }),
+        body: JSON.stringify({ theme: newTheme, density: activeDensity, inboxType, readingPane, conversationView }),
       }).catch(() => {});
     } catch (_) {}
   };
@@ -214,22 +233,32 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
     if (token) realtimeClient.setToken(token);
     realtimeClient.connect();
 
-    // Restore saved theme from local storage or backend
+    // Restore saved theme and density from local storage or backend
     try {
       const savedTheme = localStorage.getItem('eazzio_theme');
       if (savedTheme && THEME_CONFIGS[savedTheme]) {
         setTheme(savedTheme);
-      } else {
-        fetch('/api/settings/preferences')
-          .then((res) => res.json())
-          .then((json) => {
-            if (json.data?.theme && THEME_CONFIGS[json.data.theme]) {
-              setTheme(json.data.theme);
-              localStorage.setItem('eazzio_theme', json.data.theme);
-            }
-          })
-          .catch(() => {});
       }
+      const savedDensity = localStorage.getItem('eazzio_density') as 'default' | 'comfortable' | 'compact';
+      if (savedDensity && ['default', 'comfortable', 'compact'].includes(savedDensity)) {
+        setInternalDensity(savedDensity);
+        if (onDensityChange) onDensityChange(savedDensity);
+      }
+
+      fetch('/api/settings/preferences')
+        .then((res) => res.json())
+        .then((json) => {
+          if (json.data?.theme && THEME_CONFIGS[json.data.theme]) {
+            setTheme(json.data.theme);
+            localStorage.setItem('eazzio_theme', json.data.theme);
+          }
+          if (json.data?.density && ['default', 'comfortable', 'compact'].includes(json.data.density)) {
+            setInternalDensity(json.data.density);
+            if (onDensityChange) onDensityChange(json.data.density);
+            localStorage.setItem('eazzio_density', json.data.density);
+          }
+        })
+        .catch(() => {});
     } catch (_) {}
 
     const unsubscribeAuth = AuthStore.subscribe((state) => {
@@ -567,8 +596,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         onOpenFullSettings={() => {
           if (onOpenSettings) onOpenSettings();
         }}
-        density={density}
-        onChangeDensity={setDensity}
+        density={activeDensity}
+        onChangeDensity={handleDensityChange}
         theme={theme}
         onChangeTheme={handleThemeChange}
         inboxType={inboxType}

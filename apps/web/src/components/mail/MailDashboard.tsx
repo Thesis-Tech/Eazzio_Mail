@@ -79,6 +79,7 @@ export function MailDashboardPage({ initialFolder = 'fld-inbox' }: { initialFold
   const [labels, setLabels] = useState<LabelItem[]>(initialLabels);
   const [filterRules, setFilterRules] = useState<FilterRule[]>(initialFilters);
   const [preferences, setPreferences] = useState<UserPreferences>(initialPreferences);
+  const [density, setDensity] = useState<'default' | 'comfortable' | 'compact'>('default');
   const [toasts, setToasts] = useState<ToastNotification[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [conversationMap, setConversationMap] = useState<Record<string, MessageDetail[]>>({});
@@ -1238,6 +1239,8 @@ export function MailDashboardPage({ initialFolder = 'fld-inbox' }: { initialFold
       }}
       customFolders={folders}
       customLabels={labels}
+      density={density}
+      onDensityChange={setDensity}
       onSearch={setSearchQuery}
       onOpenCompose={() => {
         setComposeInitialData({});
@@ -1415,6 +1418,7 @@ export function MailDashboardPage({ initialFolder = 'fld-inbox' }: { initialFold
                 totalThreadsCount={displayedThreads.length}
                 onRefresh={() => loadMessages(activeFolderId)}
                 isSplitView={Boolean(selectedThreadId)}
+                density={density}
               />
             )}
           </div>
