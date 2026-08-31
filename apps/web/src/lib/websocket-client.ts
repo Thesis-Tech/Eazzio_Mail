@@ -49,13 +49,16 @@ export class RealtimeClient {
     if (process.env.NEXT_PUBLIC_WS_URL) {
       urls.push(process.env.NEXT_PUBLIC_WS_URL);
     }
-    // 1. Current host /ws (standard reverse-proxied endpoint on port 80 / 443)
-    urls.push(`${protocol}//${window.location.host}/ws`);
 
-    // 2. Direct local development ports fallback (if not behind reverse proxy)
+    // Direct local development ports fallback (if localhost on dev port 3000)
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
       urls.push(`${protocol}//${hostname}:8080/ws`);
+      urls.push(`${protocol}//${window.location.host}/ws`);
       urls.push(`${protocol}//${hostname}:8081`);
+    } else {
+      // Production reverse-proxied endpoint on port 80 / 443
+      urls.push(`${protocol}//${window.location.host}/ws`);
+      urls.push(`${protocol}//${hostname}:8080/ws`);
     }
 
     return Array.from(new Set(urls));

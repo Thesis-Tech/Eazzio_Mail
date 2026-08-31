@@ -1,41 +1,21 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import {
-  X, Minus, Maximize2, Minimize2, Send, Paperclip, Trash2, Bold, Italic, 
-  Underline, List, ListOrdered, Link2, Sparkles, Clock, ChevronDown, 
-  AlertCircle, Save, Shield, ShieldCheck, FileDown, Type, AlignLeft,
-  AlignCenter, AlignRight, AlignJustify, Strikethrough, Quote, Undo2, Redo2,
-  RemoveFormatting, Palette, Image as ImageIcon, Smile, Lock, PenTool,
-  Check, MoreVertical, Calendar, CornerDownRight, Outdent, Indent
+import { 
+  X, Minus, Maximize2, Minimize2, ChevronDown, 
+  Paperclip, Image, Trash2, Send, Clock, Sparkles, 
+  Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, 
+  List, ListOrdered, Indent, Outdent, Link2, Smile, 
+  Type, Check, AlertCircle, FileDown, Lock, Unlock,
+  RemoveFormatting, Undo2, Redo2, Search
 } from 'lucide-react';
+import { ComposerAttachment, ComposeEmailPayload } from '@/types/mail';
 
-export interface ComposerAttachment {
-  id: string;
-  name: string;
-  sizeBytes: number;
-  type?: string;
-  dataBase64?: string;
-  file?: File;
-}
-
-export interface ComposeEmailPayload {
-  to: string[];
-  cc?: string[];
-  bcc?: string[];
-  subject: string;
-  body: string;
-  bodyHtml?: string;
-  bodyText?: string;
-  attachments?: ComposerAttachment[];
-  scheduledAt?: string;
-}
-
-export interface MailComposerProps {
+interface MailComposerProps {
   isOpen: boolean;
   onClose: () => void;
-  onSend: (email: ComposeEmailPayload) => Promise<void> | void;
-  onSaveDraft?: (email: ComposeEmailPayload) => Promise<void> | void;
+  onSend: (payload: ComposeEmailPayload) => Promise<void>;
+  onSaveDraft?: (payload: ComposeEmailPayload) => Promise<void>;
   initialTo?: string[];
   initialCc?: string[];
   initialBcc?: string[];
@@ -44,7 +24,7 @@ export interface MailComposerProps {
   initialAttachments?: ComposerAttachment[];
 }
 
-const readFileAsBase64 = (file: File): Promise<string> => {
+const fileToBase64 = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => {
@@ -59,8 +39,8 @@ const readFileAsBase64 = (file: File): Promise<string> => {
 
 const FONT_FAMILIES = [
   { label: 'Sans Serif', value: 'sans-serif', fontClass: 'font-sans' },
-  { label: 'Serif', value: 'serif', fontClass: 'font-serif' },
-  { label: 'Fixed Width', value: 'monospace', fontClass: 'font-mono' },
+  { label: 'Serif', value: 'Georgia, serif', fontClass: 'font-serif' },
+  { label: 'Fixed Width', value: 'ui-monospace, monospace', fontClass: 'font-mono' },
   { label: 'Wide', value: 'Arial Black, sans-serif', fontClass: 'tracking-wider font-sans' },
   { label: 'Narrow', value: 'Arial Narrow, sans-serif', fontClass: 'tracking-tight font-sans' },
   { label: 'Comic Sans MS', value: '"Comic Sans MS", cursive, sans-serif', fontClass: 'font-sans' },
@@ -85,7 +65,59 @@ const TEXT_COLORS = [
   '#2D5BFF', '#14B8A6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#6366F1', '#06B6D4', '#84CC16',
 ];
 
-const EMOJIS = ['👍', '❤️', '😊', '🎉', '🔥', '✅', '🙏', '👏', '🚀', '💡', '✨', '👋', '🤝', '💯', '📩', '⭐', '☕', '💪', '🎯', '😃'];
+const EMOJI_CATEGORIES = [
+  {
+    name: 'Smileys',
+    icon: '😀',
+    emojis: [
+      '😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇', 
+      '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😋', '😛', '😜', 
+      '🤪', '🤓', '😎', '🤩', '🥳', '😏', '😒', '😔', '😢', '😭', 
+      '😤', '😠', '😡', '🤯', '😳', '😱', '🤔', '🤗', '🤫', '😴', 
+      '🤐', '😷', '🤒', '🤕', '🤠', '😈', '🤡', '💩', '👻', '💀'
+    ]
+  },
+  {
+    name: 'Gestures',
+    icon: '👍',
+    emojis: [
+      '👍', '👎', '👏', '🙌', '👐', '🤲', '🤝', '🙏', '✍️', '💅', 
+      '🤳', '💪', '👈', '👉', '👆', '👇', '☝️', '✌️', '🤞', '🫰', 
+      '🤟', '🤘', '🤙', '🖐️', '✋', '👊', '🤛', '🤜', '👁️', '👀', 
+      '❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '💔', '❣️', 
+      '💕', '💞', '💓', '💗', '💖', '💘', '💝', '✨', '🔥', '⭐'
+    ]
+  },
+  {
+    name: 'Work',
+    icon: '💼',
+    emojis: [
+      '💼', '📁', '📂', '📄', '📃', '📊', '📈', '📉', '📑', '📋', 
+      '📌', '📍', '📎', '🖇️', '📏', '✂️', '🗄️', '🗑️', '🔒', '🔓', 
+      '🔑', '🔨', '🛠️', '⚙️', '⚖️', '🔗', '🧪', '🔬', '📡', '💻', 
+      '🖥️', '📱', '⌨️', '🖱️', '🖨️', '💾', '💡', '🔌', '🔋', '⏰'
+    ]
+  },
+  {
+    name: 'Symbols',
+    icon: '✅',
+    emojis: [
+      '✅', '❌', '⭕', '🛑', '⛔', '🚫', '💯', '⚠️', '♻️', '❇️', 
+      '✳️', '✴️', '🌐', '💠', 'Ⓜ️', '🌀', '💤', '🆗', '🆙', '🆒', 
+      '🆕', '🆓', '0️⃣', '1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', 
+      '8️⃣', '9️⃣', '🔟', '➕', '➖', '➗', '✖️', '🟰', '♾️', '💲'
+    ]
+  },
+  {
+    name: 'Travel & Activity',
+    icon: '🚀',
+    emojis: [
+      '🚀', '✈️', '🚗', '🚲', '🌍', '🏝️', '🏔️', '🏖️', '⛺', '⚽', 
+      '🏀', '🏈', '🎾', '🎮', '🏆', '🥇', '🥈', '🥉', '🎯', '🎨', 
+      '🎸', '📷', '☕', '🍺', '🍻', '🥂', '🍷', '🍕', '🍔', '🌮'
+    ]
+  }
+];
 
 export const MailComposer: React.FC<MailComposerProps> = ({
   isOpen, onClose, onSend, onSaveDraft,
@@ -116,9 +148,9 @@ export const MailComposer: React.FC<MailComposerProps> = ({
   const [isFontDropdownOpen, setIsFontDropdownOpen] = useState(false);
   const [isSizeDropdownOpen, setIsSizeDropdownOpen] = useState(false);
   const [isColorDropdownOpen, setIsColorDropdownOpen] = useState(false);
-  const [isAlignDropdownOpen, setIsAlignDropdownOpen] = useState(false);
-  const [isMoreFormatOpen, setIsMoreFormatOpen] = useState(false);
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
+  const [emojiCategory, setEmojiCategory] = useState(0);
+  const [emojiSearch, setEmojiSearch] = useState('');
   const [isScheduleOpen, setIsScheduleOpen] = useState(false);
   const [isAiOpen, setIsAiOpen] = useState(false);
   const [aiPrompt, setAiPrompt] = useState('');
@@ -130,8 +162,35 @@ export const MailComposer: React.FC<MailComposerProps> = ({
   const editorRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const savedSelectionRef = useRef<Range | null>(null);
 
   const prevIsOpenRef = useRef(false);
+
+  // Selection Preservation
+  const saveSelection = () => {
+    if (typeof window === 'undefined') return;
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0) {
+      const range = sel.getRangeAt(0);
+      if (editorRef.current && editorRef.current.contains(range.commonAncestorContainer)) {
+        savedSelectionRef.current = range.cloneRange();
+      }
+    }
+  };
+
+  const restoreSelection = () => {
+    if (typeof window === 'undefined') return;
+    if (savedSelectionRef.current && editorRef.current) {
+      editorRef.current.focus();
+      const sel = window.getSelection();
+      if (sel) {
+        sel.removeAllRanges();
+        sel.addRange(savedSelectionRef.current);
+      }
+    } else if (editorRef.current) {
+      editorRef.current.focus();
+    }
+  };
 
   useEffect(() => {
     if (isOpen && !prevIsOpenRef.current) {
@@ -189,15 +248,24 @@ export const MailComposer: React.FC<MailComposerProps> = ({
   };
 
   const executeCommand = (command: string, value: string = '') => {
-    if (!editorRef.current) return;
-    editorRef.current.focus();
+    restoreSelection();
     document.execCommand(command, false, value);
+    saveSelection();
   };
 
   const handleApplyFont = (fontName: string, fontValue: string) => {
     setCurrentFont(fontName);
     setIsFontDropdownOpen(false);
-    executeCommand('fontName', fontValue);
+    restoreSelection();
+    
+    const sel = window.getSelection();
+    if (sel && !sel.isCollapsed && sel.rangeCount > 0) {
+      document.execCommand('fontName', false, fontValue);
+    } else if (editorRef.current) {
+      editorRef.current.style.fontFamily = fontValue;
+      document.execCommand('fontName', false, fontValue);
+    }
+    saveSelection();
   };
 
   const handleApplySize = (sizeLabel: string, sizeCmd: string) => {
@@ -207,6 +275,7 @@ export const MailComposer: React.FC<MailComposerProps> = ({
   };
 
   const handleInsertLink = () => {
+    restoreSelection();
     const url = window.prompt('Enter link URL:', 'https://');
     if (url && url !== 'https://') {
       executeCommand('createLink', url);
@@ -214,15 +283,18 @@ export const MailComposer: React.FC<MailComposerProps> = ({
   };
 
   const handleInsertEmoji = (emoji: string) => {
-    executeCommand('insertText', emoji);
+    restoreSelection();
+    document.execCommand('insertText', false, emoji);
+    saveSelection();
     setIsEmojiPickerOpen(false);
   };
 
   const handleInsertSignature = () => {
     if (!editorRef.current) return;
+    restoreSelection();
     const sigHtml = `<br><br>--<br><b>Best Regards,</b><br>Rahul Kumar<br><span style="color:#888; font-size:12px;">Thesis Technologies</span>`;
-    editorRef.current.focus();
     document.execCommand('insertHTML', false, sigHtml);
+    saveSelection();
   };
 
   const handleGenerateAi = () => {
@@ -273,6 +345,12 @@ export const MailComposer: React.FC<MailComposerProps> = ({
     }
   };
 
+  // Filter emojis by search keyword
+  const currentCategoryEmojis = EMOJI_CATEGORIES[emojiCategory]?.emojis || [];
+  const filteredEmojis = emojiSearch.trim()
+    ? EMOJI_CATEGORIES.flatMap(c => c.emojis)
+    : currentCategoryEmojis;
+
   return (
     <div 
       style={{
@@ -289,86 +367,81 @@ export const MailComposer: React.FC<MailComposerProps> = ({
     >
       {/* 1. Window Header (Gmail Style) */}
       <div 
-        style={{
-          backgroundColor: 'var(--theme-bg-sidebar, #090A0D)',
-          borderColor: 'var(--theme-border, #1E232B)',
-        }}
-        className="h-11 px-4 border-b flex items-center justify-between shrink-0 select-none cursor-pointer"
-        onClick={(e) => { 
-          if (e.target === e.currentTarget && isMinimized) setIsMinimized(false); 
-        }}
+        style={{ backgroundColor: 'var(--theme-bg-sidebar, #090A0D)' }}
+        className="px-4 py-3 flex items-center justify-between border-b border-white/5 select-none cursor-default"
       >
-        <div className="flex items-center gap-2 truncate">
-          <span className="text-xs font-bold text-slate-200 truncate">
-            {subject.trim() || 'New Message'}
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-semibold text-slate-200">
+            {subject.trim() ? subject : 'New Message'}
           </span>
           {isConfidential && (
-            <span className="flex items-center gap-1 text-[10px] bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded border border-amber-500/20">
+            <span className="flex items-center gap-1 text-[11px] font-medium text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded-full">
               <Lock className="w-3 h-3" /> Confidential
             </span>
           )}
         </div>
-        
-        <div className="flex items-center gap-1 shrink-0 ml-4 text-slate-400">
+
+        <div className="flex items-center gap-1">
           <button 
+            type="button"
             onClick={() => setIsMinimized(!isMinimized)} 
-            className="p-1.5 rounded hover:text-white hover:bg-white/10 transition-colors"
+            className="p-1 rounded hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
             title={isMinimized ? "Expand" : "Minimize"}
           >
             <Minus className="w-3.5 h-3.5" />
           </button>
           <button 
-            onClick={() => { 
-              setIsMaximized(!isMaximized); 
-              setIsMinimized(false); 
-            }} 
-            className="p-1.5 rounded hover:text-white hover:bg-white/10 transition-colors hidden sm:block"
-            title={isMaximized ? "Exit full screen" : "Full screen"}
+            type="button"
+            onClick={() => { setIsMaximized(!isMaximized); setIsMinimized(false); }} 
+            className="p-1 rounded hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+            title={isMaximized ? "Restore" : "Maximize"}
           >
             {isMaximized ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
           </button>
           <button 
+            type="button"
             onClick={onClose} 
-            className="p-1.5 rounded hover:text-white hover:bg-rose-500/20 transition-colors"
-            title="Save & Close"
+            className="p-1 rounded hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 transition-colors"
+            title="Close"
           >
-            <X className="w-3.5 h-3.5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
       </div>
 
       {!isMinimized && (
-        <div 
-          style={{ backgroundColor: 'var(--theme-bg-main, #0A0C10)' }}
-          className="flex-1 flex flex-col min-h-0 relative"
-        >
+        <>
+          {/* Error Banner */}
           {errorMessage && (
-            <div className="px-4 py-2 bg-rose-500/10 border-b border-rose-500/20 text-rose-400 text-xs font-semibold flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              <span>{errorMessage}</span>
+            <div className="px-4 py-2 bg-rose-500/10 border-b border-rose-500/20 text-rose-400 text-xs flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                {errorMessage}
+              </span>
+              <button type="button" onClick={() => setErrorMessage(null)} className="hover:text-rose-200">
+                <X className="w-3.5 h-3.5" />
+              </button>
             </div>
           )}
 
-          {/* 2. Recipient Fields (Gmail borderless lines) */}
-          <div className="px-4 py-1 space-y-0.5 border-b border-white/5">
-            {/* To Line */}
-            <div className="flex items-center gap-2 min-h-[36px]">
-              <span className="text-slate-400 text-xs w-16 select-none font-medium">Recipients</span>
-              <div className="flex-1 flex items-center gap-1.5 flex-wrap">
-                {toChips.map((chip) => (
+          {/* 2. Recipient Fields (To, CC, BCC, Subject) */}
+          <div className="px-4 pt-2 pb-1 space-y-1 text-xs">
+            
+            {/* 'To' Field */}
+            <div className="flex items-start gap-2 py-1 border-b border-white/5">
+              <span className="text-slate-500 font-medium w-14 pt-1">Recipients</span>
+              <div className="flex-1 flex flex-wrap items-center gap-1.5 min-h-[26px]">
+                {toChips.map((email) => (
                   <span 
-                    key={chip} 
-                    style={{
-                      backgroundColor: 'var(--theme-accent-bg, rgba(45,91,255,0.15))',
-                      borderColor: 'var(--theme-accent, #2D5BFF)',
-                      color: 'var(--theme-accent, #2D5BFF)'
-                    }}
-                    className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium border"
+                    key={email} 
+                    style={{ backgroundColor: 'var(--theme-bg-sidebar, #1E232B)' }}
+                    className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-slate-200 border border-white/10 text-xs animate-in fade-in"
                   >
-                    <span>{chip}</span>
+                    <span>{email}</span>
                     <button 
-                      onClick={() => setToChips(toChips.filter((c) => c !== chip))}
-                      className="hover:text-white transition-colors"
+                      type="button"
+                      onClick={() => setToChips(toChips.filter((e) => e !== email))} 
+                      className="hover:text-rose-400 text-slate-400"
                     >
                       <X className="w-3 h-3" />
                     </button>
@@ -385,37 +458,42 @@ export const MailComposer: React.FC<MailComposerProps> = ({
                     } 
                   }} 
                   onBlur={() => handleAddChip('to', toInput)} 
-                  className="flex-1 min-w-[140px] bg-transparent text-xs text-white outline-none py-1 placeholder-slate-500" 
-                  placeholder={toChips.length === 0 ? "Type email address..." : ""}
+                  placeholder={toChips.length === 0 ? "Type email address..." : ""} 
+                  className="flex-1 min-w-[140px] bg-transparent text-xs text-white placeholder-slate-500 outline-none py-1" 
                 />
               </div>
-              <div className="flex gap-2 text-xs font-semibold text-slate-400 select-none">
+              <div className="flex items-center gap-2 text-[11px] font-medium text-slate-400 pt-1 select-none">
                 {!showCc && (
-                  <button onClick={() => setShowCc(true)} className="hover:text-white transition-colors">
+                  <button type="button" onClick={() => setShowCc(true)} className="hover:text-white transition-colors">
                     Cc
                   </button>
                 )}
                 {!showBcc && (
-                  <button onClick={() => setShowBcc(true)} className="hover:text-white transition-colors">
+                  <button type="button" onClick={() => setShowBcc(true)} className="hover:text-white transition-colors">
                     Bcc
                   </button>
                 )}
               </div>
             </div>
 
-            {/* Cc Line */}
+            {/* 'Cc' Field */}
             {showCc && (
-              <div className="flex items-center gap-2 min-h-[32px] border-t border-white/5 pt-1">
-                <span className="text-slate-400 text-xs w-16 select-none font-medium">Cc</span>
-                <div className="flex-1 flex items-center gap-1.5 flex-wrap">
-                  {ccChips.map((chip) => (
+              <div className="flex items-start gap-2 py-1 border-b border-white/5 animate-in fade-in">
+                <span className="text-slate-500 font-medium w-14 pt-1">Cc</span>
+                <div className="flex-1 flex flex-wrap items-center gap-1.5 min-h-[26px]">
+                  {ccChips.map((email) => (
                     <span 
-                      key={chip} 
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 text-xs border border-slate-700"
+                      key={email} 
+                      style={{ backgroundColor: 'var(--theme-bg-sidebar, #1E232B)' }}
+                      className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-slate-200 border border-white/10 text-xs"
                     >
-                      <span>{chip}</span>
-                      <button onClick={() => setCcChips(ccChips.filter((c) => c !== chip))}>
-                        <X className="w-3 h-3 hover:text-white" />
+                      <span>{email}</span>
+                      <button 
+                        type="button"
+                        onClick={() => setCcChips(ccChips.filter((e) => e !== email))} 
+                        className="hover:text-rose-400 text-slate-400"
+                      >
+                        <X className="w-3 h-3" />
                       </button>
                     </span>
                   ))}
@@ -436,19 +514,24 @@ export const MailComposer: React.FC<MailComposerProps> = ({
               </div>
             )}
 
-            {/* Bcc Line */}
+            {/* 'Bcc' Field */}
             {showBcc && (
-              <div className="flex items-center gap-2 min-h-[32px] border-t border-white/5 pt-1">
-                <span className="text-slate-400 text-xs w-16 select-none font-medium">Bcc</span>
-                <div className="flex-1 flex items-center gap-1.5 flex-wrap">
-                  {bccChips.map((chip) => (
+              <div className="flex items-start gap-2 py-1 border-b border-white/5 animate-in fade-in">
+                <span className="text-slate-500 font-medium w-14 pt-1">Bcc</span>
+                <div className="flex-1 flex flex-wrap items-center gap-1.5 min-h-[26px]">
+                  {bccChips.map((email) => (
                     <span 
-                      key={chip} 
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 text-xs border border-slate-700"
+                      key={email} 
+                      style={{ backgroundColor: 'var(--theme-bg-sidebar, #1E232B)' }}
+                      className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-slate-200 border border-white/10 text-xs"
                     >
-                      <span>{chip}</span>
-                      <button onClick={() => setBccChips(bccChips.filter((c) => c !== chip))}>
-                        <X className="w-3 h-3 hover:text-white" />
+                      <span>{email}</span>
+                      <button 
+                        type="button"
+                        onClick={() => setBccChips(bccChips.filter((e) => e !== email))} 
+                        className="hover:text-rose-400 text-slate-400"
+                      >
+                        <X className="w-3 h-3" />
                       </button>
                     </span>
                   ))}
@@ -488,7 +571,10 @@ export const MailComposer: React.FC<MailComposerProps> = ({
               contentEditable="true"
               suppressContentEditableWarning={true}
               data-placeholder="Write your email here..."
-              className="flex-1 w-full bg-transparent text-sm text-slate-200 leading-relaxed outline-none min-h-[160px] focus:outline-none empty:before:content-[attr(data-placeholder)] empty:before:text-slate-600 empty:before:pointer-events-none prose prose-invert max-w-none"
+              onKeyUp={saveSelection}
+              onMouseUp={saveSelection}
+              onBlur={saveSelection}
+              className="flex-1 w-full bg-transparent text-sm text-slate-200 leading-relaxed outline-none min-h-[160px] focus:outline-none empty:before:content-[attr(data-placeholder)] empty:before:text-slate-600 empty:before:pointer-events-none [&_ul]:list-disc [&_ul]:pl-7 [&_ul]:my-2 [&_ul_li]:list-disc [&_ol]:list-decimal [&_ol]:pl-7 [&_ol]:my-2 [&_ol_li]:list-decimal [&_li]:my-1 [&_blockquote]:border-l-2 [&_blockquote]:border-slate-500 [&_blockquote]:pl-3 [&_a]:text-blue-400 [&_a]:underline font-sans"
             />
 
             {/* Attachment preview chips */}
@@ -496,7 +582,7 @@ export const MailComposer: React.FC<MailComposerProps> = ({
               <div className="mt-4 pt-3 border-t border-white/10 flex flex-wrap gap-2">
                 {attachments.map((att) => (
                   <div 
-                    key={att.id} 
+                    key={att.id}
                     style={{
                       backgroundColor: 'var(--theme-bg-card, #12141A)',
                       borderColor: 'var(--theme-border, #1E232B)',
@@ -509,6 +595,7 @@ export const MailComposer: React.FC<MailComposerProps> = ({
                       {Math.round(att.sizeBytes / 1024)} KB
                     </span>
                     <button 
+                      type="button"
                       onClick={() => setAttachments(attachments.filter((a) => a.id !== att.id))} 
                       className="ml-1 text-slate-400 hover:text-rose-400 transition-colors"
                     >
@@ -536,6 +623,7 @@ export const MailComposer: React.FC<MailComposerProps> = ({
                 <div className="relative">
                   <button
                     type="button"
+                    onMouseDown={(e) => e.preventDefault()}
                     onClick={() => {
                       setIsFontDropdownOpen(!isFontDropdownOpen);
                       setIsSizeDropdownOpen(false);
@@ -559,10 +647,11 @@ export const MailComposer: React.FC<MailComposerProps> = ({
                         <button
                           key={f.label}
                           type="button"
+                          onMouseDown={(e) => e.preventDefault()}
                           onClick={() => handleApplyFont(f.label, f.value)}
                           className="w-full px-3 py-1.5 text-left text-xs text-slate-200 hover:bg-white/10 flex items-center justify-between transition-colors"
                         >
-                          <span className={f.fontClass}>{f.label}</span>
+                          <span style={{ fontFamily: f.value }} className={f.fontClass}>{f.label}</span>
                           {currentFont === f.label && <Check className="w-3.5 h-3.5 text-blue-400" />}
                         </button>
                       ))}
@@ -574,6 +663,7 @@ export const MailComposer: React.FC<MailComposerProps> = ({
                 <div className="relative">
                   <button
                     type="button"
+                    onMouseDown={(e) => e.preventDefault()}
                     onClick={() => {
                       setIsSizeDropdownOpen(!isSizeDropdownOpen);
                       setIsFontDropdownOpen(false);
@@ -597,6 +687,7 @@ export const MailComposer: React.FC<MailComposerProps> = ({
                         <button
                           key={s.label}
                           type="button"
+                          onMouseDown={(e) => e.preventDefault()}
                           onClick={() => handleApplySize(s.label, s.cmd)}
                           className="w-full px-3 py-1.5 text-left text-xs text-slate-200 hover:bg-white/10 flex items-center justify-between transition-colors"
                         >
@@ -613,6 +704,7 @@ export const MailComposer: React.FC<MailComposerProps> = ({
                 {/* Bold */}
                 <button
                   type="button"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => executeCommand('bold')}
                   className="p-1.5 rounded hover:bg-white/10 text-slate-300 font-bold hover:text-white transition-colors"
                   title="Bold (Ctrl+B)"
@@ -623,6 +715,7 @@ export const MailComposer: React.FC<MailComposerProps> = ({
                 {/* Italic */}
                 <button
                   type="button"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => executeCommand('italic')}
                   className="p-1.5 rounded hover:bg-white/10 text-slate-300 italic hover:text-white transition-colors"
                   title="Italic (Ctrl+I)"
@@ -633,6 +726,7 @@ export const MailComposer: React.FC<MailComposerProps> = ({
                 {/* Underline */}
                 <button
                   type="button"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => executeCommand('underline')}
                   className="p-1.5 rounded hover:bg-white/10 text-slate-300 underline hover:text-white transition-colors"
                   title="Underline (Ctrl+U)"
@@ -644,6 +738,7 @@ export const MailComposer: React.FC<MailComposerProps> = ({
                 <div className="relative">
                   <button
                     type="button"
+                    onMouseDown={(e) => e.preventDefault()}
                     onClick={() => {
                       setIsColorDropdownOpen(!isColorDropdownOpen);
                       setIsFontDropdownOpen(false);
@@ -670,6 +765,7 @@ export const MailComposer: React.FC<MailComposerProps> = ({
                           <button
                             key={col}
                             type="button"
+                            onMouseDown={(e) => e.preventDefault()}
                             onClick={() => {
                               executeCommand('foreColor', col);
                               setIsColorDropdownOpen(false);
@@ -688,6 +784,7 @@ export const MailComposer: React.FC<MailComposerProps> = ({
                 {/* Alignment */}
                 <button
                   type="button"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => executeCommand('justifyLeft')}
                   className="p-1.5 rounded hover:bg-white/10 text-slate-300 hover:text-white transition-colors"
                   title="Align left"
@@ -696,6 +793,7 @@ export const MailComposer: React.FC<MailComposerProps> = ({
                 </button>
                 <button
                   type="button"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => executeCommand('justifyCenter')}
                   className="p-1.5 rounded hover:bg-white/10 text-slate-300 hover:text-white transition-colors"
                   title="Align center"
@@ -704,6 +802,7 @@ export const MailComposer: React.FC<MailComposerProps> = ({
                 </button>
                 <button
                   type="button"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => executeCommand('justifyRight')}
                   className="p-1.5 rounded hover:bg-white/10 text-slate-300 hover:text-white transition-colors"
                   title="Align right"
@@ -716,6 +815,7 @@ export const MailComposer: React.FC<MailComposerProps> = ({
                 {/* Numbered List */}
                 <button
                   type="button"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => executeCommand('insertOrderedList')}
                   className="p-1.5 rounded hover:bg-white/10 text-slate-300 hover:text-white transition-colors"
                   title="Numbered list"
@@ -726,6 +826,7 @@ export const MailComposer: React.FC<MailComposerProps> = ({
                 {/* Bulleted List */}
                 <button
                   type="button"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => executeCommand('insertUnorderedList')}
                   className="p-1.5 rounded hover:bg-white/10 text-slate-300 hover:text-white transition-colors"
                   title="Bulleted list"
@@ -736,6 +837,7 @@ export const MailComposer: React.FC<MailComposerProps> = ({
                 {/* Indent / Outdent */}
                 <button
                   type="button"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => executeCommand('outdent')}
                   className="p-1.5 rounded hover:bg-white/10 text-slate-300 hover:text-white transition-colors"
                   title="Indent less"
@@ -744,6 +846,7 @@ export const MailComposer: React.FC<MailComposerProps> = ({
                 </button>
                 <button
                   type="button"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => executeCommand('indent')}
                   className="p-1.5 rounded hover:bg-white/10 text-slate-300 hover:text-white transition-colors"
                   title="Indent more"
@@ -753,6 +856,7 @@ export const MailComposer: React.FC<MailComposerProps> = ({
 
                 <button
                   type="button"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => executeCommand('removeFormat')}
                   className="p-1.5 rounded hover:bg-white/10 text-slate-300 hover:text-rose-400 transition-colors ml-1"
                   title="Remove formatting"
@@ -765,6 +869,7 @@ export const MailComposer: React.FC<MailComposerProps> = ({
               <div className="flex items-center gap-0.5 text-slate-400">
                 <button
                   type="button"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => executeCommand('undo')}
                   className="p-1.5 rounded hover:bg-white/10 hover:text-white transition-colors"
                   title="Undo (Ctrl+Z)"
@@ -773,6 +878,7 @@ export const MailComposer: React.FC<MailComposerProps> = ({
                 </button>
                 <button
                   type="button"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => executeCommand('redo')}
                   className="p-1.5 rounded hover:bg-white/10 hover:text-white transition-colors"
                   title="Redo (Ctrl+Y)"
@@ -797,66 +903,88 @@ export const MailComposer: React.FC<MailComposerProps> = ({
               {/* Send Button Split Pill */}
               <div className="relative inline-flex rounded-full shadow-lg">
                 <button 
+                  type="button"
                   onClick={() => handleSend()} 
-                  disabled={isSending} 
-                  style={{ backgroundColor: 'var(--theme-accent, #2D5BFF)' }}
-                  className="px-5 py-2 rounded-l-full hover:brightness-110 disabled:opacity-50 text-white font-bold text-xs transition-all flex items-center gap-1.5 shadow-md"
+                  disabled={isSending}
+                  className="px-5 py-2 rounded-l-full bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-semibold text-xs flex items-center gap-2 transition-all disabled:opacity-50"
                 >
                   <span>{isSending ? 'Sending...' : 'Send'}</span>
+                  {!isSending && <Send className="w-3.5 h-3.5" />}
                 </button>
-                <div className="w-[1px] bg-black/30 z-10"></div>
-                <button 
-                  onClick={() => setIsScheduleOpen(!isScheduleOpen)} 
-                  disabled={isSending} 
-                  style={{ backgroundColor: 'var(--theme-accent, #2D5BFF)' }}
-                  className="px-2.5 py-2 rounded-r-full hover:brightness-110 disabled:opacity-50 text-white transition-all shadow-md"
-                  title="More send options"
+
+                {/* Schedule Send Dropdown trigger */}
+                <button
+                  type="button"
+                  onClick={() => setIsScheduleOpen(!isScheduleOpen)}
+                  disabled={isSending}
+                  className="px-2 py-2 rounded-r-full bg-blue-700 hover:bg-blue-600 text-white border-l border-blue-800 transition-colors flex items-center justify-center disabled:opacity-50"
+                  title="Schedule send"
                 >
                   <ChevronDown className="w-3.5 h-3.5" />
                 </button>
-                
-                {/* Schedule Send Popover */}
+
+                {/* Schedule Send Modal Dropdown */}
                 {isScheduleOpen && (
                   <div 
                     style={{
                       backgroundColor: 'var(--theme-bg-card, #12141A)',
                       borderColor: 'var(--theme-border, #1E232B)',
                     }}
-                    className="absolute left-0 bottom-[115%] w-60 rounded-xl border shadow-2xl py-1 z-50 animate-in fade-in slide-in-from-bottom-2"
+                    className="absolute left-0 bottom-full mb-2 w-60 rounded-xl border shadow-2xl py-2 z-50 animate-in fade-in"
                   >
-                    <div className="px-3 py-2 text-xs font-bold text-slate-300 border-b border-white/5 flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5 text-blue-400" />
-                      <span>Schedule send</span>
+                    <div className="px-3 py-1.5 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                      Schedule send
                     </div>
-                    {[
-                      { label: 'Tomorrow morning', time: '8:00 AM', hrs: 24 },
-                      { label: 'Tomorrow afternoon', time: '1:00 PM', hrs: 29 },
-                      { label: 'Monday morning', time: '8:00 AM', hrs: 72 },
-                    ].map((opt) => (
-                      <button 
-                        key={opt.label} 
-                        onClick={() => { 
-                          const d = new Date(); 
-                          d.setHours(d.getHours() + opt.hrs); 
-                          handleSend(d); 
-                        }} 
-                        className="w-full px-3 py-2 text-left text-xs text-slate-200 hover:bg-white/10 flex justify-between items-center transition-colors"
-                      >
-                        <span>{opt.label}</span>
-                        <span className="text-[10px] text-slate-400 font-mono">{opt.time}</span>
-                      </button>
-                    ))}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const d = new Date();
+                        d.setDate(d.getDate() + 1);
+                        d.setHours(8, 0, 0, 0);
+                        handleSend(d);
+                      }}
+                      className="w-full px-3 py-2 text-left text-xs text-slate-200 hover:bg-white/10 flex items-center justify-between transition-colors"
+                    >
+                      <span>Tomorrow morning</span>
+                      <span className="text-[11px] text-slate-500 font-mono">8:00 AM</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const d = new Date();
+                        d.setDate(d.getDate() + 1);
+                        d.setHours(13, 0, 0, 0);
+                        handleSend(d);
+                      }}
+                      className="w-full px-3 py-2 text-left text-xs text-slate-200 hover:bg-white/10 flex items-center justify-between transition-colors"
+                    >
+                      <span>Tomorrow afternoon</span>
+                      <span className="text-[11px] text-slate-500 font-mono">1:00 PM</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const d = new Date();
+                        d.setDate(d.getDate() + 7);
+                        d.setHours(8, 0, 0, 0);
+                        handleSend(d);
+                      }}
+                      className="w-full px-3 py-2 text-left text-xs text-slate-200 hover:bg-white/10 flex items-center justify-between transition-colors border-t border-white/5 mt-1"
+                    >
+                      <span>Next week</span>
+                      <span className="text-[11px] text-slate-500 font-mono">Mon, 8:00 AM</span>
+                    </button>
                   </div>
                 )}
               </div>
 
-              {/* Formatting Toggle (Aa) */}
-              <button
+              {/* Toggle Formatting Bar (Aa) */}
+              <button 
                 type="button"
                 onClick={() => setShowFormatting(!showFormatting)}
-                className={`px-2 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-1 ${
+                className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-colors ${
                   showFormatting 
-                    ? 'bg-white/10 text-white' 
+                    ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' 
                     : 'text-slate-400 hover:text-white hover:bg-white/5'
                 }`}
                 title="Formatting options"
@@ -898,12 +1026,17 @@ export const MailComposer: React.FC<MailComposerProps> = ({
                 <Link2 className="w-4 h-4" />
               </button>
 
-              {/* Emoji Picker (😀) */}
+              {/* Full Categorized Emoji Picker (😀) */}
               <div className="relative">
                 <button 
                   type="button"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => setIsEmojiPickerOpen(!isEmojiPickerOpen)}
-                  className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+                  className={`p-2 rounded-lg transition-colors ${
+                    isEmojiPickerOpen 
+                      ? 'bg-amber-500/20 text-amber-300' 
+                      : 'text-slate-400 hover:text-white hover:bg-white/10'
+                  }`}
                   title="Insert emoji"
                 >
                   <Smile className="w-4 h-4" />
@@ -915,146 +1048,196 @@ export const MailComposer: React.FC<MailComposerProps> = ({
                       backgroundColor: 'var(--theme-bg-card, #12141A)',
                       borderColor: 'var(--theme-border, #1E232B)',
                     }}
-                    className="absolute left-0 bottom-full mb-2 p-2 rounded-xl border shadow-2xl z-50 grid grid-cols-5 gap-1 animate-in fade-in"
+                    className="absolute left-0 bottom-full mb-2 p-3 rounded-2xl border shadow-2xl z-50 w-72 animate-in fade-in flex flex-col gap-2"
                   >
-                    {EMOJIS.map((e) => (
-                      <button
-                        key={e}
-                        type="button"
-                        onClick={() => handleInsertEmoji(e)}
-                        className="w-8 h-8 rounded hover:bg-white/10 flex items-center justify-center text-base hover:scale-125 transition-transform"
-                      >
-                        {e}
-                      </button>
-                    ))}
+                    {/* Search Bar */}
+                    <div className="relative">
+                      <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                      <input 
+                        type="text"
+                        value={emojiSearch}
+                        onChange={(e) => setEmojiSearch(e.target.value)}
+                        placeholder="Search emojis..."
+                        className="w-full bg-white/5 border border-white/10 rounded-lg pl-8 pr-3 py-1 text-xs text-white placeholder-slate-500 outline-none focus:border-blue-500"
+                      />
+                    </div>
+
+                    {/* Category Tabs */}
+                    {!emojiSearch.trim() && (
+                      <div className="flex items-center justify-between border-b border-white/10 pb-1.5 px-1">
+                        {EMOJI_CATEGORIES.map((cat, idx) => (
+                          <button
+                            key={cat.name}
+                            type="button"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => setEmojiCategory(idx)}
+                            className={`p-1 rounded-lg text-sm transition-all ${
+                              emojiCategory === idx 
+                                ? 'bg-blue-500/20 text-blue-400 scale-110' 
+                                : 'text-slate-400 hover:text-white hover:bg-white/5'
+                            }`}
+                            title={cat.name}
+                          >
+                            <span>{cat.icon}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Emoji Grid */}
+                    <div className="grid grid-cols-7 gap-1 max-h-48 overflow-y-auto custom-scrollbar p-1">
+                      {filteredEmojis.map((e, idx) => (
+                        <button
+                          key={`${e}-${idx}`}
+                          type="button"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => handleInsertEmoji(e)}
+                          className="w-8 h-8 rounded-lg hover:bg-white/15 text-lg flex items-center justify-center transition-transform hover:scale-125"
+                        >
+                          <span>{e}</span>
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
 
-              {/* Insert Photo / Image (🖼) */}
-              <button 
+              {/* Insert Signature */}
+              <button
                 type="button"
-                onClick={() => imageInputRef.current?.click()}
-                className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
-                title="Insert photo"
+                onClick={handleInsertSignature}
+                className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors text-xs font-semibold"
+                title="Insert signature"
               >
-                <ImageIcon className="w-4 h-4" />
+                <Type className="w-4 h-4" />
               </button>
 
-              {/* Confidential Mode (🔒) */}
-              <button 
+              {/* Confidential Mode */}
+              <button
                 type="button"
                 onClick={() => setIsConfidential(!isConfidential)}
                 className={`p-2 rounded-lg transition-colors ${
-                  isConfidential ? 'text-amber-400 bg-amber-500/10' : 'text-slate-400 hover:text-white hover:bg-white/10'
+                  isConfidential 
+                    ? 'bg-amber-500/20 text-amber-300' 
+                    : 'text-slate-400 hover:text-white hover:bg-white/10'
                 }`}
-                title="Toggle confidential mode"
+                title="Confidential mode"
               >
-                <Lock className="w-4 h-4" />
+                {isConfidential ? <Lock className="w-4 h-4 text-amber-400" /> : <Unlock className="w-4 h-4" />}
               </button>
-
-              {/* Insert Signature (✍) */}
-              <button 
-                type="button"
-                onClick={handleInsertSignature}
-                className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
-                title="Insert signature"
-              >
-                <PenTool className="w-4 h-4" />
-              </button>
-
-              {/* Hidden File Inputs */}
-              <input 
-                type="file" 
-                multiple 
-                ref={fileInputRef} 
-                onChange={async (e) => {
-                  const files = e.target.files;
-                  if (!files) return;
-                  const newAtts: ComposerAttachment[] = [];
-                  for (let i = 0; i < files.length; i++) {
-                    const base64 = await readFileAsBase64(files[i]);
-                    newAtts.push({ 
-                      id: `att-${Date.now()}-${i}`, 
-                      name: files[i].name, 
-                      sizeBytes: files[i].size, 
-                      dataBase64: base64, 
-                      file: files[i] 
-                    });
-                  }
-                  setAttachments([...attachments, ...newAtts]);
-                }} 
-                className="hidden" 
-              />
-
-              <input 
-                type="file" 
-                accept="image/*"
-                ref={imageInputRef} 
-                onChange={async (e) => {
-                  const file = e.target.files?.[0];
-                  if (!file) return;
-                  const base64 = await readFileAsBase64(file);
-                  if (editorRef.current) {
-                    editorRef.current.focus();
-                    document.execCommand('insertHTML', false, `<img src="data:${file.type};base64,${base64}" style="max-width:100%; border-radius:8px; margin:8px 0;" alt="${file.name}" />`);
-                  }
-                }} 
-                className="hidden" 
-              />
             </div>
 
-            {/* Right Discard / Trash */}
-            <div className="flex items-center gap-1 text-slate-400">
+            {/* Right Actions (Trash / Draft) */}
+            <div className="flex items-center gap-1">
               <button 
-                onClick={onClose} 
-                className="p-2 rounded-lg hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                type="button"
+                onClick={() => {
+                  if (onSaveDraft) {
+                    const textContent = editorRef.current?.innerText || '';
+                    const htmlContent = editorRef.current?.innerHTML || '';
+                    onSaveDraft({
+                      to: toChips,
+                      cc: ccChips,
+                      bcc: bccChips,
+                      subject,
+                      body: textContent,
+                      bodyText: textContent,
+                      bodyHtml: htmlContent,
+                      attachments,
+                    });
+                  }
+                  onClose();
+                }}
+                className="p-2 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
                 title="Discard draft"
               >
                 <Trash2 className="w-4 h-4" />
               </button>
             </div>
           </div>
-          
-          {/* AI Writer Panel (Expandable) */}
+
+          {/* AI Helper Flyout Drawer */}
           {isAiOpen && (
             <div 
               style={{
-                backgroundColor: 'var(--theme-bg-card, #12141A)',
+                backgroundColor: 'var(--theme-bg-sidebar, #090A0D)',
                 borderColor: 'var(--theme-border, #1E232B)',
               }}
-              className="absolute bottom-16 right-4 left-4 sm:left-auto sm:w-96 rounded-2xl border shadow-2xl p-4 z-50 animate-in slide-in-from-bottom-4"
+              className="p-3 border-t flex flex-col gap-2 z-30 animate-in slide-in-from-bottom-2"
             >
-              <div className="flex justify-between items-center mb-2.5">
-                <span className="text-xs font-bold text-purple-400 flex items-center gap-1.5">
+              <div className="flex items-center justify-between text-xs font-medium text-purple-300">
+                <span className="flex items-center gap-1.5">
                   <Sparkles className="w-3.5 h-3.5" /> Help me write
                 </span>
-                <button onClick={() => setIsAiOpen(false)} className="text-slate-400 hover:text-white">
-                  <X className="w-4 h-4" />
+                <button type="button" onClick={() => setIsAiOpen(false)} className="text-slate-400 hover:text-white">
+                  <X className="w-3.5 h-3.5" />
                 </button>
               </div>
-              <textarea 
-                value={aiPrompt}
-                onChange={(e) => setAiPrompt(e.target.value)}
-                placeholder="E.g., Ask for the project status update politely..." 
-                rows={3} 
-                className="w-full bg-black/30 border border-white/10 rounded-xl p-3 text-xs text-white resize-none outline-none focus:border-purple-500/50" 
-              />
-              <div className="flex justify-between items-center mt-3">
-                <span className="text-[10px] text-slate-500">Powered by Eazzio AI</span>
-                <button 
+              <div className="flex items-center gap-2">
+                <input 
+                  type="text" 
+                  value={aiPrompt}
+                  onChange={(e) => setAiPrompt(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleGenerateAi()}
+                  placeholder="e.g. Write a friendly follow-up about the project roadmap..."
+                  className="flex-1 bg-white/5 border border-purple-500/30 rounded-xl px-3 py-1.5 text-xs text-white placeholder-slate-500 outline-none focus:border-purple-500"
+                />
+                <button
+                  type="button"
                   onClick={handleGenerateAi}
                   disabled={isGeneratingAi || !aiPrompt.trim()}
-                  className="px-4 py-1.5 rounded-lg bg-gradient-to-r from-purple-500 to-blue-500 text-white font-bold text-xs hover:opacity-90 disabled:opacity-50 transition-opacity"
+                  className="px-4 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-semibold text-xs transition-colors disabled:opacity-50 flex items-center gap-1.5"
                 >
-                  {isGeneratingAi ? 'Writing...' : 'Generate'}
+                  <span>{isGeneratingAi ? 'Writing...' : 'Generate'}</span>
                 </button>
               </div>
             </div>
           )}
 
-        </div>
+          {/* Hidden File Inputs */}
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            multiple 
+            className="hidden" 
+            onChange={async (e) => {
+              const files = Array.from(e.target.files || []);
+              if (files.length === 0) return;
+              const newAtts: ComposerAttachment[] = [];
+              for (const file of files) {
+                const dataBase64 = await fileToBase64(file);
+                newAtts.push({
+                  id: `att-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                  name: file.name,
+                  contentType: file.type || 'application/octet-stream',
+                  sizeBytes: file.size,
+                  dataBase64,
+                });
+              }
+              setAttachments([...attachments, ...newAtts]);
+              if (fileInputRef.current) fileInputRef.current.value = '';
+            }} 
+          />
+          <input 
+            type="file" 
+            ref={imageInputRef} 
+            accept="image/*" 
+            className="hidden" 
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              const base64 = await fileToBase64(file);
+              const imgHtml = `<img src="data:${file.type};base64,${base64}" alt="${file.name}" style="max-width:100%; border-radius:8px; margin:8px 0;" />`;
+              restoreSelection();
+              document.execCommand('insertHTML', false, imgHtml);
+              saveSelection();
+              if (imageInputRef.current) imageInputRef.current.value = '';
+            }} 
+          />
+        </>
       )}
     </div>
   );
 };
+
+export default MailComposer;
