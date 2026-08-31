@@ -371,20 +371,26 @@ export function MailDashboardPage({ initialFolder = 'fld-inbox' }: { initialFold
     setThreads([]);
     setIsLoading(true);
 
+    const slug = getFolderSlug(folderId);
+    if (typeof window !== 'undefined') {
+      window.history.pushState(null, '', `/mail/${slug}`);
+    }
+
     // 2. Load fresh data for newly selected folder
     loadMessages(folderId);
   };
 
-  // Initial load with Auth Guard (run once on mount)
+  // Initial load and prop synchronization
   useEffect(() => {
     const isAuth = AuthStore.initFromStorage();
     if (!isAuth && !AuthStore.getState().isAuthenticated) {
       window.location.href = '/login';
       return;
     }
-    loadMessages('fld-inbox');
+    setActiveFolderId(initialFolder);
+    loadMessages(initialFolder);
     syncOtherFolderCounts();
-  }, [loadMessages, syncOtherFolderCounts]);
+  }, [initialFolder, loadMessages, syncOtherFolderCounts]);
 
   // Realtime WebSocket Subscription
   useEffect(() => {

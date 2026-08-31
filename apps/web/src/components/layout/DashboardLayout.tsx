@@ -65,7 +65,16 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('connected');
   const [searchQuery, setSearchQuery] = useState('');
   const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const [isMoreFoldersOpen, setIsMoreFoldersOpen] = useState(false);
+  const primaryFolders = customFolders.filter(f => ['inbox', 'starred', 'snoozed', 'sent', 'drafts'].includes(f.slug.toLowerCase()));
+  const secondaryFolders = customFolders.filter(f => !['inbox', 'starred', 'snoozed', 'sent', 'drafts'].includes(f.slug.toLowerCase()));
+  const isSecondaryActive = secondaryFolders.some(f => f.id === activeFolderId || f.slug.toLowerCase() === activeFolderId.replace('fld-', '').toLowerCase());
+  const [isMoreFoldersOpen, setIsMoreFoldersOpen] = useState(isSecondaryActive);
+
+  useEffect(() => {
+    if (isSecondaryActive) {
+      setIsMoreFoldersOpen(true);
+    }
+  }, [isSecondaryActive]);
 
   useEffect(() => {
     AuthStore.initFromStorage();
@@ -126,9 +135,6 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
       default: return <Mail className="w-[18px] h-[18px]" />;
     }
   };
-
-  const primaryFolders = customFolders.filter(f => ['inbox', 'starred', 'sent', 'drafts'].includes(f.slug.toLowerCase()));
-  const secondaryFolders = customFolders.filter(f => !['inbox', 'starred', 'sent', 'drafts'].includes(f.slug.toLowerCase()));
 
   const renderSidebarContent = () => (
     <div className="flex flex-col h-full bg-[#090A0D] border-r border-[#1E232B] text-slate-300 transition-all duration-300 ease-in-out w-64 overflow-hidden">
