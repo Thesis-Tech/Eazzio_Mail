@@ -81,6 +81,7 @@ export function MailDashboardPage({ initialFolder = 'fld-inbox' }: { initialFold
   const [preferences, setPreferences] = useState<UserPreferences>(initialPreferences);
   const [density, setDensity] = useState<'default' | 'comfortable' | 'compact'>('default');
   const [settingsTab, setSettingsTab] = useState<'general' | 'labels' | 'inbox' | 'accounts' | 'filters' | 'forwarding' | 'themes'>('general');
+  const [readingPane, setReadingPane] = useState<'none' | 'right' | 'below'>('none');
   const [toasts, setToasts] = useState<ToastNotification[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [conversationMap, setConversationMap] = useState<Record<string, MessageDetail[]>>({});
@@ -91,15 +92,19 @@ export function MailDashboardPage({ initialFolder = 'fld-inbox' }: { initialFold
   const isResizingRef = useRef(false);
   const startPosRef = useRef({ x: 0, width: 384 });
 
-  // Restore persisted width from localStorage on mount
+  // Restore persisted width & reading pane from localStorage on mount
   useEffect(() => {
     try {
-      const saved = localStorage.getItem('eazzio_thread_list_width');
-      if (saved) {
-        const parsed = parseInt(saved, 10);
+      const savedWidth = localStorage.getItem('eazzio_thread_list_width');
+      if (savedWidth) {
+        const parsed = parseInt(savedWidth, 10);
         if (!isNaN(parsed) && parsed >= 240 && parsed <= 850) {
           setThreadListWidth(parsed);
         }
+      }
+      const savedPane = localStorage.getItem('eazzio_reading_pane') as 'none' | 'right' | 'below';
+      if (savedPane && ['none', 'right', 'below'].includes(savedPane)) {
+        setReadingPane(savedPane);
       }
     } catch (_) {}
   }, []);
@@ -1242,6 +1247,8 @@ export function MailDashboardPage({ initialFolder = 'fld-inbox' }: { initialFold
       customLabels={labels}
       density={density}
       onDensityChange={setDensity}
+      readingPane={readingPane}
+      onReadingPaneChange={setReadingPane}
       onSearch={setSearchQuery}
       onOpenCompose={() => {
         setComposeInitialData({});
@@ -1252,16 +1259,26 @@ export function MailDashboardPage({ initialFolder = 'fld-inbox' }: { initialFold
         setIsSettingsOpen(true);
       }}
     >
-      <div className="flex-1 flex overflow-hidden" style={{ backgroundColor: 'var(--theme-bg-main, #0A0C10)' }}>
-        {/* Left Column: Thread List (Full-width when no message open, resizable split when message is selected) */}
+      <div 
+        style={{ backgroundColor: 'var(--theme-bg-main, #0A0C10)' }}
+        className={`flex-1 flex ${readingPane === 'below' && selectedThreadId ? 'flex-col' : 'flex-row'} overflow-hidden`}
+      >
+        {/* Column 1: Thread List */}
         <div
           style={{
-            ...(selectedThreadId ? { width: `${threadListWidth}px` } : {}),
+            ...(readingPane === 'right' && selectedThreadId ? { width: `${threadListWidth}px` } : {}),
+            ...(readingPane === 'below' && selectedThreadId ? { height: '50%' } : {}),
             backgroundColor: 'var(--theme-bg-main, #0A0C10)',
             borderColor: 'var(--theme-border, #1E232B)',
           }}
           className={`${
-            selectedThreadId ? 'hidden md:flex shrink-0 border-r' : 'flex flex-1 w-full'
+            readingPane === 'none' && selectedThreadId
+              ? 'hidden'
+              : readingPane === 'right' && selectedThreadId
+              ? 'hidden md:flex shrink-0 border-r'
+              : readingPane === 'below' && selectedThreadId
+              ? 'flex shrink-0 border-b'
+              : 'flex flex-1 w-full'
           } flex-col min-w-0`}
         >
           {/* Active Search Term Filter Chip Bar */}
@@ -1421,15 +1438,15 @@ export function MailDashboardPage({ initialFolder = 'fld-inbox' }: { initialFold
                 folderName={getFolderSlug(activeFolderId).toUpperCase()}
                 totalThreadsCount={displayedThreads.length}
                 onRefresh={() => loadMessages(activeFolderId)}
-                isSplitView={Boolean(selectedThreadId)}
+                isSplitView={readingPane !== 'none' && Boolean(selectedThreadId)}
                 density={density}
               />
             )}
           </div>
         </div>
 
-        {/* Resizable Split Slider Divider (only active when a conversation is opened) */}
-        {selectedThreadId && (
+        {/* Resizable Split Slider Divider (only active in 'right' reading pane mode) */}
+        {readingPane === 'right' && selectedThreadId && (
           <SplitSlider
             isDragging={isResizing}
             currentWidth={threadListWidth}
@@ -1439,11 +1456,13 @@ export function MailDashboardPage({ initialFolder = 'fld-inbox' }: { initialFold
           />
         )}
 
-        {/* Right Column: Active Conversation Viewer */}
+        {/* Active Conversation Viewer */}
         {selectedThreadId && selectedThread && (
           <div 
             style={{ backgroundColor: 'var(--theme-bg-main, #0A0C10)' }}
-            className="flex flex-1 flex-col overflow-hidden min-w-0"
+            className={`flex flex-1 flex-col overflow-hidden min-w-0 ${
+              readingPane === 'none' ? 'w-full' : ''
+            }`}
           >
             <ConversationViewer
               threadId={selectedThread.id}

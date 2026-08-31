@@ -32,6 +32,8 @@ export interface DashboardLayoutProps {
   customLabels?: LabelItem[];
   density?: 'default' | 'comfortable' | 'compact';
   onDensityChange?: (density: 'default' | 'comfortable' | 'compact') => void;
+  readingPane?: 'none' | 'right' | 'below';
+  onReadingPaneChange?: (readingPane: 'none' | 'right' | 'below') => void;
 }
 
 const defaultFolders: FolderItem[] = [
@@ -206,6 +208,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   customLabels = defaultLabels,
   density: propDensity,
   onDensityChange,
+  readingPane: propReadingPane,
+  onReadingPaneChange,
 }) => {
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
@@ -221,11 +225,26 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   const activeDensity = propDensity || internalDensity;
   const [theme, setTheme] = useState('dark-oled');
   const [inboxType, setInboxType] = useState<'default' | 'important' | 'unread' | 'starred' | 'priority'>('default');
-  const [readingPane, setReadingPane] = useState<'none' | 'right' | 'below'>('right');
+  const [internalReadingPane, setInternalReadingPane] = useState<'none' | 'right' | 'below'>('none');
+  const activeReadingPane = propReadingPane || internalReadingPane;
   const [conversationView, setConversationView] = useState(true);
 
   // Active theme configuration
   const currentTheme = getThemeConfig(theme);
+
+  // Handle Reading Pane Change with instant persistence
+  const handleReadingPaneChange = (newPane: 'none' | 'right' | 'below') => {
+    setInternalReadingPane(newPane);
+    if (onReadingPaneChange) onReadingPaneChange(newPane);
+    try {
+      localStorage.setItem('eazzio_reading_pane', newPane);
+      fetch('/api/settings/preferences', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ readingPane: newPane, density: activeDensity, theme, inboxType, conversationView }),
+      }).catch(() => {});
+    } catch (_) {}
+  };
 
   // Handle Density Change with instant persistence
   const handleDensityChange = (newDensity: 'default' | 'comfortable' | 'compact') => {
@@ -236,7 +255,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
       fetch('/api/settings/preferences', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ density: newDensity, theme, inboxType, readingPane, conversationView }),
+        body: JSON.stringify({ density: newDensity, theme, inboxType, readingPane: activeReadingPane, conversationView }),
       }).catch(() => {});
     } catch (_) {}
   };
@@ -249,7 +268,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
       fetch('/api/settings/preferences', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ theme: newTheme, density: activeDensity, inboxType, readingPane, conversationView }),
+        body: JSON.stringify({ theme: newTheme, density: activeDensity, inboxType, readingPane: activeReadingPane, conversationView }),
       }).catch(() => {});
     } catch (_) {}
   };
@@ -273,7 +292,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
     if (token) realtimeClient.setToken(token);
     realtimeClient.connect();
 
-    // Restore saved theme and density from local storage or backend
+    // Restore saved theme, density, and reading pane from local storage or backend
     try {
       const savedTheme = localStorage.getItem('eazzio_theme');
       if (savedTheme && THEME_CONFIGS[savedTheme]) {
@@ -283,6 +302,11 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
       if (savedDensity && ['default', 'comfortable', 'compact'].includes(savedDensity)) {
         setInternalDensity(savedDensity);
         if (onDensityChange) onDensityChange(savedDensity);
+      }
+      const savedPane = localStorage.getItem('eazzio_reading_pane') as 'none' | 'right' | 'below';
+      if (savedPane && ['none', 'right', 'below'].includes(savedPane)) {
+        setInternalReadingPane(savedPane);
+        if (onReadingPaneChange) onReadingPaneChange(savedPane);
       }
 
       fetch('/api/settings/preferences')
@@ -296,6 +320,11 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
             setInternalDensity(json.data.density);
             if (onDensityChange) onDensityChange(json.data.density);
             localStorage.setItem('eazzio_density', json.data.density);
+          }
+          if (json.data?.readingPane && ['none', 'right', 'below'].includes(json.data.readingPane)) {
+            setInternalReadingPane(json.data.readingPane);
+            if (onReadingPaneChange) onReadingPaneChange(json.data.readingPane);
+            localStorage.setItem('eazzio_reading_pane', json.data.readingPane);
           }
         })
         .catch(() => {});
@@ -642,8 +671,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         onChangeTheme={handleThemeChange}
         inboxType={inboxType}
         onChangeInboxType={setInboxType}
-        readingPane={readingPane}
-        onChangeReadingPane={setReadingPane}
+        readingPane={activeReadingPane}
+        onChangeReadingPane={handleReadingPaneChange}
         conversationView={conversationView}
         onToggleConversationView={setConversationView}
       />
