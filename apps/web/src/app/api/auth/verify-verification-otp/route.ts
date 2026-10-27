@@ -1,74 +1,150 @@
 import { NextResponse } from 'next/server';
-import { OtpStore } from '../../../../lib/otp-store';
+import crypto from 'crypto';
+import { prisma } from '../../../../lib/prisma';
 
-const API_BACKEND_URL = process.env.API_BACKEND_URL || 'http://127.0.0.1:8080';
-
+/**
+ * Hardened OTP Verification Route
+ * Enforces:
+ * - Constant-time comparison of hashed OTP
+ * - Invalidation after 5 failed attempts
+ * - Invalidation upon expiry (5-minute TTL)
+ * - Atomic invalidation on successful verification (prevents replay / reuse)
+ * - No master test bypass codes (123456/999999 banned)
+ */
 export async function POST(req: Request) {
   try {
-    const { target, code } = (await req.json()) as {
+    const { target, code, channel, email: accountEmail } = (await req.json()) as {
       target?: string;
       code?: string;
+      channel?: 'email' | 'telegram' | 'whatsapp';
+      email?: string;
     };
 
-    if (!target || !code) {
+    if ((!target && !accountEmail) || !code) {
       return NextResponse.json(
-        { error: 'Target identifier and verification code are required' },
+        { error: 'Identifier and verification code are required' },
         { status: 400 }
       );
     }
 
-    const cleanTarget = target.trim();
     const cleanCode = code.trim();
-
-    // 1. Allow master test codes in development
-    if (cleanCode === '123456' || cleanCode === '999999') {
-      return NextResponse.json({
-        success: true,
-        verified: true,
-        target: cleanTarget,
-        message: 'Verification confirmed',
-      });
-    }
-
-    // 2. If email target, check with Backend API OTP store
-    if (cleanTarget.includes('@')) {
-      try {
-        const apiRes = await fetch(`${API_BACKEND_URL}/v1/auth/otp/verify`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: cleanTarget, code: cleanCode }),
-        });
-
-        const apiData = await apiRes.json();
-        if (apiRes.ok && apiData.success) {
-          return NextResponse.json({
-            success: true,
-            verified: true,
-            target: cleanTarget,
-            message: 'Email successfully verified',
-          });
-        }
-      } catch (err) {
-        console.warn('[Backend OTP Verification Warning]', err);
-      }
-    }
-
-    // 3. Check with local OtpStore
-    const isValid = OtpStore.verifyOtp(cleanTarget, cleanCode);
-    if (!isValid) {
+    if (!/^\d{6}$/.test(cleanCode)) {
       return NextResponse.json(
-        { error: 'Invalid or expired verification code. Please check and try again.' },
+        { error: 'Verification code must be exactly 6 digits' },
         { status: 400 }
       );
     }
+
+    const rawTarget = (target || accountEmail || '').trim();
+    const activeChannel = channel || (rawTarget.includes('@') ? 'email' : 'whatsapp');
+
+    // 1. Resolve Identifier Key
+    let identifierKey = '';
+    if (activeChannel === 'email') {
+      identifierKey = `otp:email:${rawTarget.toLowerCase()}`;
+    } else if (activeChannel === 'telegram') {
+      const userLookup = accountEmail || (rawTarget.includes('@') ? rawTarget : null);
+      if (!userLookup) {
+        return NextResponse.json(
+          { error: 'Account email required for Telegram verification' },
+          { status: 400 }
+        );
+      }
+      const user = await prisma.user.findFirst({
+        where: {
+          OR: [{ email: userLookup.toLowerCase() }, { recoveryEmail: userLookup.toLowerCase() }],
+        },
+      });
+      if (!user) {
+        return NextResponse.json(
+          { error: 'Account not found for Telegram verification' },
+          { status: 404 }
+        );
+      }
+      identifierKey = `otp:telegram:${user.id}`;
+    } else {
+      return NextResponse.json(
+        { error: 'Unsupported verification channel' },
+        { status: 400 }
+      );
+    }
+
+    // 2. Query Active Verification Record
+    const record = await prisma.verification.findFirst({
+      where: { identifier: identifierKey },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!record) {
+      return NextResponse.json(
+        { error: 'No verification code was requested or the code has expired.' },
+        { status: 400 }
+      );
+    }
+
+    // Check Expiration
+    if (Date.now() > record.expiresAt.getTime()) {
+      await prisma.verification.delete({ where: { id: record.id } }).catch(() => {});
+      return NextResponse.json(
+        { error: 'Verification code has expired. Please request a new code.' },
+        { status: 400 }
+      );
+    }
+
+    // Parse stored hash and attempts
+    const [storedHash, attemptsStr] = record.value.split(':');
+    let attempts = parseInt(attemptsStr || '0', 10);
+
+    // Enforce 5-attempt brute-force limit
+    if (attempts >= 5) {
+      await prisma.verification.delete({ where: { id: record.id } }).catch(() => {});
+      return NextResponse.json(
+        {
+          error:
+            'Too many incorrect attempts. For security, this verification code has been invalidated. Please request a new code.',
+        },
+        { status: 429 }
+      );
+    }
+
+    // 3. Constant-Time Hash Comparison
+    const submittedHash = crypto.createHash('sha256').update(cleanCode).digest('hex');
+    const isMatch = crypto.timingSafeEqual(
+      Buffer.from(storedHash, 'hex'),
+      Buffer.from(submittedHash, 'hex')
+    );
+
+    if (!isMatch) {
+      attempts += 1;
+      await prisma.verification.update({
+        where: { id: record.id },
+        data: { value: `${storedHash}:${attempts}` },
+      });
+
+      const remainingAttempts = 5 - attempts;
+      return NextResponse.json(
+        {
+          error: `Incorrect verification code. ${remainingAttempts} attempt${
+            remainingAttempts === 1 ? '' : 's'
+          } remaining.`,
+          remainingAttempts,
+        },
+        { status: 400 }
+      );
+    }
+
+    // 4. Success: Atomically Invalidate to prevent replay
+    await prisma.verification.delete({ where: { id: record.id } }).catch(() => {});
 
     return NextResponse.json({
       success: true,
       verified: true,
-      target: cleanTarget,
-      message: 'Verification confirmed',
+      target: rawTarget,
+      channel: activeChannel,
+      message: 'Verification successful',
     });
   } catch (err: unknown) {
+    console.error('[verify-verification-otp error]:', err);
     return NextResponse.json(
       { error: (err as Error).message || 'Verification failed' },
       { status: 500 }

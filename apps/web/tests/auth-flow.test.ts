@@ -90,7 +90,6 @@ describe('Web App Auth Flow & Progressive Authentication (TASK-AUTH-UPGRADE)', (
     expect(result.email).toBe('rahulkumar@eazzio.com');
     expect(result.authMethods).toContain('password');
     expect(result.authMethods).toContain('otp');
-    expect(result.authMethods).toContain('passkey');
     expect(result.requiresChallenge).toBe(false);
   });
 

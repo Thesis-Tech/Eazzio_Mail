@@ -168,9 +168,6 @@ export default function LoginPage() {
     try {
       const data = await AuthStore.sendOtp(normalizedEmail);
       setOtpCooldown(data.cooldownSeconds || 60);
-      if (data.devCode) {
-        setOtpCode(data.devCode);
-      }
       setStep('otp');
     } catch (err: any) {
       setErrorMessage(err.message || 'Failed to send verification code.');

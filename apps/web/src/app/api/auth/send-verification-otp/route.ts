@@ -1,210 +1,177 @@
 import { NextResponse } from 'next/server';
-import { OtpStore } from '../../../../lib/otp-store';
+import crypto from 'crypto';
+import { prisma } from '../../../../lib/prisma';
+import { sendEmailOtp } from '../../../../lib/email-dispatcher';
+import { sendTelegramOtp } from '../../../../lib/telegram-dispatcher';
 
-const API_BACKEND_URL = process.env.API_BACKEND_URL || 'http://127.0.0.1:8080';
-
+/**
+ * Hardened OTP Dispatch Route
+ * Enforces:
+ * - 6-digit cryptographically secure OTP
+ * - 5-minute TTL
+ * - 60-second resend cooldown per target
+ * - Hashed storage in database `verification` table
+ * - Strict verification check: telegram dispatched ONLY to user's verified linked telegramChatId
+ * - NO test bypass codes, NO devCode in production response
+ */
 export async function POST(req: Request) {
   try {
-    const { target, channel, countryCode = '+91' } = (await req.json()) as {
+    const { target, channel, email: accountEmail } = (await req.json()) as {
       target?: string;
-      channel?: 'whatsapp' | 'telegram' | 'email';
-      countryCode?: string;
+      channel?: 'email' | 'telegram' | 'whatsapp';
+      email?: string;
     };
 
-    if (!target || !target.trim()) {
+    if (!target && !accountEmail) {
       return NextResponse.json(
-        { error: 'Phone number or recovery email is required' },
+        { error: 'Account identifier or delivery target is required' },
         { status: 400 }
       );
     }
 
-    const cleanTarget = target.trim();
-    const activeChannel = channel || (cleanTarget.includes('@') ? 'email' : 'whatsapp');
+    const rawTarget = (target || accountEmail || '').trim();
+    const activeChannel = channel || (rawTarget.includes('@') ? 'email' : 'whatsapp');
 
-    // Validation
+    // WhatsApp is disabled by default
+    if (activeChannel === 'whatsapp') {
+      return NextResponse.json(
+        {
+          error:
+            'WhatsApp verification is currently disabled. Please use Recovery Email or Telegram Bot.',
+        },
+        { status: 400 }
+      );
+    }
+
+    // 1. Resolve Delivery Target & Security Linkage
+    let resolvedEmail = '';
+    let resolvedChatId: string | null = null;
+    let identifierKey = '';
+
     if (activeChannel === 'email') {
-      if (!cleanTarget.includes('@') || !cleanTarget.includes('.')) {
+      if (!rawTarget.includes('@') || !rawTarget.includes('.')) {
         return NextResponse.json(
-          { error: 'Please enter a valid recovery email address' },
+          { error: 'Please enter a valid email address' },
+          { status: 400 }
+        );
+      }
+      resolvedEmail = rawTarget.toLowerCase();
+      identifierKey = `otp:email:${resolvedEmail}`;
+    } else if (activeChannel === 'telegram') {
+      // Find user by account email or target identifier
+      const userLookup = accountEmail || (rawTarget.includes('@') ? rawTarget : null);
+      if (!userLookup) {
+        return NextResponse.json(
+          {
+            error:
+              'Account email is required to verify your linked Telegram bot destination.',
+          },
           { status: 400 }
         );
       }
 
-      // Generate real 6-digit OTP and store immediately for instant verification
-      const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
-      OtpStore.setOtp(cleanTarget, generatedOtp, 'email', 300);
+      const user = await prisma.user.findFirst({
+        where: {
+          OR: [{ email: userLookup.toLowerCase() }, { recoveryEmail: userLookup.toLowerCase() }],
+        },
+      });
 
-      // Dispatch via Brevo / SMTP relay through backend API
-      try {
-        const apiRes = await fetch(`${API_BACKEND_URL}/v1/auth/otp/send`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: cleanTarget, customCode: generatedOtp }),
-        });
-
-        if (!apiRes.ok) {
-          const errData = await apiRes.json().catch(() => ({}));
-          console.warn('[Email OTP Relay API Warning]', errData);
-        }
-      } catch (err: any) {
-        console.warn('[Email OTP Gateway Error]', err);
+      if (!user || !user.telegramChatId) {
+        return NextResponse.json(
+          {
+            error:
+              'No verified Telegram account is linked to this profile. Please use your recovery email or link Telegram in Account Settings.',
+          },
+          { status: 400 }
+        );
       }
 
-      return NextResponse.json({
-        success: true,
-        channel: 'email',
-        target: cleanTarget,
-        message: `6-digit verification code sent to ${cleanTarget}`,
-        cooldownSeconds: 60,
+      resolvedChatId = user.telegramChatId;
+      identifierKey = `otp:telegram:${user.id}`;
+    }
+
+    // 2. Enforce 60-second Resend Cooldown
+    const existingOtp = await prisma.verification.findFirst({
+      where: {
+        identifier: identifierKey,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (existingOtp) {
+      const elapsedSeconds = Math.floor((Date.now() - existingOtp.createdAt.getTime()) / 1000);
+      if (elapsedSeconds < 60) {
+        const remaining = 60 - elapsedSeconds;
+        return NextResponse.json(
+          {
+            error: `Please wait ${remaining} seconds before requesting another verification code.`,
+            cooldownSeconds: remaining,
+          },
+          { status: 429 }
+        );
+      }
+      // Invalidate previous outstanding OTPs for this target
+      await prisma.verification.deleteMany({
+        where: { identifier: identifierKey },
       });
     }
 
-    // Phone / WhatsApp / Telegram Channels
-    const digitsOnly = cleanTarget.replace(/[^0-9]/g, '');
-    if (digitsOnly.length < 7 || digitsOnly.length > 15) {
-      return NextResponse.json(
-        { error: 'Please enter a valid phone number (7-15 digits)' },
-        { status: 400 }
-      );
-    }
+    // 3. Generate Cryptographically Secure 6-Digit OTP
+    const otpValue = crypto.randomInt(100000, 999999).toString();
+    const otpHash = crypto.createHash('sha256').update(otpValue).digest('hex');
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes TTL
 
-    // Generate random 6-digit OTP
-    const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
-    OtpStore.setOtp(cleanTarget, generatedOtp, activeChannel, 300); // 5 minutes TTL
+    // Store in Better Auth Verification table (hashed value with attempts counter in metadata)
+    // Format: hash:attempts (e.g. "<hex>:0")
+    await prisma.verification.create({
+      data: {
+        identifier: identifierKey,
+        value: `${otpHash}:0`,
+        expiresAt,
+      },
+    });
 
-    let dispatchNotice = '';
-    let devCode: string | undefined = undefined;
-
-    if (activeChannel === 'whatsapp') {
-      const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
-      const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
-      const fullPhone = cleanTarget.startsWith('+')
-        ? cleanTarget.replace(/[^0-9]/g, '')
-        : `${countryCode.replace(/[^0-9]/g, '')}${cleanTarget.replace(/[^0-9]/g, '')}`;
-
-      if (accessToken && phoneNumberId) {
-        try {
-          const metaUrl = `https://graph.facebook.com/v21.0/${phoneNumberId}/messages`;
-          const metaRes = await fetch(metaUrl, {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              messaging_product: 'whatsapp',
-              recipient_type: 'individual',
-              to: fullPhone,
-              type: 'text',
-              text: {
-                preview_url: false,
-                body: `Your Eazzio Mail verification code is: *${generatedOtp}*. It expires in 5 minutes. Do not share this code with anyone.`,
-              },
-            }),
-          });
-          if (!metaRes.ok) {
-            const errJson = await metaRes.json().catch(() => ({}));
-            console.error('[WhatsApp Cloud API Error]', errJson);
-          }
-        } catch (err) {
-          console.warn('[WhatsApp Cloud Gateway Warning]', err);
-        }
-      } else {
-        devCode = generatedOtp;
+    // 4. Dispatch via Selected Channel
+    if (activeChannel === 'email') {
+      const dispatch = await sendEmailOtp({
+        to: resolvedEmail,
+        otp: otpValue,
+        type: 'email-verification',
+      });
+      if (!dispatch.success) {
+        return NextResponse.json(
+          { error: dispatch.error || 'Failed to dispatch email verification code' },
+          { status: 502 }
+        );
       }
-      console.log(`[Eazzio Security] WhatsApp OTP for ${cleanTarget}: ${generatedOtp}`);
-      dispatchNotice = `6-digit verification code sent to WhatsApp (${cleanTarget})`;
     } else if (activeChannel === 'telegram') {
-      const telegramBotToken = process.env.TELEGRAM_BOT_TOKEN;
-      let targetChatId: string | number | undefined = process.env.TELEGRAM_CHAT_ID;
-
-      // If user provided a numeric chat ID directly
-      if (/^-?\d{5,15}$/.test(cleanTarget)) {
-        targetChatId = cleanTarget;
+      const dispatch = await sendTelegramOtp({
+        chatId: resolvedChatId!,
+        otp: otpValue,
+        purpose: 'verification',
+      });
+      if (!dispatch.success) {
+        return NextResponse.json(
+          { error: dispatch.error || 'Failed to dispatch Telegram verification code' },
+          { status: 502 }
+        );
       }
-
-      if (telegramBotToken) {
-        try {
-          // Always fetch latest chats from bot to find matching user
-          const updatesRes = await fetch(`https://api.telegram.org/bot${telegramBotToken}/getUpdates`, {
-            signal: AbortSignal.timeout(5000),
-          });
-          const updatesData = await updatesRes.json();
-
-          if (updatesData.ok && Array.isArray(updatesData.result) && updatesData.result.length > 0) {
-            const updates = updatesData.result;
-            const cleanInput = cleanTarget.replace(/^[@+]/g, '').replace(/[^0-9a-zA-Z]/g, '').toLowerCase();
-
-            // Try to match by username or phone number
-            const foundUpdate = updates.slice().reverse().find((u: any) => {
-              const username = u.message?.from?.username?.toLowerCase();
-              const phone = u.message?.contact?.phone_number?.replace(/[^0-9]/g, '');
-              const chatId = String(u.message?.chat?.id || '');
-              return (
-                (username && cleanInput.includes(username)) ||
-                (username && username.includes(cleanInput)) ||
-                (phone && cleanInput.includes(phone)) ||
-                (chatId === cleanTarget)
-              );
-            });
-
-            if (foundUpdate) {
-              targetChatId = foundUpdate.message?.chat?.id;
-              console.log(`[Telegram] Matched user chat: ${targetChatId} (username: ${foundUpdate.message?.from?.username})`);
-            } else if (!targetChatId) {
-              // No match found and no TELEGRAM_CHAT_ID env — use the most recent chat
-              const lastUpdate = updates[updates.length - 1];
-              targetChatId = lastUpdate.message?.chat?.id;
-              console.log(`[Telegram] No match, using latest chat: ${targetChatId}`);
-            }
-          }
-
-          if (targetChatId) {
-            const sendRes = await fetch(`https://api.telegram.org/bot${telegramBotToken}/sendMessage`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                chat_id: targetChatId,
-                text: `🔐 *Eazzio Mail Security Verification*\n\nYour 6-digit verification code is:\n\n👉 \`${generatedOtp}\` 👈\n\nThis code expires in 5 minutes. Do not share it with anyone.`,
-                parse_mode: 'Markdown',
-              }),
-            });
-            const sendData = await sendRes.json();
-            if (sendData.ok) {
-              console.log(`[Eazzio Security] ✅ Telegram OTP dispatched to chat ${targetChatId}`);
-            } else {
-              console.warn(`[Eazzio Security] ❌ Telegram send failed:`, sendData.description);
-            }
-          } else {
-            console.warn(`[Eazzio Security] ❌ No Telegram chat ID found. User must /start the bot first.`);
-          }
-        } catch (tgErr) {
-          console.warn('[Telegram Gateway Warning]', tgErr);
-        }
-      } else {
-        console.warn('[Telegram] TELEGRAM_BOT_TOKEN not set in .env');
-      }
-      console.log(`[Eazzio Security] Telegram OTP for ${cleanTarget}: ${generatedOtp}`);
-      dispatchNotice = `6-digit verification code sent via Telegram (${cleanTarget})`;
     }
-
-
 
     return NextResponse.json({
       success: true,
       channel: activeChannel,
-      target: cleanTarget,
-      message: dispatchNotice,
+      message:
+        activeChannel === 'telegram'
+          ? '6-digit verification code sent to your linked Telegram account'
+          : `6-digit verification code sent to ${resolvedEmail}`,
       cooldownSeconds: 60,
-      devCode,
     });
-
   } catch (err: unknown) {
-    console.error('Failed to send verification OTP:', err);
+    console.error('[send-verification-otp error]:', err);
     return NextResponse.json(
-      { error: (err as Error).message || 'Failed to send verification code' },
+      { error: (err as Error).message || 'Failed to dispatch verification code' },
       { status: 500 }
     );
   }
 }
-

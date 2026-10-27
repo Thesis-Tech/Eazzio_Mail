@@ -86,10 +86,11 @@ export default function ForgotPasswordPage() {
         ? target
         : (target.startsWith('+') ? target : `${countryCode}${target}`);
 
-      const res = await AuthStore.forgotPassword(identifier.trim(), channel, fullTarget);
-      if (res.devToken) {
-        setResetToken(res.devToken);
-      }
+      const res = await AuthStore.forgotPassword(
+        identifier.trim(),
+        channel === 'telegram' ? 'telegram' : 'email',
+        fullTarget
+      );
       setDispatchNotice(res.message || `Reset code sent via ${channel}`);
       setStep('code');
     } catch (err: any) {
