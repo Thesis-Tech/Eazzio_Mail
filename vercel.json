@@ -1,0 +1,5 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "npx prisma generate && pnpm --filter @eazzio/domain build && pnpm --filter @eazzio/contracts build && pnpm --filter @eazzio/ui-kit build && pnpm --filter @eazzio/identity build && pnpm --filter @eazzio/web build",
+  "framework": "nextjs"
+}
