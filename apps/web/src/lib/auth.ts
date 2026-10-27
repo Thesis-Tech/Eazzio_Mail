@@ -1,6 +1,7 @@
 import { betterAuth } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { emailOTP, bearer } from 'better-auth/plugins';
+import { dash } from '@better-auth/infra';
 import { prisma } from './prisma';
 import { sendEmailOtp } from './email-dispatcher';
 
@@ -50,6 +51,7 @@ export const auth = betterAuth({
     },
   },
   plugins: [
+    dash(),
     bearer(),
     emailOTP({
       otpLength: 6,
