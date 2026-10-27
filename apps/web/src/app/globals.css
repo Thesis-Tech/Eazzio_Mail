@@ -3,28 +3,41 @@
 @tailwind utilities;
 
 :root {
-  --bg-primary: #ffffff;
-  --bg-secondary: #f4f5f7;
-  --text-primary: #14161a;
-  --text-secondary: #5b616e;
-  --brand-primary: #2d5bff;
-  --brand-accent: #ffa43d;
-  --border: #e2e4e9;
-}
-
-.dark {
-  --bg-primary: #0f1115;
-  --bg-secondary: #16181d;
-  --text-primary: #edeef0;
-  --text-secondary: #9aa0ac;
-  --brand-primary: #2d5bff;
-  --brand-accent: #ffa43d;
-  --border: #2a2e37;
+  --bg-primary: #F8FAFC;
+  --bg-secondary: #FFFFFF;
+  --bg-surface: #FFFFFF;
+  --bg-card: #FFFFFF;
+  --bg-hover: #F1F5F9;
+  --bg-sidebar: #FFFFFF;
+  --bg-header: #FFFFFF;
+  --text-primary: #0F172A;
+  --text-secondary: #475569;
+  --text-muted: #64748B;
+  --brand-primary: #14B8A6;
+  --brand-hover: #0D9488;
+  --brand-soft: #CCFBF1;
+  --brand-subtle: #F0FDFA;
+  --brand-active-text: #0F766E;
+  --border: #E2E8F0;
+  --border-strong: #CBD5E1;
+  --theme-bg-main: #F8FAFC;
+  --theme-bg-sidebar: #FFFFFF;
+  --theme-bg-header: #FFFFFF;
+  --theme-bg-card: #FFFFFF;
+  --theme-bg-hover: #F1F5F9;
+  --theme-border: #E2E8F0;
+  --theme-accent: #14B8A6;
+  --theme-accent-hover: #0D9488;
+  --theme-accent-bg: #F0FDFA;
+  --theme-accent-glow: rgba(20, 184, 166, 0.15);
+  --theme-text-primary: #0F172A;
+  --theme-text-secondary: #475569;
+  --theme-text-muted: #64748B;
 }
 
 body {
-  color: var(--text-primary);
-  background: var(--bg-primary);
+  color: #0F172A;
+  background: #F8FAFC;
   font-family:
     Inter,
     -apple-system,
@@ -32,4 +45,64 @@ body {
     'Segoe UI',
     Roboto,
     sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Universal Consistent Clean Scrollbar System (Firefox + WebKit) */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #CBD5E1 #F8FAFC;
+}
+
+.dark * {
+  scrollbar-color: #334155 #0F172A;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #F8FAFC;
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: #0F172A;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #334155;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+/* Accessible Skip Link */
+.skip-link {
+  position: absolute;
+  top: -999px;
+  left: 1rem;
+  z-index: 100;
+  padding: 0.5rem 1rem;
+  background: #14B8A6;
+  color: #ffffff;
+  font-weight: 700;
+  border-radius: 0.75rem;
+  text-decoration: none;
+  transition: top 0.2s ease-in-out;
+}
+
+.skip-link:focus {
+  top: 1rem;
 }

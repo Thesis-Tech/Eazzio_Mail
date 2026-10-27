@@ -11,6 +11,8 @@ export interface ToastNotification {
   message: string;
   threadId?: string;
   timestamp: string;
+  actionLabel?: string;
+  onAction?: () => void;
 }
 
 export interface ToastContainerProps {
@@ -59,6 +61,21 @@ export const ToastContainer: React.FC<ToastContainerProps> = ({
 
             <p className="text-xs font-medium text-slate-200 truncate mt-0.5">{typeof toast.title === 'string' ? toast.title : JSON.stringify(toast.title)}</p>
             <p className="text-xs text-slate-400 truncate mt-0.5">{typeof toast.message === 'string' ? toast.message : JSON.stringify(toast.message)}</p>
+            {toast.actionLabel && toast.onAction && (
+              <div className="mt-2 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toast.onAction?.();
+                    onDismiss(toast.id);
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-[#14B8A6] hover:bg-[#0D9488] text-white text-[11px] font-bold tracking-wide transition-colors shadow-sm"
+                >
+                  {toast.actionLabel}
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Dismiss Button */}

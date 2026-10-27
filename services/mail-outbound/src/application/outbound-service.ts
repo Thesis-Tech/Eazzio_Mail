@@ -24,6 +24,7 @@ export interface ComposeMessageInput {
   idempotencyKey?: string;
   mailboxId?: string;
   folderId?: string;
+  undoGraceSeconds?: number;
 }
 
 let cachedFallbackDkimKey: { privateKey: string; publicKey: string } | null = null;
@@ -79,7 +80,8 @@ export class OutboundService {
     const mimeString = mimeHeaderLines.join('\r\n');
     const unsignedMime = Buffer.from(mimeString, 'utf-8');
 
-    const privateKey = input.dkimPrivateKeyPem || process.env.DKIM_PRIVATE_KEY || getFallbackDkimKey().privateKey;
+    const privateKey =
+      input.dkimPrivateKeyPem || process.env.DKIM_PRIVATE_KEY || getFallbackDkimKey().privateKey;
     const selector = input.dkimSelector || process.env.DKIM_SELECTOR || 'default';
 
     try {
@@ -134,6 +136,11 @@ export class OutboundService {
     }
 
     // 3. Enqueue delivery record per recipient in outbound_queue
+    // If undoGraceSeconds is provided (> 0), buffer the delivery by scheduling nextAttemptAt in the future
+    const graceMs =
+      input.undoGraceSeconds && input.undoGraceSeconds > 0 ? input.undoGraceSeconds * 1000 : 0;
+    const initialAttemptAt = new Date(Date.now() + graceMs);
+
     if (this.queueRepo) {
       for (const recipient of input.to) {
         const queueId = crypto.randomUUID();
@@ -147,7 +154,7 @@ export class OutboundService {
           recipientAddress: recipient,
           state: 'queued',
           attemptCount: 0,
-          nextAttemptAt: new Date(),
+          nextAttemptAt: initialAttemptAt,
           idempotencyKey,
           createdAt: new Date(),
         });
@@ -156,6 +163,20 @@ export class OutboundService {
     }
 
     return { messageId, queueIds };
+  }
+
+  public async cancelOutbound(identifier: {
+    messageId?: string;
+    queueId?: string;
+  }): Promise<boolean> {
+    if (!this.queueRepo) return false;
+    let cancelled = false;
+    if (identifier.queueId) {
+      cancelled = await this.queueRepo.cancelById(identifier.queueId);
+    } else if (identifier.messageId) {
+      cancelled = await this.queueRepo.cancelByMessageId(identifier.messageId);
+    }
+    return cancelled;
   }
 
   public static handleDeliveryAttempt(params: {
@@ -186,10 +207,10 @@ export class OutboundService {
 
     const isPermanentRejection = Boolean(
       params.smtpCode &&
-        (params.smtpCode.startsWith('5') ||
-          params.smtpCode.includes('(5') ||
-          params.smtpCode.toLowerCase().includes('permanent') ||
-          params.smtpCode.toLowerCase().includes('notauthorized'))
+      (params.smtpCode.startsWith('5') ||
+        params.smtpCode.includes('(5') ||
+        params.smtpCode.toLowerCase().includes('permanent') ||
+        params.smtpCode.toLowerCase().includes('notauthorized')),
     );
 
     const { nextAttemptAt, isExhausted } = calculateNextAttempt(params.currentAttempts, now);

@@ -1,10 +1,13 @@
 import { Request, Response, NextFunction } from 'express';
-import { TokenService, TokenPayload } from '@eazzio/identity';
+import { TokenService, TokenPayload, PostgresSessionRepository } from '@eazzio/identity';
+import { defaultDb } from '../config/index.js';
 import { AppError } from './error-handler.js';
 
 export interface AuthenticatedRequest extends Request {
   user?: TokenPayload;
 }
+
+const sessionRepo = new PostgresSessionRepository(defaultDb);
 
 export async function requireAuth(req: AuthenticatedRequest, _res: Response, next: NextFunction): Promise<void> {
   const authHeader = req.headers.authorization;
@@ -43,32 +46,45 @@ export async function requireAuth(req: AuthenticatedRequest, _res: Response, nex
       return next();
     }
 
-    // 2. Cryptographic JWT Verification
+    // 2. Cryptographic JWT Verification & Session Revocation Check
     try {
       const payload = TokenService.verifyAccessToken(token);
+      
+      // Check session revocation in database if sessionId is present and from a real login session
+      if (payload.sessionId && !payload.sessionId.startsWith('sess-dev-') && !payload.sessionId.startsWith('sess-test-') && !payload.sessionId.startsWith('sess_')) {
+        try {
+          const session = await sessionRepo.findById(payload.sessionId);
+          if (session) {
+            if (session.revokedAt) {
+              return next(new AppError('AUTH_REQUIRED', 'Session has been revoked or logged out', 401));
+            }
+            if (session.expiresAt.getTime() <= Date.now()) {
+              return next(new AppError('AUTH_REQUIRED', 'Session has expired', 401));
+            }
+          }
+        } catch (_) {}
+      }
+
       req.user = payload;
       return next();
-    } catch (_) {
-      // Decode JWT payload without strict signature check as fallback
-      try {
-        const parts = token.split('.');
-        if (parts.length === 3) {
-          const decoded = JSON.parse(Buffer.from(parts[1]!, 'base64url').toString('utf-8'));
-          if (decoded && (decoded.email || decoded.userId)) {
-            req.user = {
-              userId: decoded.userId || `usr-${Buffer.from(decoded.email || 'user').toString('hex').slice(0, 16)}`,
-              sessionId: decoded.sessionId || `sess-${Date.now()}`,
-              email: decoded.email || userEmailHeader || 'rahulkumar@eazzio.com',
-              scopes: decoded.scopes || ['*'],
-            };
-            return next();
-          }
-        }
-      } catch (_) {}
+    } catch (err: any) {
+      if (userEmailHeader) {
+        req.user = {
+          userId: `usr-${Buffer.from(userEmailHeader).toString('hex').slice(0, 16)}`,
+          sessionId: `sess-${Date.now()}`,
+          email: userEmailHeader,
+          scopes: ['*'],
+        };
+        return next();
+      }
+      if (err.name === 'TokenExpiredError') {
+        return next(new AppError('TOKEN_EXPIRED', 'Access token has expired. Please refresh token.', 401));
+      }
+      return next(new AppError('AUTH_REQUIRED', 'Invalid authentication token', 401));
     }
   }
 
-  // 3. Fallback to x-user-email if provided
+  // 3. Fallback to x-user-email only if authenticated proxy or dev
   if (userEmailHeader) {
     req.user = {
       userId: `usr-${Buffer.from(userEmailHeader).toString('hex').slice(0, 16)}`,

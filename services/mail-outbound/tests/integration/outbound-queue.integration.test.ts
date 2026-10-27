@@ -165,4 +165,47 @@ describe('Outbound Mail Queue & Delivery Runner Integration Tests (TASK-010)', (
     expect(item?.lastError).toContain('421');
     expect(item?.nextAttemptAt.getTime()).toBeGreaterThan(Date.now());
   });
+
+  it('should support undo send grace window and cancel delivery before transport', async () => {
+    const recipient = `undo@recipient-${testSuffix}.com`;
+
+    // 1. Enqueue with 15 second undo grace window
+    const { messageId, queueIds } = await outboundService.enqueueOutbound({
+      fromAddress: `sender@outbound-${testSuffix}.com`,
+      to: [recipient],
+      subject: 'Undo Send Test',
+      bodyText: 'I want to cancel this message',
+      domainName: `outbound-${testSuffix}.com`,
+      dkimSelector: 'default',
+      dkimPrivateKeyPem: privateKey,
+      idempotencyKey: `idemp-undo-${testSuffix}`,
+      mailboxId,
+      folderId,
+      undoGraceSeconds: 15,
+    });
+
+    const queueId = queueIds[0]!;
+
+    // 2. Check that nextAttemptAt is buffered into the future
+    const queuedItem = await queueRepo.findById(queueId);
+    expect(queuedItem?.state).toBe('queued');
+    expect(queuedItem?.nextAttemptAt.getTime()).toBeGreaterThan(Date.now() + 5000);
+
+    // 3. QueueRunner should NOT pick it up yet because nextAttemptAt > now()
+    const mockTransport: EazzioEmailTransport = {
+      submitOutbound: async () => ({ queueId: 'unexpected' }),
+      getDeliveryStatus: async () => ({ state: 'delivered' }),
+    };
+    const queueRunner = new QueueRunner(queueRepo, messageRepo, storage, mockTransport);
+    const result = await queueRunner.processNextBatch();
+    expect(result.processed).toBe(0);
+
+    // 4. User invokes undo/cancel before grace window expires
+    const cancelled = await outboundService.cancelOutbound({ queueId });
+    expect(cancelled).toBe(true);
+
+    const cancelledItem = await queueRepo.findById(queueId);
+    expect(cancelledItem?.state).toBe('cancelled');
+    expect(cancelledItem?.lastError).toContain('Cancelled by user');
+  });
 });

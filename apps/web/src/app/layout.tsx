@@ -1,6 +1,13 @@
 import type { Metadata } from 'next';
+import { Inter } from 'next/font/google';
 import './globals.css';
 import React from 'react';
+
+const inter = Inter({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-inter',
+});
 
 const baseUrl =
   process.env.NEXT_PUBLIC_APP_URL ||
@@ -71,8 +78,38 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body className="min-h-screen bg-[#F8FAFC] text-[#0F172A] antialiased">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  var saved = localStorage.getItem('eazzio_theme');
+                  var themeMap = {
+                    'emerald': '#030E0B',
+                    'dark-oled': '#0A0C10',
+                    'midnight': '#070D18',
+                    'purple': '#0D0716',
+                    'graphite': '#111113',
+                    'sunset': '#120609',
+                    'cyberpunk': '#0C0C08',
+                    'ocean': '#040C12',
+                    'eazzio-teal': '#F8FAFC'
+                  };
+                  if (saved && themeMap[saved]) {
+                    document.documentElement.style.backgroundColor = themeMap[saved];
+                    if (saved !== 'eazzio-teal') {
+                      document.documentElement.classList.add('dark');
+                    }
+                  }
+                } catch (e) {}
+              })();
+            `,
+          }}
+        />
+      </head>
+      <body suppressHydrationWarning className={`${inter.variable} min-h-screen antialiased bg-transparent font-sans`}>
         {children}
       </body>
     </html>

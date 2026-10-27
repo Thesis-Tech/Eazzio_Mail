@@ -5,7 +5,7 @@ describe('RFC 3464 DSN & Bounce Report Parser (FR-OUT-07)', () => {
   it('should accurately parse standard 550 Mailbox Not Found bounce report', () => {
     const rawHeaders = {
       'content-type': 'multipart/report; report-type=delivery-status; boundary="boundary_123"',
-      'subject': 'Undelivered Mail Returned to Sender',
+      subject: 'Undelivered Mail Returned to Sender',
       'in-reply-to': '<original-msg-12345@eazzio.com>',
     };
 
@@ -38,13 +38,15 @@ Diagnostic-Code: smtp; 550-5.1.1 The email account that you tried to reach does 
     expect(report.originalRecipient).toBe('invalid.user.404@gmail.com');
     expect(report.originalMessageId).toBe('<original-msg-12345@eazzio.com>');
     expect(report.reportingMta).toBe('mx.google.com');
-    expect(report.diagnosticCode).toContain('The email account that you tried to reach does not exist');
+    expect(report.diagnosticCode).toContain(
+      'The email account that you tried to reach does not exist',
+    );
   });
 
   it('should ignore regular non-bounce incoming emails', () => {
     const rawHeaders = {
       'content-type': 'text/plain',
-      'subject': 'Project Update and Meeting Notes',
+      subject: 'Project Update and Meeting Notes',
     };
     const body = 'Hello team, here are the minutes from today meeting.';
 

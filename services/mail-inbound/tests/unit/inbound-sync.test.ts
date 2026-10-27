@@ -42,11 +42,11 @@ describe('MailSyncService Synchronization & Duplicate Protection', () => {
   it('should process new emails and report accurate metrics', async () => {
     const mockMime = Buffer.from(
       `From: "Sender" <alice@example.com>\r\n` +
-      `To: <rahulkumar@eazzio.com>\r\n` +
-      `Subject: Test Inbound Sync\r\n` +
-      `Message-ID: <unique-sync-001@example.com>\r\n` +
-      `Date: Mon, 24 Aug 2026 10:00:00 +0000\r\n\r\n` +
-      `Hello Eazzio, this is a test inbound email.`
+        `To: <rahulkumar@eazzio.com>\r\n` +
+        `Subject: Test Inbound Sync\r\n` +
+        `Message-ID: <unique-sync-001@example.com>\r\n` +
+        `Date: Mon, 24 Aug 2026 10:00:00 +0000\r\n\r\n` +
+        `Hello Eazzio, this is a test inbound email.`,
     );
 
     const mockEmails: RawInboundEmail[] = [
@@ -63,7 +63,9 @@ describe('MailSyncService Synchronization & Duplicate Protection', () => {
 
     const mockProvider: InboundMailProvider = {
       providerName: 'godaddy',
-      testConnection: vi.fn().mockResolvedValue({ success: true, message: 'OK', provider: 'godaddy' }),
+      testConnection: vi
+        .fn()
+        .mockResolvedValue({ success: true, message: 'OK', provider: 'godaddy' }),
       fetchNewMessages: vi.fn().mockResolvedValue(mockEmails),
       markSynchronized: markSynchronizedSpy,
     };
@@ -93,10 +95,10 @@ describe('MailSyncService Synchronization & Duplicate Protection', () => {
   it('should skip duplicate emails without re-importing', async () => {
     const mockMime = Buffer.from(
       `From: "Sender" <alice@example.com>\r\n` +
-      `To: <rahulkumar@eazzio.com>\r\n` +
-      `Subject: Test Duplicate Sync\r\n` +
-      `Message-ID: <duplicate-sync-001@example.com>\r\n\r\n` +
-      `Duplicate content.`
+        `To: <rahulkumar@eazzio.com>\r\n` +
+        `Subject: Test Duplicate Sync\r\n` +
+        `Message-ID: <duplicate-sync-001@example.com>\r\n\r\n` +
+        `Duplicate content.`,
     );
 
     const mockEmails: RawInboundEmail[] = [
@@ -112,7 +114,9 @@ describe('MailSyncService Synchronization & Duplicate Protection', () => {
 
     const mockProvider: InboundMailProvider = {
       providerName: 'godaddy',
-      testConnection: vi.fn().mockResolvedValue({ success: true, message: 'OK', provider: 'godaddy' }),
+      testConnection: vi
+        .fn()
+        .mockResolvedValue({ success: true, message: 'OK', provider: 'godaddy' }),
       fetchNewMessages: vi.fn().mockResolvedValue(mockEmails),
       markSynchronized: markSynchronizedSpy,
     };

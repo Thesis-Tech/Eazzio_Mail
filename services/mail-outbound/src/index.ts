@@ -4,3 +4,8 @@ export * from './domain/sanitizer.js';
 export * from './repositories/outbound-queue-repository.js';
 export * from './application/outbound-service.js';
 export * from './application/queue-runner.js';
+export * from './provider/outbound-provider.interface.js';
+export * from './provider/postfix-outbound-provider.js';
+export * from './provider/mailersend-outbound-provider.js';
+export * from './provider/godaddy-smtp-outbound-provider.js';
+export * from './provider/outbound-provider-factory.js';

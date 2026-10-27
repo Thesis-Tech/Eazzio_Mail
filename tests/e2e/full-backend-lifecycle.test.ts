@@ -24,10 +24,11 @@ describe('Eazzio Mail Full Backend Lifecycle Integration (Phase 4.K/4.L)', () =>
     expect(authResult.sessionToken).toBeDefined();
 
     // 2. Admin Domain 4-Check Verification
-    const domainVerification = AdminService.verifyDomain({
-      domainId: 'dom-1',
-      domainName: 'eazzio.com',
-      dnsRecords: { mx: true, spf: true, dkim: true, dmarc: true }
+    const domainVerification = DomainVerifier.evaluateStatus({
+      mx: true,
+      spf: true,
+      dkim: true,
+      dmarc: true
     });
     expect(domainVerification.isFullyVerified).toBe(true);
 
@@ -37,7 +38,8 @@ describe('Eazzio Mail Full Backend Lifecycle Integration (Phase 4.K/4.L)', () =>
       'utf-8'
     );
 
-    const inboundResult = await InboundPipeline.process({
+    const pipeline = new InboundPipeline();
+    const inboundResult = await pipeline.process({
       envelope: {
         from: { value: 'partner@external.com' } as any,
         to: [{ value: 'alex@eazzio.com' }] as any,

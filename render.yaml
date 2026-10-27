@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: eazzio-mail-api
+    env: node
+    plan: starter
+    region: oregon
+    buildCommand: pnpm install --frozen-lockfile && pnpm --recursive run build
+    startCommand: pnpm --filter @eazzio/api start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 8080
+      - key: API_PORT
+        value: 8080
+      - key: DATABASE_URL
+        sync: false # Set to Neon DB connection string with ?sslmode=require
+      - key: JWT_SECRET
+        generateValue: true
+      - key: OUTBOUND_MAIL_PROVIDER
+        value: godaddy-smtp
+      - key: MAIL_TRANSPORT
+        value: relay

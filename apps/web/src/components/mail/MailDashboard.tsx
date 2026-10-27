@@ -1,15 +1,28 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import dynamic from 'next/dynamic';
 import { DashboardLayout } from '../layout/DashboardLayout';
 import { SplitSlider } from '../layout/SplitSlider';
 import { ThreadList } from './ThreadList';
 import { ConversationViewer } from './ConversationViewer';
-import { MailComposer } from './MailComposer';
-import { SnoozeModal } from './SnoozeModal';
-import { SettingsModal } from '../settings/SettingsModal';
 import { ThreadSummary, MessageDetail, FolderItem, LabelItem, FilterRule, UserPreferences, ComposeEmailPayload, ComposerAttachment } from '../../types/mail';
 import { Mail, Search, RefreshCw, ChevronDown, X } from 'lucide-react';
+
+const MailComposer = dynamic(
+  () => import('./MailComposer').then((mod) => mod.MailComposer),
+  { ssr: false }
+);
+
+const SettingsModal = dynamic(
+  () => import('../settings/SettingsModal').then((mod) => mod.SettingsModal),
+  { ssr: false }
+);
+
+const SnoozeModal = dynamic(
+  () => import('./SnoozeModal').then((mod) => mod.SnoozeModal),
+  { ssr: false }
+);
 import { parseSearchQuery } from '../search/SearchBar';
 import { realtimeClient, RealtimeMailEvent } from '../../lib/websocket-client';
 import { ToastContainer, ToastNotification } from '../notification/ToastContainer';
@@ -51,7 +64,7 @@ const initialPreferences: UserPreferences = {
   signature: 'Best regards,\nEazzio User',
   autoSummarizeWithAI: true,
   soundNotifications: true,
-  theme: 'dark',
+  theme: 'eazzio-teal',
 };
 
 // Stable folder slug resolver
@@ -73,6 +86,7 @@ export function MailDashboardPage({
   const [searchQuery, setSearchQuery] = useState('');
   const [isComposeOpen, setIsComposeOpen] = useState(false);
   const [composeInitialData, setComposeInitialData] = useState<{
+    from?: string;
     to?: string[];
     cc?: string[];
     bcc?: string[];
@@ -92,7 +106,12 @@ export function MailDashboardPage({
   const [readingPane, setReadingPane] = useState<'none' | 'right' | 'below'>('none');
   const [toasts, setToasts] = useState<ToastNotification[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [apiError, setApiError] = useState<string | null>(null);
   const [conversationMap, setConversationMap] = useState<Record<string, MessageDetail[]>>({});
+  const [mutedThreadIds, setMutedThreadIds] = useState<Set<string>>(new Set());
+
+  // FE-005 Undo Send Pending Queue
+  const pendingSendsRef = useRef<Map<string, { timeoutId: NodeJS.Timeout; payload: ComposeEmailPayload }>>(new Map());
 
   // Resizable Slider Width between Thread List & Conversation Viewer
   const [threadListWidth, setThreadListWidth] = useState<number>(384);
@@ -100,7 +119,7 @@ export function MailDashboardPage({
   const isResizingRef = useRef(false);
   const startPosRef = useRef({ x: 0, width: 384 });
 
-  // Restore persisted width & reading pane from localStorage on mount
+  // Restore persisted width & reading pane from localStorage on mount & handle URL query parameters (e.g. ?composeTo=...)
   useEffect(() => {
     try {
       const savedWidth = localStorage.getItem('eazzio_thread_list_width');
@@ -113,6 +132,21 @@ export function MailDashboardPage({
       const savedPane = localStorage.getItem('eazzio_reading_pane') as 'none' | 'right' | 'below';
       if (savedPane && ['none', 'right', 'below'].includes(savedPane)) {
         setReadingPane(savedPane);
+      }
+
+      // Check if URL parameters contain composeTo
+      if (typeof window !== 'undefined' && window.location.search) {
+        const searchParams = new URLSearchParams(window.location.search);
+        const composeTo = searchParams.get('composeTo');
+        const composeSubject = searchParams.get('composeSubject') || searchParams.get('subject');
+        if (composeTo) {
+          setComposeInitialData(prev => ({
+            ...prev,
+            to: [composeTo],
+            subject: composeSubject || prev.subject || '',
+          }));
+          setIsComposeOpen(true);
+        }
       }
     } catch (_) {}
   }, []);
@@ -189,6 +223,7 @@ export function MailDashboardPage({
   const loadMessages = useCallback(async (folderId: string) => {
     const requestId = ++currentRequestIdRef.current;
     setIsLoading(true);
+    setApiError(null);
     const slug = getFolderSlug(folderId);
 
     try {
@@ -200,28 +235,27 @@ export function MailDashboardPage({
       const token = authState.token || '';
       const senderEmail = authState.user?.email || '';
 
+      const fetchHeaders: Record<string, string> = {};
+      if (token) fetchHeaders['Authorization'] = `Bearer ${token}`;
+      if (senderEmail) fetchHeaders['x-user-email'] = senderEmail;
+
       let res: Response | null = null;
       try {
-        res = await fetch(`/api/messages?folder=${slug}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'x-user-email': senderEmail,
-          },
+        res = await fetch(`/api/messages?folder=${encodeURIComponent(slug)}`, {
+          headers: fetchHeaders,
         });
 
         if (res && !res.ok && res.status === 502) {
           // Automatic retry if backend service was restarting
           await new Promise((r) => setTimeout(r, 1000));
-          res = await fetch(`/api/messages?folder=${slug}`, {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              'x-user-email': senderEmail,
-            },
+          res = await fetch(`/api/messages?folder=${encodeURIComponent(slug)}`, {
+            headers: fetchHeaders,
           });
         }
       } catch (fetchErr) {
-        console.warn('Network error reaching /api/messages, using cached/local state:', fetchErr);
+        console.warn('Network error reaching /api/messages:', fetchErr);
         if (requestId === currentRequestIdRef.current) {
+          setApiError('Unable to connect to the mail server. Check your connection.');
           setIsLoading(false);
         }
         return;
@@ -233,7 +267,17 @@ export function MailDashboardPage({
       }
 
       if (!res || !res.ok) {
-        console.warn(`Messages endpoint responded with status ${res?.status}`);
+        const status = res?.status;
+        console.warn(`Messages endpoint responded with status ${status}`);
+        if (status === 401) {
+          setApiError('Your session has expired. Please sign in again.');
+        } else if (status === 429) {
+          setApiError('Too many requests. Please wait a moment and try again.');
+        } else if (status === 502) {
+          setApiError('Mail service is temporarily unavailable. Please try again.');
+        } else {
+          setApiError(`Unable to load messages (${status || 'network error'})`);
+        }
         setIsLoading(false);
         return;
       }
@@ -342,14 +386,15 @@ export function MailDashboardPage({
       const token = authState.token || '';
       const senderEmail = authState.user?.email || '';
 
+      const syncHeaders: Record<string, string> = {};
+      if (token) syncHeaders['Authorization'] = `Bearer ${token}`;
+      if (senderEmail) syncHeaders['x-user-email'] = senderEmail;
+
       const targetSlugs = ['inbox', 'starred', 'sent', 'drafts', 'spam', 'trash', 'archive'];
       for (const slug of targetSlugs) {
         try {
-          const res = await fetch(`/api/messages?folder=${slug}`, {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              'x-user-email': senderEmail,
-            },
+          const res = await fetch(`/api/messages?folder=${encodeURIComponent(slug)}`, {
+            headers: syncHeaders,
           });
           if (res.ok) {
             const data = await res.json();
@@ -385,6 +430,8 @@ export function MailDashboardPage({
     setSelectedThreadId(null);
     setThreads([]);
     setIsLoading(true);
+    setApiError(null);
+    setApiError(null);
 
     const slug = getFolderSlug(folderId);
     if (typeof window !== 'undefined') {
@@ -813,6 +860,65 @@ export function MailDashboardPage({
     }
   };
 
+  const handleBulkCancelScheduled = async (threadIds: string[]) => {
+    if (threadIds.length === 0) return;
+
+    const idSet = new Set(threadIds);
+    setThreads((prev) => {
+      const updated = prev.filter((t) => !idSet.has(t.id));
+      setFolders((fPrev) =>
+        fPrev.map((f) =>
+          f.id === activeFolderId
+            ? {
+                ...f,
+                totalCount: updated.length,
+                unreadCount: updated.filter((t) => t.isUnread).length,
+              }
+            : f
+        )
+      );
+      return updated;
+    });
+
+    if (selectedThreadId && idSet.has(selectedThreadId)) {
+      setSelectedThreadId(null);
+    }
+
+    try {
+      const authState = AuthStore.getState();
+      const token = authState.token || '';
+      const senderEmail = authState.user?.email || '';
+
+      await fetch('/api/messages/batch', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+          'x-user-email': senderEmail,
+        },
+        body: JSON.stringify({
+          action: 'cancel-scheduled',
+          threadIds,
+        }),
+      });
+
+      setToasts((prev) => [
+        {
+          id: `toast-${Date.now()}`,
+          title: 'Scheduled Send Cancelled',
+          senderName: 'Outbound Scheduler',
+          message: `${threadIds.length} scheduled email(s) cancelled and moved to Drafts.`,
+          timestamp: 'Just now',
+        },
+        ...prev,
+      ]);
+
+      syncOtherFolderCounts();
+    } catch (err) {
+      console.error('Failed to cancel scheduled send:', err);
+    }
+  };
+
   const handleBulkMarkRead = async (threadIds: string[], isRead: boolean) => {
     const idSet = new Set(threadIds);
     setThreads((prev) => {
@@ -987,6 +1093,38 @@ export function MailDashboardPage({
     } catch (err) {
       console.error('Failed to update spam status:', err);
     }
+  };
+
+  // FE-006 Conversation Mute / Unmute
+  const handleToggleMute = (threadId: string) => {
+    const isCurrentlyMuted = mutedThreadIds.has(threadId);
+    setMutedThreadIds((prev) => {
+      const next = new Set(prev);
+      if (isCurrentlyMuted) {
+        next.delete(threadId);
+      } else {
+        next.add(threadId);
+      }
+      return next;
+    });
+
+    // Update in threads list
+    setThreads((prev) =>
+      prev.map((t) => (t.id === threadId ? { ...t, isMuted: !isCurrentlyMuted } : t))
+    );
+
+    setToasts((prev) => [
+      {
+        id: `toast-${Date.now()}`,
+        title: isCurrentlyMuted ? 'Conversation Unmuted' : 'Conversation Muted',
+        senderName: 'Eazzio Mailbox',
+        message: isCurrentlyMuted
+          ? 'New replies to this conversation will notify you and appear in your Inbox.'
+          : 'New replies will automatically skip your Inbox and be archived.',
+        timestamp: 'Just now',
+      },
+      ...prev,
+    ]);
   };
 
   const handleEmptyFolder = async (folderSlug: string) => {
@@ -1242,8 +1380,8 @@ export function MailDashboardPage({
     }
   };
 
-  // Send Outbound Email Handler
-  const handleSendComposeEmail = async (payload: ComposeEmailPayload) => {
+  // Actual dispatch outbound worker
+  const dispatchOutboundEmail = async (payload: ComposeEmailPayload) => {
     let assignedMessageId = `msg-${Date.now()}`;
 
     try {
@@ -1263,22 +1401,70 @@ export function MailDashboardPage({
           to: payload.to,
           cc: payload.cc,
           bcc: payload.bcc,
+          from: payload.from,
           subject: payload.subject,
           bodyText: payload.body,
-          bodyHtml: `<p>${payload.body.replace(/\n/g, '<br>')}</p>`,
+          bodyHtml: payload.bodyHtml || `<p>${payload.body.replace(/\n/g, '<br>')}</p>`,
+          scheduledAt: payload.scheduledAt,
         }),
       });
 
       const result = await response.json();
       if (result.success) {
         assignedMessageId = result.messageId || assignedMessageId;
+        const msgIdForCancel = result.id || result.queueIds?.[0] || assignedMessageId;
+        const hasServerUndo = Boolean(result.undoGraceSeconds && result.undoGraceSeconds > 0 && !payload.scheduledAt);
+
+        const successToastId = `toast-${Date.now()}`;
         setToasts((prev) => [
           {
-            id: `toast-${Date.now()}`,
-            title: 'Message Queued for Delivery',
+            id: successToastId,
+            title: payload.scheduledAt ? 'Message Scheduled' : 'Message Sent',
             senderName: 'Outbound Mail Pipeline',
-            message: `Delivering to ${payload.to.join(', ')} via Eazzio Outbound Transport`,
+            message: payload.scheduledAt 
+              ? `Scheduled for delivery to ${payload.to.join(', ')}`
+              : (hasServerUndo ? `Message queued for delivery. Undo available for ${result.undoGraceSeconds}s.` : `Delivered to ${payload.to.join(', ')}`),
             timestamp: 'Just now',
+            actionLabel: hasServerUndo ? 'Undo' : undefined,
+            onAction: hasServerUndo ? async () => {
+              try {
+                const cancelRes = await fetch(`/api/messages/outbound/${encodeURIComponent(msgIdForCancel)}/cancel`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`,
+                    'x-user-email': senderEmail,
+                  },
+                });
+                const cancelData = await cancelRes.json();
+                if (cancelData.success) {
+                  // Restore composer with draft
+                  setComposeInitialData({
+                    to: payload.to,
+                    cc: payload.cc,
+                    bcc: payload.bcc,
+                    subject: payload.subject,
+                    body: payload.body,
+                    attachments: payload.attachments,
+                  });
+                  setIsComposeOpen(true);
+                  setToasts((tp) => [
+                    {
+                      id: `toast-${Date.now()}`,
+                      title: 'Send Cancelled',
+                      senderName: 'Outbound Pipeline',
+                      message: 'Message delivery aborted. Restored to draft.',
+                      timestamp: 'Just now',
+                    },
+                    ...tp.filter((t) => t.id !== successToastId),
+                  ]);
+                } else {
+                  alert(cancelData.error?.message || cancelData.error || 'Unable to abort sending: message already relayed.');
+                }
+              } catch (cancelErr: any) {
+                console.error('Failed to cancel outbound sending:', cancelErr);
+              }
+            } : undefined,
           },
           ...prev,
         ]);
@@ -1327,6 +1513,68 @@ export function MailDashboardPage({
         ...prev,
       ]);
     }
+  };
+
+  // Send Outbound Email Handler (FE-005 Undo Send with 10s buffer)
+  const handleSendComposeEmail = async (payload: ComposeEmailPayload) => {
+    // If scheduled, dispatch directly
+    if (payload.scheduledAt) {
+      await dispatchOutboundEmail(payload);
+      return;
+    }
+
+    const sendId = `send-${Date.now()}`;
+    const undoTimeSeconds = 10;
+
+    // Toast with interactive "Undo" button
+    const toastId = `toast-undo-${Date.now()}`;
+    
+    const timeoutId = setTimeout(async () => {
+      pendingSendsRef.current.delete(sendId);
+      setToasts((prev) => prev.filter((t) => t.id !== toastId));
+      await dispatchOutboundEmail(payload);
+    }, undoTimeSeconds * 1000);
+
+    pendingSendsRef.current.set(sendId, { timeoutId, payload });
+
+    setToasts((prev) => [
+      {
+        id: toastId,
+        title: 'Sending message...',
+        senderName: 'Outbound Queue',
+        message: `Sending to ${payload.to.join(', ')} in ${undoTimeSeconds}s`,
+        timestamp: 'Just now',
+        actionLabel: 'Undo',
+        onAction: () => {
+          const pending = pendingSendsRef.current.get(sendId);
+          if (pending) {
+            clearTimeout(pending.timeoutId);
+            pendingSendsRef.current.delete(sendId);
+            // Re-open composer with existing draft
+            setComposeInitialData({
+              to: payload.to,
+              cc: payload.cc,
+              bcc: payload.bcc,
+              subject: payload.subject,
+              body: payload.body,
+              attachments: payload.attachments,
+            });
+            setIsComposeOpen(true);
+            setToasts((tp) => [
+              {
+                id: `toast-${Date.now()}`,
+                title: 'Send Cancelled',
+                senderName: 'Outbound Queue',
+                message: 'Your email has been restored to draft.',
+                timestamp: 'Just now',
+              },
+              ...tp.filter((t) => t.id !== toastId),
+            ]);
+          }
+        },
+      },
+      ...prev,
+    ]);
   };
 
   const handleToastClick = (threadId?: string) => {
@@ -1434,84 +1682,93 @@ export function MailDashboardPage({
             parsedFilters.isStarred ||
             parsedFilters.label) && (
             <div 
-              style={{ backgroundColor: 'var(--theme-bg-card, #12141A)', borderColor: 'var(--theme-border, #1E232B)' }}
-              className="px-4 py-2 border-b flex flex-wrap items-center gap-1.5 text-xs text-[#94A3B8]"
+              style={{ backgroundColor: 'var(--theme-bg-card, #FFFFFF)', borderColor: 'var(--theme-border, #E2E8F0)' }}
+              className="px-4 py-2 border-b flex flex-wrap items-center gap-1.5 text-xs text-[var(--theme-text-secondary,#475569)]"
             >
-              <span className="font-semibold text-white mr-1 flex items-center gap-1">
-                <Search style={{ color: 'var(--theme-accent, #2D5BFF)' }} className="w-3 h-3" /> Active Filters:
+              <span className="font-semibold mr-1 flex items-center gap-1 text-[var(--theme-text-primary,#0F172A)]">
+                <Search style={{ color: 'var(--theme-accent, #14B8A6)' }} className="w-3 h-3" /> Active Filters:
               </span>
               {parsedFilters.from && (
-                <span style={{ backgroundColor: 'var(--theme-accent-bg, rgba(45,91,255,0.1))', color: 'var(--theme-accent, #2D5BFF)', borderColor: 'var(--theme-border, #1E232B)' }} className="px-2 py-0.5 rounded border">
+                <span style={{ backgroundColor: 'var(--theme-accent-bg, rgba(20,184,166,0.1))', color: 'var(--theme-accent, #14B8A6)', borderColor: 'var(--theme-border, #E2E8F0)' }} className="px-2 py-0.5 rounded border">
                   from:{parsedFilters.from}
                 </span>
               )}
               {parsedFilters.subject && (
-                <span style={{ backgroundColor: 'var(--theme-accent-bg, rgba(45,91,255,0.1))', color: 'var(--theme-accent, #2D5BFF)', borderColor: 'var(--theme-border, #1E232B)' }} className="px-2 py-0.5 rounded border">
+                <span style={{ backgroundColor: 'var(--theme-accent-bg, rgba(20,184,166,0.1))', color: 'var(--theme-accent, #14B8A6)', borderColor: 'var(--theme-border, #E2E8F0)' }} className="px-2 py-0.5 rounded border">
                   subject:{parsedFilters.subject}
                 </span>
               )}
               {parsedFilters.hasAttachment && (
-                <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                <span style={{ backgroundColor: 'var(--theme-accent-bg, rgba(20,184,166,0.1))', color: 'var(--theme-accent, #14B8A6)', borderColor: 'var(--theme-border, #E2E8F0)' }} className="px-2 py-0.5 rounded border">
                   has:attachment
                 </span>
               )}
               {parsedFilters.isUnread && (
-                <span className="px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                <span style={{ backgroundColor: 'var(--theme-accent-bg, rgba(20,184,166,0.1))', color: 'var(--theme-accent, #14B8A6)', borderColor: 'var(--theme-border, #E2E8F0)' }} className="px-2 py-0.5 rounded border">
                   is:unread
                 </span>
               )}
               {parsedFilters.isStarred && (
-                <span className="px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                <span style={{ backgroundColor: 'var(--theme-accent-bg, rgba(20,184,166,0.1))', color: 'var(--theme-accent, #14B8A6)', borderColor: 'var(--theme-border, #E2E8F0)' }} className="px-2 py-0.5 rounded border">
                   is:starred
                 </span>
               )}
               {parsedFilters.label && (
-                <span className="px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                <span style={{ backgroundColor: 'var(--theme-accent-bg, rgba(20,184,166,0.1))', color: 'var(--theme-accent, #14B8A6)', borderColor: 'var(--theme-border, #E2E8F0)' }} className="px-2 py-0.5 rounded border">
                   label:{parsedFilters.label}
                 </span>
               )}
               <button
                 onClick={() => setSearchQuery('')}
-                className="ml-auto text-[11px] text-[#94A3B8] hover:text-white flex items-center gap-0.5 underline decoration-dotted"
+                className="ml-auto text-xs opacity-70 hover:opacity-100 flex items-center gap-0.5 transition-opacity"
               >
                 <X className="w-3 h-3" /> Clear
               </button>
             </div>
           )}
 
-          {/* Gmail-Style Filter Chips Bar (hidden scrollbar) */}
+          {/* Filter Chips Bar */}
           <div 
-            style={{ backgroundColor: 'var(--theme-bg-card, #12141A)', borderColor: 'var(--theme-border, #1E232B)' }}
+            style={{
+              backgroundColor: 'var(--theme-bg-header, #FFFFFF)',
+              borderColor: 'var(--theme-border, #E2E8F0)',
+            }}
             className="px-4 py-2 border-b flex items-center gap-2 overflow-x-auto text-xs shrink-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           >
             {/* From ▾ */}
             <button
               onClick={() => setSearchQuery(searchQuery.includes('from:') ? '' : 'from: ')}
-              style={{ backgroundColor: 'var(--theme-bg-sidebar, #090A0D)', borderColor: 'var(--theme-border, #1E232B)' }}
-              className="px-3 py-1 rounded-lg border hover:brightness-125 text-slate-300 flex items-center gap-1.5 shrink-0 transition-all"
+              style={{
+                backgroundColor: 'var(--theme-bg-card, #FFFFFF)',
+                borderColor: 'var(--theme-border, #CBD5E1)',
+              }}
+              className="px-3 py-1.5 rounded-xl border hover:opacity-90 font-medium flex items-center gap-1.5 shrink-0 transition-all text-xs shadow-xs"
             >
               <span>From</span>
-              <ChevronDown className="w-3 h-3 text-slate-400" />
+              <ChevronDown className="w-3 h-3 opacity-60" />
             </button>
 
             {/* Any time ▾ */}
             <button
-              style={{ backgroundColor: 'var(--theme-bg-sidebar, #090A0D)', borderColor: 'var(--theme-border, #1E232B)' }}
-              className="px-3 py-1 rounded-lg border hover:brightness-125 text-slate-300 flex items-center gap-1.5 shrink-0 transition-all"
+              style={{
+                backgroundColor: 'var(--theme-bg-card, #FFFFFF)',
+                borderColor: 'var(--theme-border, #CBD5E1)',
+              }}
+              className="px-3 py-1.5 rounded-xl border hover:opacity-90 font-medium flex items-center gap-1.5 shrink-0 transition-all text-xs shadow-xs"
             >
               <span>Any time</span>
-              <ChevronDown className="w-3 h-3 text-slate-400" />
+              <ChevronDown className="w-3 h-3 opacity-60" />
             </button>
 
             {/* Has attachment */}
             <button
               onClick={() => setSearchQuery(searchQuery.includes('has:attachment') ? searchQuery.replace('has:attachment', '').trim() : `${searchQuery} has:attachment`.trim())}
               style={{
-                backgroundColor: searchQuery.includes('has:attachment') ? 'var(--theme-accent-bg, rgba(45,91,255,0.15))' : 'var(--theme-bg-sidebar, #090A0D)',
-                borderColor: searchQuery.includes('has:attachment') ? 'var(--theme-accent, #2D5BFF)' : 'var(--theme-border, #1E232B)',
-                color: searchQuery.includes('has:attachment') ? 'var(--theme-accent, #2D5BFF)' : '#CBD5E1',
+                backgroundColor: searchQuery.includes('has:attachment') ? 'var(--theme-accent-bg, #F0FDFA)' : 'var(--theme-bg-card, #FFFFFF)',
+                borderColor: searchQuery.includes('has:attachment') ? 'var(--theme-accent, #14B8A6)' : 'var(--theme-border, #CBD5E1)',
+                color: searchQuery.includes('has:attachment') ? 'var(--theme-accent, #0F766E)' : undefined,
               }}
-              className="px-3 py-1 rounded-lg border flex items-center gap-1.5 shrink-0 transition-all"
+              className="px-3 py-1.5 rounded-xl border flex items-center gap-1.5 shrink-0 transition-all text-xs font-medium shadow-xs"
             >
               <span>Has attachment</span>
             </button>
@@ -1519,22 +1776,25 @@ export function MailDashboardPage({
             {/* To ▾ */}
             <button
               onClick={() => setSearchQuery(searchQuery.includes('to:') ? '' : 'to: ')}
-              style={{ backgroundColor: 'var(--theme-bg-sidebar, #090A0D)', borderColor: 'var(--theme-border, #1E232B)' }}
-              className="px-3 py-1 rounded-lg border hover:brightness-125 text-slate-300 flex items-center gap-1.5 shrink-0 transition-all"
+              style={{
+                backgroundColor: 'var(--theme-bg-card, #FFFFFF)',
+                borderColor: 'var(--theme-border, #CBD5E1)',
+              }}
+              className="px-3 py-1.5 rounded-xl border hover:opacity-90 font-medium flex items-center gap-1.5 shrink-0 transition-all text-xs shadow-xs"
             >
               <span>To</span>
-              <ChevronDown className="w-3 h-3 text-slate-400" />
+              <ChevronDown className="w-3 h-3 opacity-60" />
             </button>
 
             {/* Exclude Social */}
             <button
               onClick={() => setSearchQuery(searchQuery.includes('-label:social') ? searchQuery.replace('-label:social', '').trim() : `${searchQuery} -label:social`.trim())}
               style={{
-                backgroundColor: searchQuery.includes('-label:social') ? 'var(--theme-accent-bg, rgba(45,91,255,0.15))' : 'var(--theme-bg-sidebar, #090A0D)',
-                borderColor: searchQuery.includes('-label:social') ? 'var(--theme-accent, #2D5BFF)' : 'var(--theme-border, #1E232B)',
-                color: searchQuery.includes('-label:social') ? 'var(--theme-accent, #2D5BFF)' : '#CBD5E1',
+                backgroundColor: searchQuery.includes('-label:social') ? 'var(--theme-accent-bg, #F0FDFA)' : 'var(--theme-bg-card, #FFFFFF)',
+                borderColor: searchQuery.includes('-label:social') ? 'var(--theme-accent, #14B8A6)' : 'var(--theme-border, #CBD5E1)',
+                color: searchQuery.includes('-label:social') ? 'var(--theme-accent, #0F766E)' : undefined,
               }}
-              className="px-3 py-1 rounded-lg border flex items-center gap-1.5 shrink-0 transition-all"
+              className="px-3 py-1.5 rounded-xl border flex items-center gap-1.5 shrink-0 transition-all text-xs font-medium shadow-xs"
             >
               <span>Exclude Social</span>
             </button>
@@ -1543,11 +1803,11 @@ export function MailDashboardPage({
             <button
               onClick={() => setSearchQuery(searchQuery.includes('is:unread') ? searchQuery.replace('is:unread', '').trim() : `${searchQuery} is:unread`.trim())}
               style={{
-                backgroundColor: searchQuery.includes('is:unread') ? 'var(--theme-accent-bg, rgba(45,91,255,0.15))' : 'var(--theme-bg-sidebar, #090A0D)',
-                borderColor: searchQuery.includes('is:unread') ? 'var(--theme-accent, #2D5BFF)' : 'var(--theme-border, #1E232B)',
-                color: searchQuery.includes('is:unread') ? 'var(--theme-accent, #2D5BFF)' : '#CBD5E1',
+                backgroundColor: searchQuery.includes('is:unread') ? 'var(--theme-accent-bg, #F0FDFA)' : 'var(--theme-bg-card, #FFFFFF)',
+                borderColor: searchQuery.includes('is:unread') ? 'var(--theme-accent, #14B8A6)' : 'var(--theme-border, #CBD5E1)',
+                color: searchQuery.includes('is:unread') ? 'var(--theme-accent, #0F766E)' : undefined,
               }}
-              className="px-3 py-1 rounded-lg border flex items-center gap-1.5 shrink-0 transition-all"
+              className="px-3 py-1.5 rounded-xl border flex items-center gap-1.5 shrink-0 transition-all text-xs font-medium shadow-xs"
             >
               <span>Is unread</span>
             </button>
@@ -1555,8 +1815,8 @@ export function MailDashboardPage({
             {/* Advanced search */}
             <button
               onClick={() => setSearchQuery('is:unread has:attachment')}
-              style={{ color: 'var(--theme-accent, #2D5BFF)' }}
-              className="ml-auto text-xs hover:underline font-medium shrink-0"
+              style={{ color: 'var(--theme-accent, #0F766E)' }}
+              className="ml-auto text-xs font-semibold hover:underline shrink-0 transition-colors"
             >
               Advanced search
             </button>
@@ -1564,9 +1824,55 @@ export function MailDashboardPage({
 
           <div className="flex-1 overflow-hidden relative">
             {isLoading ? (
-              <div className="flex flex-col items-center justify-center h-full p-8 text-slate-400 space-y-3">
-                <RefreshCw style={{ color: 'var(--theme-accent, #14B8A6)' }} className="w-5 h-5 animate-spin" />
-                <span className="text-xs">Loading conversations...</span>
+              <div className="p-4 space-y-3 divide-y divide-[var(--theme-border,#1E232B)]/40 overflow-hidden">
+                {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+                  <div key={i} className="pt-3 first:pt-0 flex items-center gap-3 animate-pulse">
+                    <div className="w-4 h-4 rounded bg-[var(--theme-border,#CBD5E1)]/40 shrink-0" />
+                    <div className="w-4 h-4 rounded bg-[var(--theme-border,#CBD5E1)]/30 shrink-0" />
+                    <div className="w-8 h-8 rounded-full bg-[var(--theme-border,#CBD5E1)]/50 shrink-0" />
+                    <div className="flex-1 min-w-0 space-y-1.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="h-3.5 bg-[var(--theme-border,#CBD5E1)]/60 rounded w-1/4" />
+                        <div className="h-3 bg-[var(--theme-border,#CBD5E1)]/40 rounded w-16" />
+                      </div>
+                      <div className="h-3 bg-[var(--theme-border,#CBD5E1)]/50 rounded w-3/4" />
+                      <div className="h-2.5 bg-[var(--theme-border,#CBD5E1)]/30 rounded w-1/2" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : apiError ? (
+              <div className="h-full flex flex-col items-center justify-center p-8 text-center animate-in fade-in">
+                <div
+                  style={{
+                    backgroundColor: 'var(--theme-bg-card, #FFFFFF)',
+                    borderColor: 'var(--theme-border, #E2E8F0)',
+                  }}
+                  className="w-16 h-16 rounded-3xl border flex items-center justify-center mb-4 shadow-sm"
+                >
+                  <RefreshCw className="w-7 h-7 opacity-50" />
+                </div>
+                <p className="text-sm font-semibold mb-1 tracking-tight">{apiError}</p>
+                <p className="text-xs opacity-50 mb-4 max-w-xs">
+                  {apiError.includes('session') ? 'Your credentials may have expired.' : 'There was a problem connecting to your mailbox.'}
+                </p>
+                {apiError.includes('session') ? (
+                  <button
+                    onClick={() => { window.location.href = '/login'; }}
+                    style={{ backgroundColor: 'var(--theme-accent, #14B8A6)' }}
+                    className="px-4 py-2 rounded-lg text-white text-xs font-semibold hover:opacity-90 transition-opacity"
+                  >
+                    Sign in again
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => loadMessages(activeFolderId)}
+                    style={{ backgroundColor: 'var(--theme-accent, #14B8A6)' }}
+                    className="px-4 py-2 rounded-lg text-white text-xs font-semibold hover:opacity-90 transition-opacity flex items-center gap-1.5"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" /> Retry
+                  </button>
+                )}
               </div>
             ) : (
               <ThreadList
@@ -1579,7 +1885,9 @@ export function MailDashboardPage({
                 onBulkUnarchive={handleBulkUnarchive}
                 onBulkMarkRead={handleBulkMarkRead}
                 onSnooze={handleOpenSnooze}
+                onToggleMute={handleToggleMute}
                 onBulkSpam={handleBulkSpam}
+                onCancelScheduled={handleBulkCancelScheduled}
                 onEmptyFolder={handleEmptyFolder}
                 folderName={getFolderSlug(activeFolderId).toUpperCase()}
                 totalThreadsCount={displayedThreads.length}
@@ -1626,6 +1934,7 @@ export function MailDashboardPage({
               onToggleStar={(threadId) => handleToggleStar(threadId)}
               onSnooze={(threadId) => handleOpenSnooze([threadId])}
               onSpam={(threadId, isSpam) => handleBulkSpam([threadId], isSpam)}
+              onCancelScheduled={(threadId) => handleBulkCancelScheduled([threadId])}
               onClose={() => setSelectedThreadId(null)}
             />
           </div>
@@ -1653,6 +1962,7 @@ export function MailDashboardPage({
         onClose={() => setIsComposeOpen(false)}
         onSend={handleSendComposeEmail}
         onSaveDraft={handleSaveDraft}
+        initialFrom={composeInitialData.from}
         initialTo={composeInitialData.to}
         initialCc={composeInitialData.cc}
         initialBcc={composeInitialData.bcc}

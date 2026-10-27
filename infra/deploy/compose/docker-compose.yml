@@ -1,5 +1,8 @@
 services:
   postgres:
+    # Set to profile 'bundled-db' so normal compose commands do not conflict with the existing host kc-postgres container on port 5432
+    profiles:
+      - bundled-db
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-eazzio_user}
@@ -66,8 +69,9 @@ services:
     ports:
       - '25:25'
       - '587:587'
-    depends_on:
-      - postgres
+    # PostgreSQL is managed externally by the kc-postgres container (attached to compose_default)
+    # depends_on:
+    #   - postgres
 
   dovecot:
     build:
@@ -75,8 +79,8 @@ services:
     ports:
       - '143:143'
       - '993:993'
-    depends_on:
-      - postgres
+    # depends_on:
+    #   - postgres
 
   rspamd:
     build:

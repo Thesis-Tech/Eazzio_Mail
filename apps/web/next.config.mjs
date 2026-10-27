@@ -43,14 +43,15 @@ const nextConfig = {
     ];
   },
   async rewrites() {
+    const backendUrl = process.env.API_BACKEND_URL || 'http://127.0.0.1:8080';
     return [
       {
         source: '/api/v1/:path*',
-        destination: 'http://127.0.0.1:8080/v1/:path*',
+        destination: `${backendUrl}/v1/:path*`,
       },
       {
         source: '/v1/:path*',
-        destination: 'http://127.0.0.1:8080/v1/:path*',
+        destination: `${backendUrl}/v1/:path*`,
       },
     ];
   },

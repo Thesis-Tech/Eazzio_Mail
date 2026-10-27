@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const API_BASE = process.env.API_GATEWAY_URL || 'http://127.0.0.1:8080';
+const API_BASE = process.env.API_BACKEND_URL || process.env.API_GATEWAY_URL || 'http://127.0.0.1:8080';
 
 export async function GET(request: NextRequest) {
   try {

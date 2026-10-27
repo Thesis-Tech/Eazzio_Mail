@@ -70,8 +70,8 @@ describe('REST API Service Live Integration Tests (TASK-008)', () => {
       [threadId, mailboxAId],
     );
     await defaultDb.query(
-      `INSERT INTO messages (id, mailbox_id, folder_id, thread_id, message_id_header, from_address, subject, snippet, size_bytes, raw_object_key, direction) VALUES 
-        ($1, $2, $3, $4, '<msg1@api.com>', 'boss@company.com', 'Welcome Aboard', 'Welcome to the team...', 2048, 'obj1', 'inbound')`,
+      `INSERT INTO messages (id, mailbox_id, folder_id, thread_id, message_id_header, from_address, subject, snippet, body_text, size_bytes, raw_object_key, direction) VALUES 
+        ($1, $2, $3, $4, '<msg1@api.com>', 'boss@company.com', 'Welcome Aboard', 'Welcome to the team...', 'We are thrilled to have you join our engineering team.', 2048, 'obj1', 'inbound')`,
       [messageId, mailboxAId, folderId, threadId],
     );
 
@@ -254,6 +254,51 @@ describe('REST API Service Live Integration Tests (TASK-008)', () => {
 
     expect(res.status).toBe(400);
     expect(res.body.error.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('should reject outbound compose from system-generated no-reply sender address', async () => {
+    const res = await request(app)
+      .post('/v1/messages/compose')
+      .set('Authorization', `Bearer ${tokenUserA}`)
+      .send({
+        from: 'no-reply@eazzio.com',
+        to: ['client@external-domain.com'],
+        subject: 'System spoof attempt',
+        bodyText: 'Should fail validation',
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    expect(res.body.error.message).toContain('system-generated no-reply');
+  });
+
+  it('should support undo send cancellation via POST /v1/messages/outbound/:id/cancel', async () => {
+    // 1. Compose message with 15s undo grace window
+    const composeRes = await request(app)
+      .post('/v1/messages/compose')
+      .set('Authorization', `Bearer ${tokenUserA}`)
+      .send({
+        mailboxId: mailboxAId,
+        to: ['undo-api-test@external-domain.com'],
+        subject: 'Undo API Integration Test',
+        bodyText: 'Testing abort before relay',
+        undoGraceSeconds: 15,
+      });
+
+    expect(composeRes.status).toBe(202);
+    expect(composeRes.body.success).toBe(true);
+    expect(composeRes.body.undoGraceSeconds).toBe(15);
+    const queueId = composeRes.body.queueIds?.[0];
+    expect(queueId).toBeDefined();
+
+    // 2. Abort delivery within grace window
+    const cancelRes = await request(app)
+      .post(`/v1/messages/outbound/${queueId}/cancel`)
+      .set('Authorization', `Bearer ${tokenUserA}`);
+
+    expect(cancelRes.status).toBe(200);
+    expect(cancelRes.body.success).toBe(true);
+    expect(cancelRes.body.message).toContain('cancelled successfully');
   });
 });
 

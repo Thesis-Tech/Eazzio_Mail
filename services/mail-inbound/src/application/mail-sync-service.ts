@@ -22,7 +22,7 @@ export class MailSyncService {
 
   constructor(
     private readonly pipeline: InboundPipeline,
-    provider?: InboundMailProvider
+    provider?: InboundMailProvider,
   ) {
     this.provider = provider || InboundProviderFactory.createProvider();
   }
@@ -55,21 +55,28 @@ export class MailSyncService {
     let skippedCount = 0;
     let failedCount = 0;
 
-    console.log(`\n🔄 [MailSync] Starting inbound synchronization [Provider: ${this.provider.providerName}, Folder: ${folder}]...`);
+    console.log(
+      `\n🔄 [MailSync] Starting inbound synchronization [Provider: ${this.provider.providerName}, Folder: ${folder}]...`,
+    );
 
     try {
       const messages = await this.provider.fetchNewMessages(folder, limit);
       checkedCount = messages.length;
-      console.log(`📥 [MailSync] Retrieved ${checkedCount} raw messages from ${this.provider.providerName}`);
+      console.log(
+        `📥 [MailSync] Retrieved ${checkedCount} raw messages from ${this.provider.providerName}`,
+      );
 
       for (const email of messages) {
         try {
           // Parse header details for the envelope
           const parsed = await MimeParser.parse(email.rawMime);
           const fromAddress = email.from || parsed.from || 'unknown@sender.com';
-          const toAddresses = (email.to && email.to.length > 0)
-            ? email.to
-            : (parsed.to.length > 0 ? parsed.to : ['rahulkumar@eazzio.com']);
+          const toAddresses =
+            email.to && email.to.length > 0
+              ? email.to
+              : parsed.to.length > 0
+                ? parsed.to
+                : ['rahulkumar@eazzio.com'];
 
           const envelope = new InboundEnvelope({
             envelopeFrom: fromAddress,
@@ -78,9 +85,9 @@ export class MailSyncService {
             sizeBytes: email.rawMime.length,
           });
 
-          const fromDomain = (fromAddress.includes('@')
-            ? fromAddress.split('@')[1]
-            : 'secureserver.net') || 'secureserver.net';
+          const fromDomain =
+            (fromAddress.includes('@') ? fromAddress.split('@')[1] : 'secureserver.net') ||
+            'secureserver.net';
 
           const processInput: InboundProcessInput = {
             envelope,
@@ -98,10 +105,14 @@ export class MailSyncService {
           if (result.status === 'ACCEPTED') {
             if (result.duplicate) {
               skippedCount++;
-              console.log(`⏩ [MailSync] Skipped duplicate message [UID: ${email.uid}, MessageId: ${result.messageId}]`);
+              console.log(
+                `⏩ [MailSync] Skipped duplicate message [UID: ${email.uid}, MessageId: ${result.messageId}]`,
+              );
             } else {
               importedCount++;
-              console.log(`✅ [MailSync] Imported message [UID: ${email.uid}, MessageId: ${result.messageId}, Subject: "${parsed.subject || 'No Subject'}"]`);
+              console.log(
+                `✅ [MailSync] Imported message [UID: ${email.uid}, MessageId: ${result.messageId}, Subject: "${parsed.subject || 'No Subject'}"]`,
+              );
               await this.provider.markSynchronized(email.uid, folder);
             }
           } else if (result.status === 'REJECTED') {
@@ -112,7 +123,9 @@ export class MailSyncService {
           } else {
             // QUARANTINED
             importedCount++;
-            console.log(`🛡️ [MailSync] Quarantined message [UID: ${email.uid}, MessageId: ${result.messageId}]`);
+            console.log(
+              `🛡️ [MailSync] Quarantined message [UID: ${email.uid}, MessageId: ${result.messageId}]`,
+            );
             await this.provider.markSynchronized(email.uid, folder);
           }
         } catch (msgErr: any) {
@@ -123,7 +136,9 @@ export class MailSyncService {
         }
       }
 
-      console.log(`🏁 [MailSync] Sync finished: ${checkedCount} checked, ${importedCount} imported, ${skippedCount} skipped, ${failedCount} failed.`);
+      console.log(
+        `🏁 [MailSync] Sync finished: ${checkedCount} checked, ${importedCount} imported, ${skippedCount} skipped, ${failedCount} failed.`,
+      );
 
       return {
         success: true,

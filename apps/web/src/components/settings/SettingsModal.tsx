@@ -48,6 +48,7 @@ import {
 } from 'lucide-react';
 
 import { FolderItem, LabelItem, FilterRule, UserPreferences } from '../../types/mail';
+import { AuthStore } from '../../lib/auth-store';
 
 export interface SettingsModalProps {
   isOpen: boolean;
@@ -77,7 +78,7 @@ const PRESET_COLORS = [
 ];
 
 const PRESET_THEMES = [
-  { id: 'eazzio-teal', name: 'Eazzio Brand (Default)', bg: '#0A0C10', accent: '#14B8A6', border: '#1E232B', desc: 'Official Eazzio brand dark canvas with cyber teal accents' },
+  { id: 'eazzio-teal', name: 'Eazzio Light (Default)', bg: '#F8FAFC', accent: '#14B8A6', border: '#CBD5E1', desc: 'Official Eazzio clean light canvas with cyber teal accents', isLight: true },
   { id: 'dark-oled', name: 'Royal Dark', bg: '#0A0C10', accent: '#2D5BFF', border: '#1E232B', desc: 'Deep black with electric royal blue accents' },
   { id: 'midnight', name: 'Midnight Blue', bg: '#070D18', accent: '#38BDF8', border: '#1E3B68', desc: 'Navy night canvas with vivid sky blue' },
   { id: 'emerald', name: 'Cyber Emerald', bg: '#030E0B', accent: '#10B981', border: '#103F31', desc: 'Futuristic matrix black with neon mint glow' },
@@ -191,31 +192,71 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       setSelectedThemeId(currentThemeId);
-      fetch('/api/settings/preferences')
+
+      let auth = AuthStore.getState();
+      let storedEmail = auth.user?.email;
+      let storedToken = auth.token;
+      if (!storedEmail || !storedToken) {
+        try {
+          const userStr = localStorage.getItem('eazzio_user');
+          if (userStr) storedEmail = JSON.parse(userStr).email;
+          if (!storedToken) storedToken = localStorage.getItem('eazzio_token');
+        } catch (_) {}
+      }
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (storedToken) headers['Authorization'] = `Bearer ${storedToken}`;
+      if (storedEmail) headers['x-user-email'] = storedEmail;
+
+      fetch('/api/settings/preferences', { headers })
         .then((res) => res.json())
         .then((json) => {
           if (json.data) {
             const p = json.data;
+            if (p.pageSize !== undefined) setPageSize(p.pageSize);
+            if (p.undoSendTime !== undefined) setUndoSendTime(p.undoSendTime);
+            if (p.defaultReplyBehavior) setDefaultReplyBehavior(p.defaultReplyBehavior);
+            if (p.hoverActions !== undefined) setHoverActions(p.hoverActions);
+            if (p.sendAndArchive !== undefined) setSendAndArchive(p.sendAndArchive);
+            if (p.desktopNotifications) setDesktopNotifications(p.desktopNotifications);
+            if (p.starPreset) setStarPreset(p.starPreset);
             if (p.signature?.text) setSignatureText(p.signature.text);
+            if (p.signature?.forNew) setSignatureForNew(p.signature.forNew);
+            if (p.signature?.forReply) setSignatureForReply(p.signature.forReply);
             if (p.autoReply?.enabled !== undefined) setVacationEnabled(p.autoReply.enabled);
             if (p.autoReply?.subject) setVacationSubject(p.autoReply.subject);
             if (p.autoReply?.body) setVacationBody(p.autoReply.body);
+            if (p.autoReply?.startDate) setVacationStartDate(p.autoReply.startDate.split('T')[0]);
+            if (p.autoReply?.endDate) setVacationEndDate(p.autoReply.endDate.split('T')[0]);
+            if (p.autoReply?.contactsOnly !== undefined) setVacationContactsOnly(p.autoReply.contactsOnly);
             if (p.inboxType) setInboxType(p.inboxType);
+            if (p.categories) setCategories(p.categories);
             if (p.readingPane) setReadingPanePos(p.readingPane);
             if (p.conversationView !== undefined) setConversationView(p.conversationView);
+            if (p.forwardingAddress !== undefined) setForwardingAddress(p.forwardingAddress);
+            if (p.popEnabled !== undefined) setPopEnabled(p.popEnabled);
+            if (p.imapEnabled !== undefined) setImapEnabled(p.imapEnabled);
+            if (p.imapExpunge) setImapExpunge(p.imapExpunge);
+            if (Array.isArray(p.blockedAddresses)) setBlockedAddresses(p.blockedAddresses);
             if (p.theme) setSelectedThemeId(p.theme);
           }
         })
         .catch(() => {});
 
-      fetchDomains();
+      fetchDomains(headers);
     }
   }, [isOpen, currentThemeId]);
 
-  const fetchDomains = async () => {
+  const fetchDomains = async (customHeaders?: Record<string, string>) => {
     try {
       setLoadingDomains(true);
-      const res = await fetch('/api/domains');
+      let headers = customHeaders;
+      if (!headers) {
+        const auth = AuthStore.getState();
+        headers = { 'Content-Type': 'application/json' };
+        if (auth.token) headers['Authorization'] = `Bearer ${auth.token}`;
+        if (auth.user?.email) headers['x-user-email'] = auth.user.email;
+      }
+      const res = await fetch('/api/domains', { headers });
       if (res.ok) {
         const json = await res.json();
         setDomains(json.data || []);
@@ -233,9 +274,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
     try {
       localStorage.setItem('eazzio_theme', themeId);
+      const auth = AuthStore.getState();
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (auth.token) headers['Authorization'] = `Bearer ${auth.token}`;
+      if (auth.user?.email) headers['x-user-email'] = auth.user.email;
+
       fetch('/api/settings/preferences', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ theme: themeId }),
       }).catch(() => {});
     } catch (_) {}
@@ -266,9 +312,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       if (onThemeChange) {
         onThemeChange(id);
       }
+      const auth = AuthStore.getState();
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (auth.token) headers['Authorization'] = `Bearer ${auth.token}`;
+      if (auth.user?.email) headers['x-user-email'] = auth.user.email;
+
       fetch('/api/settings/preferences', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ theme: id }),
       }).catch(() => {});
     } catch (_) {}
@@ -276,6 +327,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const handleSaveGeneral = async () => {
     try {
+      let auth = AuthStore.getState();
+      let storedEmail = auth.user?.email;
+      let storedToken = auth.token;
+      if (!storedEmail || !storedToken) {
+        try {
+          const userStr = localStorage.getItem('eazzio_user');
+          if (userStr) storedEmail = JSON.parse(userStr).email;
+          if (!storedToken) storedToken = localStorage.getItem('eazzio_token');
+        } catch (_) {}
+      }
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (storedToken) headers['Authorization'] = `Bearer ${storedToken}`;
+      if (storedEmail) headers['x-user-email'] = storedEmail;
+
       const payload = {
         pageSize,
         undoSendTime,
@@ -283,22 +348,36 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         hoverActions,
         sendAndArchive,
         conversationView,
+        desktopNotifications,
+        starPreset,
         theme: selectedThemeId,
-        signature: { text: signatureText, enabled: Boolean(signatureText.trim()) },
+        signature: {
+          text: signatureText,
+          enabled: Boolean(signatureText.trim()),
+          forNew: signatureForNew,
+          forReply: signatureForReply,
+        },
         autoReply: {
           enabled: vacationEnabled,
           subject: vacationSubject,
           body: vacationBody,
-          startDate: vacationStartDate,
-          endDate: vacationEndDate || null,
+          startDate: vacationStartDate ? new Date(vacationStartDate).toISOString() : null,
+          endDate: vacationEndDate ? new Date(vacationEndDate).toISOString() : null,
+          contactsOnly: vacationContactsOnly,
         },
         inboxType,
+        categories,
         readingPane: readingPanePos,
+        forwardingAddress,
+        popEnabled,
+        imapEnabled,
+        imapExpunge,
+        blockedAddresses,
       };
 
       await fetch('/api/settings/preferences', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(payload),
       });
 
@@ -370,8 +449,30 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     } catch (_) {}
   };
 
-  const handleUnblock = (addr: string) => {
-    setBlockedAddresses(blockedAddresses.filter((a) => a !== addr));
+  const handleUnblock = async (addr: string) => {
+    const updated = blockedAddresses.filter((a) => a !== addr);
+    setBlockedAddresses(updated);
+    try {
+      let auth = AuthStore.getState();
+      let storedEmail = auth.user?.email;
+      let storedToken = auth.token;
+      if (!storedEmail || !storedToken) {
+        try {
+          const userStr = localStorage.getItem('eazzio_user');
+          if (userStr) storedEmail = JSON.parse(userStr).email;
+          if (!storedToken) storedToken = localStorage.getItem('eazzio_token');
+        } catch (_) {}
+      }
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (storedToken) headers['Authorization'] = `Bearer ${storedToken}`;
+      if (storedEmail) headers['x-user-email'] = storedEmail;
+
+      await fetch('/api/settings/preferences', {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify({ blockedAddresses: updated }),
+      });
+    } catch (_) {}
   };
 
   if (!isOpen) return null;
@@ -379,40 +480,42 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-6 animate-in fade-in duration-200">
       {/* Backdrop */}
-      <div className="fixed inset-0 bg-black/80 backdrop-blur-md" onClick={onClose} />
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
       {/* Modal Box */}
       <div 
-        style={{ 
-          backgroundColor: 'var(--theme-bg-main, #0A0C10)', 
-          borderColor: 'var(--theme-border, #1E232B)' 
+        style={{
+          backgroundColor: 'var(--theme-bg-sidebar, #FFFFFF)',
+          borderColor: 'var(--theme-border, #E2E8F0)',
         }}
-        className="relative w-full max-w-5xl h-[92vh] max-h-[850px] rounded-2xl border shadow-2xl flex flex-col z-10 overflow-hidden text-slate-200 font-sans"
+        className="relative w-full max-w-5xl h-[92vh] max-h-[850px] rounded-2xl border shadow-2xl flex flex-col z-10 overflow-hidden font-sans"
       >
         {/* Modal Header */}
         <div 
-          style={{ 
-            backgroundColor: 'var(--theme-bg-header, #0A0C10)', 
-            borderColor: 'var(--theme-border, #1E232B)' 
+          style={{
+            backgroundColor: 'var(--theme-bg-header, #F8FAFC)',
+            borderColor: 'var(--theme-border, #E2E8F0)',
           }}
           className="h-16 px-6 border-b flex items-center justify-between shrink-0"
         >
           <div className="flex items-center gap-3">
             <div 
-              style={{ background: 'linear-gradient(135deg, var(--theme-accent, #2D5BFF), #14B8A6)' }}
-              className="w-8 h-8 rounded-xl flex items-center justify-center text-white font-bold shadow-lg"
+              style={{
+                backgroundColor: 'var(--theme-accent, #14B8A6)',
+              }}
+              className="w-8 h-8 rounded-xl flex items-center justify-center text-white font-bold shadow-sm"
             >
               <Sliders className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-white tracking-tight">Settings</h2>
-              <p className="text-xs text-slate-400">Configure your inbox preferences, labels, filters, custom themes, and domains</p>
+              <h2 className="text-base font-bold tracking-tight">Settings</h2>
+              <p className="text-xs opacity-60">Configure your inbox preferences, labels, filters, custom themes, and domains</p>
             </div>
           </div>
 
           <button
             onClick={onClose}
-            className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+            className="p-2 rounded-xl opacity-60 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -420,9 +523,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
         {/* Gmail Navigation Tabs Bar */}
         <div 
-          style={{ 
-            backgroundColor: 'var(--theme-bg-card, #12141A)', 
-            borderColor: 'var(--theme-border, #1E232B)' 
+          style={{
+            backgroundColor: 'var(--theme-bg-sidebar, #FFFFFF)',
+            borderColor: 'var(--theme-border, #E2E8F0)',
           }}
           className="flex items-center px-6 border-b overflow-x-auto custom-scrollbar no-scrollbar shrink-0 text-xs font-semibold gap-1"
         >
@@ -440,15 +543,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
-                style={isActive ? { color: 'var(--theme-accent, #2D5BFF)' } : undefined}
+                style={isActive ? {
+                  color: 'var(--theme-accent, #0F766E)',
+                } : undefined}
                 className={`py-3.5 px-4 transition-all whitespace-nowrap relative font-medium ${
-                  isActive ? 'font-bold' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+                  isActive ? 'font-bold' : 'opacity-60 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/5'
                 }`}
               >
                 <span>{tab.label}</span>
                 {isActive && (
                   <div 
-                    style={{ backgroundColor: 'var(--theme-accent, #2D5BFF)' }}
+                    style={{ backgroundColor: 'var(--theme-accent, #14B8A6)' }}
                     className="absolute bottom-0 left-0 right-0 h-0.5 rounded-t-full"
                   />
                 )}
@@ -459,7 +564,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
         {/* Modal Scrollable Body */}
         <div 
-          style={{ backgroundColor: 'var(--theme-bg-main, #0A0C10)' }}
+          style={{
+            backgroundColor: 'var(--theme-bg-main, #F8FAFC)',
+          }}
           className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar text-xs"
         >
           
@@ -467,17 +574,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           {/* 1. GENERAL TAB */}
           {/* ========================================================= */}
           {activeTab === 'general' && (
-            <div className="space-y-6 divide-y divide-white/5">
+            <div style={{ borderColor: 'var(--theme-border, #E2E8F0)' }} className="space-y-6 divide-y">
               
               {/* Language */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-2">
-                <div className="font-semibold text-slate-300">Language:</div>
+                <div className="font-bold text-[#0F172A]">Language:</div>
                 <div className="md:col-span-3 space-y-2">
                   <div className="flex items-center gap-3">
-                    <span className="text-slate-400">Eazzio Mail display language:</span>
+                    <span className="text-[#475569]">Eazzio Mail display language:</span>
                     <select 
-                      style={{ backgroundColor: 'var(--theme-bg-card, #12141A)', borderColor: 'var(--theme-border, #1E232B)' }}
-                      className="px-3 py-1.5 rounded-lg border text-white outline-none"
+                      className="px-3 py-1.5 rounded-xl border border-[#CBD5E1] bg-white text-[#0F172A] font-medium outline-none shadow-xs focus:ring-2 focus:ring-[#14B8A6]/20 focus:border-[#14B8A6]"
                     >
                       <option>English (US)</option>
                       <option>English (UK)</option>
@@ -492,33 +598,31 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
               {/* Maximum Page Size */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4">
-                <div className="font-semibold text-slate-300">Maximum page size:</div>
+                <div className="font-bold text-[#0F172A]">Maximum page size:</div>
                 <div className="md:col-span-3 flex items-center gap-3">
-                  <span className="text-slate-400">Show</span>
+                  <span className="text-[#475569]">Show</span>
                   <select
                     value={pageSize}
                     onChange={(e) => setPageSize(Number(e.target.value))}
-                    style={{ backgroundColor: 'var(--theme-bg-card, #12141A)', borderColor: 'var(--theme-border, #1E232B)' }}
-                    className="px-3 py-1.5 rounded-lg border text-white outline-none"
+                    className="px-3 py-1.5 rounded-xl border border-[#CBD5E1] bg-white text-[#0F172A] font-medium outline-none shadow-xs focus:ring-2 focus:ring-[#14B8A6]/20 focus:border-[#14B8A6]"
                   >
                     <option value={25}>25</option>
                     <option value={50}>50</option>
                     <option value={100}>100</option>
                   </select>
-                  <span className="text-slate-400">conversations per page</span>
+                  <span className="text-[#475569]">conversations per page</span>
                 </div>
               </div>
 
               {/* Undo Send */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4">
-                <div className="font-semibold text-slate-300">Undo Send:</div>
+                <div className="font-bold text-[#0F172A]">Undo Send:</div>
                 <div className="md:col-span-3 flex items-center gap-3">
-                  <span className="text-slate-400">Send cancellation period:</span>
+                  <span className="text-[#475569]">Send cancellation period:</span>
                   <select
                     value={undoSendTime}
                     onChange={(e) => setUndoSendTime(Number(e.target.value))}
-                    style={{ backgroundColor: 'var(--theme-bg-card, #12141A)', borderColor: 'var(--theme-border, #1E232B)' }}
-                    className="px-3 py-1.5 rounded-lg border text-white outline-none"
+                    className="px-3 py-1.5 rounded-xl border border-[#CBD5E1] bg-white text-[#0F172A] font-medium outline-none shadow-xs focus:ring-2 focus:ring-[#14B8A6]/20 focus:border-[#14B8A6]"
                   >
                     <option value={5}>5 seconds</option>
                     <option value={10}>10 seconds</option>
@@ -530,7 +634,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
               {/* Default Reply Behavior */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4">
-                <div className="font-semibold text-slate-300">Default reply behavior:</div>
+                <div className="font-bold text-[#0F172A]">Default reply behavior:</div>
                 <div className="md:col-span-3 space-y-2">
                   <label className="flex items-center gap-2.5 cursor-pointer">
                     <input
@@ -538,9 +642,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       name="replyBehavior"
                       checked={defaultReplyBehavior === 'reply'}
                       onChange={() => setDefaultReplyBehavior('reply')}
-                      className="accent-[#2D5BFF]"
+                      className="accent-[#14B8A6] w-4 h-4"
                     />
-                    <span className="text-slate-200">Reply</span>
+                    <span className="text-[#1E293B] font-medium">Reply</span>
                   </label>
                   <label className="flex items-center gap-2.5 cursor-pointer">
                     <input
@@ -548,16 +652,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       name="replyBehavior"
                       checked={defaultReplyBehavior === 'reply_all'}
                       onChange={() => setDefaultReplyBehavior('reply_all')}
-                      className="accent-[#2D5BFF]"
+                      className="accent-[#14B8A6] w-4 h-4"
                     />
-                    <span className="text-slate-200">Reply all</span>
+                    <span className="text-[#1E293B] font-medium">Reply all</span>
                   </label>
                 </div>
               </div>
 
               {/* Hover Actions */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4">
-                <div className="font-semibold text-slate-300">Hover actions:</div>
+                <div className="font-bold text-[#0F172A]">Hover actions:</div>
                 <div className="md:col-span-3 space-y-2">
                   <label className="flex items-center gap-2.5 cursor-pointer">
                     <input
@@ -565,9 +669,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       name="hoverActions"
                       checked={hoverActions}
                       onChange={() => setHoverActions(true)}
-                      className="accent-[#2D5BFF]"
+                      className="accent-[#14B8A6] w-4 h-4"
                     />
-                    <span className="text-slate-200">Enable hover actions — Quickly access archive, delete, mark read, and snooze</span>
+                    <span className="text-[#1E293B] font-medium">Enable hover actions — Quickly access archive, delete, mark read, and snooze</span>
                   </label>
                   <label className="flex items-center gap-2.5 cursor-pointer">
                     <input
@@ -575,16 +679,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       name="hoverActions"
                       checked={!hoverActions}
                       onChange={() => setHoverActions(false)}
-                      className="accent-[#2D5BFF]"
+                      className="accent-[#14B8A6] w-4 h-4"
                     />
-                    <span className="text-slate-200">Disable hover actions</span>
+                    <span className="text-[#1E293B] font-medium">Disable hover actions</span>
                   </label>
                 </div>
               </div>
 
               {/* Conversation View */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4">
-                <div className="font-semibold text-slate-300">Conversation View:</div>
+                <div className="font-bold text-[#0F172A]">Conversation View:</div>
                 <div className="md:col-span-3 space-y-2">
                   <label className="flex items-center gap-2.5 cursor-pointer">
                     <input
@@ -592,9 +696,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       name="convView"
                       checked={conversationView}
                       onChange={() => setConversationView(true)}
-                      className="accent-[#2D5BFF]"
+                      className="accent-[#14B8A6] w-4 h-4"
                     />
-                    <span className="text-slate-200">Conversation view on — Group messages with the same subject together</span>
+                    <span className="text-[#1E293B] font-medium">Conversation view on — Group messages with the same subject together</span>
                   </label>
                   <label className="flex items-center gap-2.5 cursor-pointer">
                     <input
@@ -602,16 +706,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       name="convView"
                       checked={!conversationView}
                       onChange={() => setConversationView(false)}
-                      className="accent-[#2D5BFF]"
+                      className="accent-[#14B8A6] w-4 h-4"
                     />
-                    <span className="text-slate-200">Conversation view off</span>
+                    <span className="text-[#1E293B] font-medium">Conversation view off</span>
                   </label>
                 </div>
               </div>
 
               {/* Desktop Notifications */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4">
-                <div className="font-semibold text-slate-300">Desktop notifications:</div>
+                <div className="font-bold text-[#0F172A]">Desktop notifications:</div>
                 <div className="md:col-span-3 space-y-2">
                   <label className="flex items-center gap-2.5 cursor-pointer">
                     <input
@@ -619,9 +723,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       name="notifications"
                       checked={desktopNotifications === 'all'}
                       onChange={() => setDesktopNotifications('all')}
-                      className="accent-[#2D5BFF]"
+                      className="accent-[#14B8A6] w-4 h-4"
                     />
-                    <span className="text-slate-200">New mail notifications on — Notify me when any new message arrives</span>
+                    <span className="text-[#1E293B] font-medium">New mail notifications on — Notify me when any new message arrives</span>
                   </label>
                   <label className="flex items-center gap-2.5 cursor-pointer">
                     <input
@@ -629,9 +733,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       name="notifications"
                       checked={desktopNotifications === 'important'}
                       onChange={() => setDesktopNotifications('important')}
-                      className="accent-[#2D5BFF]"
+                      className="accent-[#14B8A6] w-4 h-4"
                     />
-                    <span className="text-slate-200">Important mail notifications on — Notify me only for important emails</span>
+                    <span className="text-[#1E293B] font-medium">Important mail notifications on — Notify me only for important emails</span>
                   </label>
                   <label className="flex items-center gap-2.5 cursor-pointer">
                     <input
@@ -639,30 +743,30 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       name="notifications"
                       checked={desktopNotifications === 'off'}
                       onChange={() => setDesktopNotifications('off')}
-                      className="accent-[#2D5BFF]"
+                      className="accent-[#14B8A6] w-4 h-4"
                     />
-                    <span className="text-slate-200">Mail notifications off</span>
+                    <span className="text-[#1E293B] font-medium">Mail notifications off</span>
                   </label>
                 </div>
               </div>
 
               {/* Stars Preset */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4">
-                <div className="font-semibold text-slate-300">Stars:</div>
+                <div className="font-bold text-[#0F172A]">Stars:</div>
                 <div className="md:col-span-3 space-y-3">
                   <div className="flex items-center gap-2">
-                    <span className="text-slate-400">Presets:</span>
-                    <button onClick={() => setStarPreset('1star')} className={`px-2.5 py-1 rounded-md border ${starPreset === '1star' ? 'bg-[#2D5BFF]/20 border-[#2D5BFF] text-[#2D5BFF]' : 'border-white/10 text-slate-400'}`}>1 star</button>
-                    <button onClick={() => setStarPreset('4stars')} className={`px-2.5 py-1 rounded-md border ${starPreset === '4stars' ? 'bg-[#2D5BFF]/20 border-[#2D5BFF] text-[#2D5BFF]' : 'border-white/10 text-slate-400'}`}>4 stars</button>
-                    <button onClick={() => setStarPreset('all')} className={`px-2.5 py-1 rounded-md border ${starPreset === 'all' ? 'bg-[#2D5BFF]/20 border-[#2D5BFF] text-[#2D5BFF]' : 'border-white/10 text-slate-400'}`}>all stars</button>
+                    <span className="text-[#475569]">Presets:</span>
+                    <button onClick={() => setStarPreset('1star')} className={`px-3 py-1 rounded-xl border text-xs font-semibold ${starPreset === '1star' ? 'bg-[#F0FDFA] border-[#14B8A6] text-[#0F766E]' : 'border-[#CBD5E1] bg-white text-[#475569]'}`}>1 star</button>
+                    <button onClick={() => setStarPreset('4stars')} className={`px-3 py-1 rounded-xl border text-xs font-semibold ${starPreset === '4stars' ? 'bg-[#F0FDFA] border-[#14B8A6] text-[#0F766E]' : 'border-[#CBD5E1] bg-white text-[#475569]'}`}>4 stars</button>
+                    <button onClick={() => setStarPreset('all')} className={`px-3 py-1 rounded-xl border text-xs font-semibold ${starPreset === 'all' ? 'bg-[#F0FDFA] border-[#14B8A6] text-[#0F766E]' : 'border-[#CBD5E1] bg-white text-[#475569]'}`}>all stars</button>
                   </div>
-                  <div className="flex items-center gap-2 p-3 bg-white/[0.02] border border-white/5 rounded-xl">
+                  <div className="flex items-center gap-2 p-3 bg-white border border-[#E2E8F0] rounded-xl shadow-xs">
                     <Star className="w-5 h-5 fill-amber-400 text-amber-400" />
                     {starPreset !== '1star' && (
                       <>
-                        <Star className="w-5 h-5 fill-blue-400 text-blue-400" />
-                        <Star className="w-5 h-5 fill-emerald-400 text-emerald-400" />
-                        <Star className="w-5 h-5 fill-purple-400 text-purple-400" />
+                        <Star className="w-5 h-5 fill-blue-500 text-blue-500" />
+                        <Star className="w-5 h-5 fill-emerald-500 text-emerald-500" />
+                        <Star className="w-5 h-5 fill-purple-500 text-purple-500" />
                       </>
                     )}
                   </div>
@@ -671,39 +775,36 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
               {/* Outbound Signature Builder */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4">
-                <div className="font-semibold text-slate-300">Signature:</div>
+                <div className="font-bold text-[#0F172A]">Signature:</div>
                 <div className="md:col-span-3 space-y-3">
                   <div 
-                    style={{ backgroundColor: 'var(--theme-bg-card, #12141A)', borderColor: 'var(--theme-border, #1E232B)' }}
-                    className="p-4 rounded-xl border space-y-3"
+                    className="p-4 rounded-xl border border-[#CBD5E1] bg-white shadow-xs space-y-3"
                   >
                     <textarea
                       value={signatureText}
                       onChange={(e) => setSignatureText(e.target.value)}
                       rows={4}
                       placeholder="Best Regards,&#10;Your Name&#10;Company"
-                      className="w-full bg-transparent text-white text-xs outline-none resize-none border-b border-white/10 pb-2"
+                      className="w-full bg-transparent text-[#0F172A] text-xs outline-none resize-none border-b border-[#E2E8F0] pb-2 font-medium"
                     />
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 text-[11px] text-slate-400">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 text-[11px] text-[#475569]">
                       <div>
-                        <label className="block mb-1 font-semibold text-slate-300">FOR NEW EMAILS USE</label>
+                        <label className="block mb-1 font-bold text-[#0F172A]">FOR NEW EMAILS USE</label>
                         <select 
                           value={signatureForNew} 
                           onChange={(e) => setSignatureForNew(e.target.value)}
-                          style={{ backgroundColor: 'var(--theme-bg-sidebar, #090A0D)', borderColor: 'var(--theme-border, #1E232B)' }}
-                          className="w-full p-2 rounded-lg border text-white"
+                          className="w-full p-2 rounded-xl border border-[#CBD5E1] bg-white text-[#0F172A] font-medium"
                         >
                           <option value="default">Default Signature</option>
                           <option value="none">No signature</option>
                         </select>
                       </div>
                       <div>
-                        <label className="block mb-1 font-semibold text-slate-300">ON REPLY / FORWARD USE</label>
+                        <label className="block mb-1 font-bold text-[#0F172A]">ON REPLY / FORWARD USE</label>
                         <select 
                           value={signatureForReply} 
                           onChange={(e) => setSignatureForReply(e.target.value)}
-                          style={{ backgroundColor: 'var(--theme-bg-sidebar, #090A0D)', borderColor: 'var(--theme-border, #1E232B)' }}
-                          className="w-full p-2 rounded-lg border text-white"
+                          className="w-full p-2 rounded-xl border border-[#CBD5E1] bg-white text-[#0F172A] font-medium"
                         >
                           <option value="default">Default Signature</option>
                           <option value="none">No signature</option>
@@ -716,7 +817,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
               {/* Vacation Responder / Auto-Reply */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4">
-                <div className="font-semibold text-slate-300">Vacation responder:</div>
+                <div className="font-bold text-[#0F172A]">Vacation responder:</div>
                 <div className="md:col-span-3 space-y-3">
                   <div className="flex items-center gap-6">
                     <label className="flex items-center gap-2 cursor-pointer">
@@ -725,9 +826,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         name="vacation"
                         checked={!vacationEnabled}
                         onChange={() => setVacationEnabled(false)}
-                        className="accent-[#2D5BFF]"
+                        className="accent-[#14B8A6] w-4 h-4"
                       />
-                      <span>Vacation responder off</span>
+                      <span className="text-[#1E293B] font-medium">Vacation responder off</span>
                     </label>
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input
@@ -735,70 +836,65 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         name="vacation"
                         checked={vacationEnabled}
                         onChange={() => setVacationEnabled(true)}
-                        className="accent-[#2D5BFF]"
+                        className="accent-[#14B8A6] w-4 h-4"
                       />
-                      <span>Vacation responder on</span>
+                      <span className="text-[#1E293B] font-medium">Vacation responder on</span>
                     </label>
                   </div>
 
                   {vacationEnabled && (
                     <div 
-                      style={{ backgroundColor: 'var(--theme-bg-card, #12141A)', borderColor: 'var(--theme-border, #1E232B)' }}
-                      className="p-4 rounded-xl border space-y-3 animate-in fade-in"
+                      className="p-4 rounded-xl border border-[#CBD5E1] bg-white shadow-xs space-y-3 animate-in fade-in"
                     >
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
-                          <label className="block text-[11px] text-slate-400 mb-1">First day</label>
+                          <label className="block text-[11px] font-semibold text-[#475569] mb-1">First day</label>
                           <input
                             type="date"
                             value={vacationStartDate}
                             onChange={(e) => setVacationStartDate(e.target.value)}
-                            style={{ backgroundColor: 'var(--theme-bg-sidebar, #090A0D)', borderColor: 'var(--theme-border, #1E232B)' }}
-                            className="w-full p-2 rounded-lg border text-white outline-none"
+                            className="w-full p-2 rounded-xl border border-[#CBD5E1] bg-white text-[#0F172A] outline-none"
                           />
                         </div>
                         <div>
-                          <label className="block text-[11px] text-slate-400 mb-1">Last day (optional)</label>
+                          <label className="block text-[11px] font-semibold text-[#475569] mb-1">Last day (optional)</label>
                           <input
                             type="date"
                             value={vacationEndDate}
                             onChange={(e) => setVacationEndDate(e.target.value)}
-                            style={{ backgroundColor: 'var(--theme-bg-sidebar, #090A0D)', borderColor: 'var(--theme-border, #1E232B)' }}
-                            className="w-full p-2 rounded-lg border text-white outline-none"
+                            className="w-full p-2 rounded-xl border border-[#CBD5E1] bg-white text-[#0F172A] outline-none"
                           />
                         </div>
                       </div>
 
                       <div>
-                        <label className="block text-[11px] text-slate-400 mb-1">Subject</label>
+                        <label className="block text-[11px] font-semibold text-[#475569] mb-1">Subject</label>
                         <input
                           type="text"
                           value={vacationSubject}
                           onChange={(e) => setVacationSubject(e.target.value)}
-                          style={{ backgroundColor: 'var(--theme-bg-sidebar, #090A0D)', borderColor: 'var(--theme-border, #1E232B)' }}
-                          className="w-full p-2 rounded-lg border text-white outline-none"
+                          className="w-full p-2 rounded-xl border border-[#CBD5E1] bg-white text-[#0F172A] outline-none"
                         />
                       </div>
 
                       <div>
-                        <label className="block text-[11px] text-slate-400 mb-1">Message</label>
+                        <label className="block text-[11px] font-semibold text-[#475569] mb-1">Message</label>
                         <textarea
                           rows={3}
                           value={vacationBody}
                           onChange={(e) => setVacationBody(e.target.value)}
-                          style={{ backgroundColor: 'var(--theme-bg-sidebar, #090A0D)', borderColor: 'var(--theme-border, #1E232B)' }}
-                          className="w-full p-2 rounded-lg border text-white outline-none resize-none"
+                          className="w-full p-2 rounded-xl border border-[#CBD5E1] bg-white text-[#0F172A] outline-none resize-none font-medium"
                         />
                       </div>
 
-                      <label className="flex items-center gap-2 cursor-pointer text-slate-400">
+                      <label className="flex items-center gap-2 cursor-pointer text-[#475569]">
                         <input
                           type="checkbox"
                           checked={vacationContactsOnly}
                           onChange={(e) => setVacationContactsOnly(e.target.checked)}
-                          className="accent-[#2D5BFF]"
+                          className="accent-[#14B8A6] w-4 h-4"
                         />
-                        <span>Only send a response to people in my Contacts</span>
+                        <span className="text-[#1E293B] font-medium">Only send a response to people in my Contacts</span>
                       </label>
                     </div>
                   )}
@@ -815,12 +911,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               
               {/* System Labels Visibility Table */}
               <div>
-                <h3 className="text-sm font-bold text-white mb-3">System Labels</h3>
+                <h3 className="text-sm font-bold text-[#0F172A] mb-3">System Labels</h3>
                 <div 
-                  style={{ backgroundColor: 'var(--theme-bg-card, #12141A)', borderColor: 'var(--theme-border, #1E232B)' }}
-                  className="rounded-xl border overflow-hidden divide-y divide-white/5"
+                  className="rounded-2xl border border-[#E2E8F0] bg-white overflow-hidden divide-y divide-[#E2E8F0] shadow-xs"
                 >
-                  <div className="grid grid-cols-3 p-3 font-semibold text-slate-400 bg-white/[0.02]">
+                  <div className="grid grid-cols-3 p-3 font-bold text-[#475569] bg-[#F8FAFC] text-xs">
                     <div>Label Name</div>
                     <div>Show in label list</div>
                     <div>IMAP Sync</div>
@@ -837,15 +932,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     { name: 'Spam', slug: 'spam' },
                     { name: 'Trash', slug: 'trash' },
                   ].map((sys) => (
-                    <div key={sys.slug} className="grid grid-cols-3 p-3 items-center">
-                      <div className="font-medium text-white">{sys.name}</div>
-                      <div className="flex items-center gap-3 text-slate-400">
-                        <button className="hover:text-white font-semibold" style={{ color: 'var(--theme-accent, #2D5BFF)' }}>show</button>
+                    <div key={sys.slug} className="grid grid-cols-3 p-3 items-center text-xs">
+                      <div className="font-semibold text-[#0F172A]">{sys.name}</div>
+                      <div className="flex items-center gap-3 text-[#64748B]">
+                        <button className="text-[#0F766E] hover:underline font-bold">show</button>
                         <span>|</span>
-                        <button className="hover:text-white">hide</button>
+                        <button className="hover:text-[#0F172A]">hide</button>
                       </div>
-                      <div className="text-emerald-400 font-mono text-[11px] flex items-center gap-1.5">
-                        <Check className="w-3.5 h-3.5" /> Show in IMAP
+                      <div className="text-[#0F766E] font-medium text-[11px] flex items-center gap-1.5">
+                        <Check className="w-3.5 h-3.5 text-[#14B8A6]" /> Show in IMAP
                       </div>
                     </div>
                   ))}
@@ -855,18 +950,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               {/* Custom Labels Section */}
               <div>
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-bold text-white">Custom Labels</h3>
+                  <h3 className="text-sm font-bold text-[#0F172A]">Custom Labels</h3>
                 </div>
 
                 {/* Create Label Form */}
-                <form onSubmit={handleCreateLabel} className="p-4 bg-white/[0.02] border border-white/10 rounded-xl flex items-center gap-3 mb-4">
+                <form onSubmit={handleCreateLabel} className="p-4 bg-white border border-[#CBD5E1] rounded-2xl shadow-xs flex items-center gap-3 mb-4">
                   <input
                     type="text"
                     placeholder="New label name (e.g. Work, Project Alpha)"
                     value={newLabelName}
                     onChange={(e) => setNewLabelName(e.target.value)}
-                    style={{ backgroundColor: 'var(--theme-bg-card, #12141A)', borderColor: 'var(--theme-border, #1E232B)' }}
-                    className="flex-1 p-2.5 rounded-lg border text-white outline-none"
+                    className="flex-1 p-2.5 rounded-xl border border-[#CBD5E1] bg-[#F8FAFC] text-[#0F172A] outline-none font-medium text-xs focus:ring-2 focus:ring-[#14B8A6]/20 focus:border-[#14B8A6]"
                   />
                   <div className="flex items-center gap-1.5">
                     {PRESET_COLORS.map((c) => (
@@ -875,15 +969,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         type="button"
                         onClick={() => setNewLabelColor(c)}
                         style={{ backgroundColor: c }}
-                        className={`w-6 h-6 rounded-full transition-transform ${newLabelColor === c ? 'scale-125 ring-2 ring-white' : 'opacity-70'}`}
+                        className={`w-6 h-6 rounded-full transition-transform ${newLabelColor === c ? 'scale-125 ring-2 ring-[#0F172A]' : 'opacity-70 hover:opacity-100'}`}
                       />
                     ))}
                   </div>
                   <button
                     type="submit"
                     disabled={!newLabelName.trim()}
-                    style={{ backgroundColor: 'var(--theme-accent, #2D5BFF)' }}
-                    className="px-4 py-2.5 rounded-lg text-white font-bold disabled:opacity-50 flex items-center gap-1.5"
+                    className="px-4 py-2.5 rounded-xl bg-[#14B8A6] hover:bg-[#0D9488] text-white font-bold disabled:opacity-50 flex items-center gap-1.5 text-xs shadow-xs transition-all"
                   >
                     <Plus className="w-4 h-4" /> Add Label
                   </button>
@@ -891,20 +984,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
                 {/* Labels List */}
                 <div 
-                  style={{ backgroundColor: 'var(--theme-bg-card, #12141A)', borderColor: 'var(--theme-border, #1E232B)' }}
-                  className="rounded-xl border divide-y divide-white/5"
+                  className="rounded-2xl border border-[#E2E8F0] bg-white divide-y divide-[#E2E8F0] shadow-xs overflow-hidden"
                 >
                   {labels.length === 0 ? (
-                    <div className="p-6 text-center text-slate-500">No custom labels created yet.</div>
+                    <div className="p-6 text-center text-[#64748B] font-medium">No custom labels created yet.</div>
                   ) : (
                     labels.map((l) => (
-                      <div key={l.id} className="p-3.5 flex items-center justify-between">
+                      <div key={l.id} className="p-3.5 flex items-center justify-between text-xs">
                         <div className="flex items-center gap-3">
                           <span className="w-3 h-3 rounded-full" style={{ backgroundColor: l.color }} />
-                          <span className="font-semibold text-white">{l.name}</span>
+                          <span className="font-bold text-[#0F172A]">{l.name}</span>
                         </div>
                         <div className="flex items-center gap-3">
-                          <button onClick={() => handleDeleteLabel(l.id)} className="p-1.5 text-slate-400 hover:text-rose-400 transition-colors">
+                          <button onClick={() => handleDeleteLabel(l.id)} className="p-1.5 text-[#64748B] hover:text-rose-600 transition-colors">
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
@@ -920,11 +1012,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           {/* 3. INBOX TAB */}
           {/* ========================================================= */}
           {activeTab === 'inbox' && (
-            <div className="space-y-6 divide-y divide-white/5">
+            <div className="space-y-6 divide-y divide-[#E2E8F0]">
               
               {/* Inbox Type */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-2">
-                <div className="font-semibold text-slate-300">Inbox type:</div>
+                <div className="font-bold text-[#0F172A]">Inbox type:</div>
                 <div className="md:col-span-3 space-y-2">
                   {[
                     { id: 'default', label: 'Default', desc: 'Categorized tabs: Primary, Promotions, Social, Updates' },
@@ -933,18 +1025,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     { id: 'starred', label: 'Starred first', desc: 'Displays all starred messages first' },
                     { id: 'priority', label: 'Priority Inbox', desc: 'Intelligent multi-section inbox with custom sorting' },
                   ].map((t) => (
-                    <label key={t.id} className="flex items-start gap-3 p-3 rounded-xl border border-transparent hover:border-white/10 hover:bg-white/[0.02] cursor-pointer">
+                    <label key={t.id} className={`flex items-start gap-3 p-3 rounded-xl border transition-all cursor-pointer ${inboxType === t.id ? 'border-[#14B8A6] bg-[#F0FDFA]' : 'border-[#E2E8F0] bg-white hover:bg-[#F8FAFC]'}`}>
                       <input
                         type="radio"
                         name="inboxType"
                         checked={inboxType === t.id}
                         onChange={() => setInboxType(t.id as any)}
-                        style={{ accentColor: 'var(--theme-accent, #2D5BFF)' }}
-                        className="mt-0.5"
+                        className="accent-[#14B8A6] w-4 h-4 mt-0.5"
                       />
                       <div>
-                        <div className="font-bold text-white">{t.label}</div>
-                        <div className="text-slate-400 text-[11px]">{t.desc}</div>
+                        <div className="font-bold text-[#0F172A] text-xs">{t.label}</div>
+                        <div className="text-[#64748B] text-[11px] font-medium">{t.desc}</div>
                       </div>
                     </label>
                   ))}
@@ -953,9 +1044,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
               {/* Categories */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4">
-                <div className="font-semibold text-slate-300">Categories:</div>
+                <div className="font-bold text-[#0F172A]">Categories:</div>
                 <div className="md:col-span-3 space-y-2">
-                  <p className="text-slate-400 text-[11px] mb-2">Choose which message categories to show as inbox tabs.</p>
+                  <p className="text-[#64748B] text-[11px] mb-2 font-medium">Choose which message categories to show as inbox tabs.</p>
                   {['Primary', 'Promotions', 'Social', 'Updates', 'Forums'].map((cat) => {
                     const key = cat.toLowerCase();
                     return (
@@ -965,9 +1056,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           checked={categories[key] ?? false}
                           disabled={key === 'primary'}
                           onChange={(e) => setCategories({ ...categories, [key]: e.target.checked })}
-                          style={{ accentColor: 'var(--theme-accent, #2D5BFF)' }}
+                          className="accent-[#14B8A6] w-4 h-4"
                         />
-                        <span className={`text-slate-200 ${key === 'primary' ? 'font-bold text-white' : ''}`}>{cat}</span>
+                        <span className={`text-xs ${key === 'primary' ? 'font-bold text-[#0F172A]' : 'font-medium text-[#1E293B]'}`}>{cat}</span>
                       </label>
                     );
                   })}
@@ -976,9 +1067,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
               {/* Reading Pane */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4">
-                <div className="font-semibold text-slate-300">Reading pane:</div>
+                <div className="font-bold text-[#0F172A]">Reading pane:</div>
                 <div className="md:col-span-3 space-y-2">
-                  <p className="text-slate-400 text-[11px] mb-2">Provides a way to read mail right next to your list of conversations.</p>
+                  <p className="text-[#64748B] text-[11px] mb-2 font-medium">Provides a way to read mail right next to your list of conversations.</p>
                   {[
                     { id: 'none', label: 'No split' },
                     { id: 'right', label: 'Right of inbox' },
@@ -990,9 +1081,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         name="readingPane"
                         checked={readingPanePos === p.id}
                         onChange={() => setReadingPanePos(p.id as any)}
-                        style={{ accentColor: 'var(--theme-accent, #2D5BFF)' }}
+                        className="accent-[#14B8A6] w-4 h-4"
                       />
-                      <span className="text-slate-200">{p.label}</span>
+                      <span className="text-[#1E293B] font-medium text-xs">{p.label}</span>
                     </label>
                   ))}
                 </div>
@@ -1006,16 +1097,50 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           {activeTab === 'accounts' && (
             <div className="space-y-6">
               
-              {/* Send Mail As */}
-              <div className="p-4 rounded-xl border border-white/10 bg-white/[0.02] space-y-3">
-                <h3 className="text-sm font-bold text-white">Send Mail As</h3>
-                <div className="flex items-center justify-between p-3 rounded-lg bg-black/30 border border-white/5">
+              {/* Send Mail As & Email Aliases (FE-003) */}
+              <div className="p-5 rounded-2xl border border-[#CBD5E1] bg-white shadow-xs space-y-3">
+                <div className="flex items-center justify-between">
                   <div>
-                    <span className="font-bold text-white">Rahul Kumar</span>{' '}
-                    <span className="text-slate-400">&lt;rahul@eazzio.com&gt;</span>
-                    <span className="ml-2 px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[10px] font-bold">Default</span>
+                    <h3 className="text-sm font-bold text-[#0F172A]">Send Mail As & Email Aliases</h3>
+                    <p className="text-[#64748B] text-[11px] font-medium">Create extra addresses that route to your primary inbox.</p>
                   </div>
-                  <button style={{ color: 'var(--theme-accent, #2D5BFF)' }} className="hover:underline font-semibold">edit info</button>
+                </div>
+                <div className="flex items-center justify-between p-3.5 rounded-xl bg-[#F8FAFC] border border-[#E2E8F0]">
+                  <div>
+                    <span className="font-bold text-[#0F172A]">Primary Mailbox</span>{' '}
+                    <span className="text-[#64748B] font-mono text-xs">&lt;kumarrahul0@eazzio.com&gt;</span>
+                    <span className="ml-2 px-2 py-0.5 rounded-full bg-[#F0FDFA] border border-[#CCFBF1] text-[#0F766E] text-[10px] font-bold">Primary</span>
+                  </div>
+                  <span className="text-emerald-600 font-bold text-xs">Active</span>
+                </div>
+
+                {/* Email Aliases */}
+                <div className="pt-2 space-y-2">
+                  <div className="text-xs font-bold text-[#0F172A]">Domain Aliases</div>
+                  {[
+                    { alias: 'support@thesistech.com', desc: 'Customer support inquiries' },
+                    { alias: 'billing@thesistech.com', desc: 'Invoices and receipts' },
+                  ].map((al) => (
+                    <div key={al.alias} className="flex items-center justify-between p-3 rounded-xl border border-[#E2E8F0] bg-white">
+                      <div>
+                        <span className="text-xs font-mono font-bold text-[#0F172A]">{al.alias}</span>
+                        <span className="text-[11px] text-slate-500 ml-2">→ Deliver to Primary</span>
+                      </div>
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">Routing Active</span>
+                    </div>
+                  ))}
+
+                  {/* Catch-All Setting */}
+                  <div className="mt-3 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-between">
+                    <div>
+                      <div className="text-xs font-bold text-[#0F172A]">Catch-All Routing</div>
+                      <div className="text-[11px] text-slate-500">Route all emails sent to any undefined address at your domains to your inbox.</div>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input type="checkbox" defaultChecked className="sr-only peer" />
+                      <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#14B8A6]"></div>
+                    </label>
+                  </div>
                 </div>
               </div>
 
@@ -1023,11 +1148,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                      <Globe style={{ color: 'var(--theme-accent, #2D5BFF)' }} className="w-4 h-4" />
+                    <h3 className="text-sm font-bold text-[#0F172A] flex items-center gap-2">
+                      <Globe className="w-4 h-4 text-[#14B8A6]" />
                       <span>Custom Domains & DNS Verification Wizard</span>
                     </h3>
-                    <p className="text-slate-400 text-[11px]">Connect your business domain with DKIM RSA-2048, SPF, DMARC, and MX records.</p>
+                    <p className="text-[#64748B] text-[11px] font-medium">Connect your business domain with DKIM RSA-2048, SPF, DMARC, and MX records.</p>
                   </div>
                 </div>
 
@@ -1050,21 +1175,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     } catch (_) {}
                     setCreatingDomain(false);
                   }}
-                  className="flex items-center gap-3 p-4 rounded-xl border border-white/10 bg-white/[0.02]"
+                  className="flex items-center gap-3 p-4 rounded-2xl border border-[#CBD5E1] bg-white shadow-xs"
                 >
                   <input
                     type="text"
                     placeholder="e.g. acme.com or mail.startup.io"
                     value={newDomainInput}
                     onChange={(e) => setNewDomainInput(e.target.value)}
-                    style={{ backgroundColor: 'var(--theme-bg-card, #12141A)', borderColor: 'var(--theme-border, #1E232B)' }}
-                    className="flex-1 p-2.5 rounded-lg border text-white outline-none"
+                    className="flex-1 p-2.5 rounded-xl border border-[#CBD5E1] bg-[#F8FAFC] text-[#0F172A] text-xs font-medium outline-none focus:ring-2 focus:ring-[#14B8A6]/20 focus:border-[#14B8A6]"
                   />
                   <button
                     type="submit"
                     disabled={creatingDomain || !newDomainInput.trim()}
-                    style={{ backgroundColor: 'var(--theme-accent, #2D5BFF)' }}
-                    className="px-5 py-2.5 rounded-lg text-white font-bold disabled:opacity-50 flex items-center gap-2"
+                    className="px-5 py-2.5 rounded-xl bg-[#14B8A6] hover:bg-[#0D9488] text-white font-bold disabled:opacity-50 flex items-center gap-2 text-xs shadow-xs transition-all"
                   >
                     {creatingDomain ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
                     <span>Add Domain</span>
@@ -1076,14 +1199,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   {domains.map((dom) => (
                     <div 
                       key={dom.id}
-                      style={{ backgroundColor: 'var(--theme-bg-card, #12141A)', borderColor: 'var(--theme-border, #1E232B)' }}
-                      className="p-4 rounded-xl border space-y-3"
+                      className="p-4 rounded-2xl border border-[#E2E8F0] bg-white shadow-xs space-y-3"
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2.5">
-                          <Globe className="w-4 h-4 text-emerald-400" />
-                          <span className="font-bold text-white text-sm">{dom.name || dom.domain}</span>
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${dom.isVerified ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>
+                          <Globe className="w-4 h-4 text-emerald-600" />
+                          <span className="font-bold text-[#0F172A] text-sm">{dom.name || dom.domain}</span>
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${dom.isVerified ? 'bg-[#F0FDFA] text-[#0F766E] border border-[#CCFBF1]' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
                             {dom.isVerified ? 'Verified Active' : 'Pending DNS'}
                           </span>
                         </div>
@@ -1094,26 +1216,26 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             fetchDomains();
                             setVerifyingDomainId(null);
                           }}
-                          className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white font-semibold flex items-center gap-1.5"
+                          className="px-3 py-1.5 rounded-xl bg-[#F8FAFC] hover:bg-[#F1F5F9] border border-[#CBD5E1] text-[#334155] font-semibold text-xs flex items-center gap-1.5 transition-colors"
                         >
-                          <RefreshCw className={`w-3.5 h-3.5 ${verifyingDomainId === dom.id ? 'animate-spin' : ''}`} />
+                          <RefreshCw className={`w-3.5 h-3.5 ${verifyingDomainId === dom.id ? 'animate-spin text-[#14B8A6]' : ''}`} />
                           Verify DNS
                         </button>
                       </div>
 
                       {/* DNS Table */}
-                      <div className="p-3 bg-black/40 rounded-lg border border-white/5 text-[11px] font-mono space-y-2">
-                        <div className="flex items-center justify-between text-slate-400">
+                      <div className="p-3 bg-[#F8FAFC] rounded-xl border border-[#E2E8F0] text-[11px] font-mono space-y-2 text-[#334155]">
+                        <div className="flex items-center justify-between">
                           <span>MX: mail.eazzio.com (Priority 10)</span>
-                          <span className="text-emerald-400">Active</span>
+                          <span className="text-emerald-600 font-bold">Active</span>
                         </div>
-                        <div className="flex items-center justify-between text-slate-400">
+                        <div className="flex items-center justify-between">
                           <span>TXT (SPF): v=spf1 include:_spf.eazzio.com ~all</span>
-                          <span className="text-emerald-400">Active</span>
+                          <span className="text-emerald-600 font-bold">Active</span>
                         </div>
-                        <div className="flex items-center justify-between text-slate-400">
+                        <div className="flex items-center justify-between">
                           <span>TXT (DKIM): eazzio._domainkey.yourdomain.com</span>
-                          <span className="text-emerald-400">RSA-2048</span>
+                          <span className="text-emerald-600 font-bold">RSA-2048</span>
                         </div>
                       </div>
                     </div>
@@ -1131,31 +1253,29 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               
               {/* Automation Filters Section */}
               <div>
-                <h3 className="text-sm font-bold text-white mb-2">Applied Filters</h3>
-                <p className="text-slate-400 text-[11px] mb-3">The following filters are applied to all incoming mail:</p>
+                <h3 className="text-sm font-bold text-[#0F172A] mb-2">Applied Filters</h3>
+                <p className="text-[#64748B] text-[11px] mb-3 font-medium">The following filters are applied to all incoming mail:</p>
 
                 {/* Create Filter Form */}
-                <form onSubmit={handleCreateFilter} className="p-4 rounded-xl border border-white/10 bg-white/[0.02] space-y-3 mb-4">
+                <form onSubmit={handleCreateFilter} className="p-4 rounded-2xl border border-[#CBD5E1] bg-white shadow-xs space-y-3 mb-4">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-slate-400 mb-1">Filter Name</label>
+                      <label className="block text-[#475569] mb-1 font-semibold text-xs">Filter Name</label>
                       <input
                         type="text"
                         placeholder="e.g. Work emails filter"
                         value={newRuleName}
                         onChange={(e) => setNewRuleName(e.target.value)}
-                        style={{ backgroundColor: 'var(--theme-bg-card, #12141A)', borderColor: 'var(--theme-border, #1E232B)' }}
-                        className="w-full p-2 rounded-lg border text-white outline-none"
+                        className="w-full p-2.5 rounded-xl border border-[#CBD5E1] bg-[#F8FAFC] text-[#0F172A] text-xs font-medium outline-none focus:ring-2 focus:ring-[#14B8A6]/20 focus:border-[#14B8A6]"
                       />
                     </div>
                     <div>
-                      <label className="block text-slate-400 mb-1">Match Field & Value</label>
+                      <label className="block text-[#475569] mb-1 font-semibold text-xs">Match Field & Value</label>
                       <div className="flex items-center gap-2">
                         <select
                           value={newRuleField}
                           onChange={(e) => setNewRuleField(e.target.value as any)}
-                          style={{ backgroundColor: 'var(--theme-bg-card, #12141A)', borderColor: 'var(--theme-border, #1E232B)' }}
-                          className="p-2 rounded-lg border text-white outline-none"
+                          className="p-2.5 rounded-xl border border-[#CBD5E1] bg-[#F8FAFC] text-[#0F172A] text-xs font-medium outline-none"
                         >
                           <option value="from">From</option>
                           <option value="to">To</option>
@@ -1167,8 +1287,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           placeholder="e.g. @company.com"
                           value={newRuleValue}
                           onChange={(e) => setNewRuleValue(e.target.value)}
-                          style={{ backgroundColor: 'var(--theme-bg-card, #12141A)', borderColor: 'var(--theme-border, #1E232B)' }}
-                          className="flex-1 p-2 rounded-lg border text-white outline-none"
+                          className="flex-1 p-2.5 rounded-xl border border-[#CBD5E1] bg-[#F8FAFC] text-[#0F172A] text-xs font-medium outline-none focus:ring-2 focus:ring-[#14B8A6]/20 focus:border-[#14B8A6]"
                         />
                       </div>
                     </div>
@@ -1176,12 +1295,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
                   <div className="flex items-center justify-between pt-2">
                     <div className="flex items-center gap-3">
-                      <span className="text-slate-400">Action:</span>
+                      <span className="text-[#475569] font-medium text-xs">Action:</span>
                       <select
                         value={newRuleAction}
                         onChange={(e) => setNewRuleAction(e.target.value as any)}
-                        style={{ backgroundColor: 'var(--theme-bg-card, #12141A)', borderColor: 'var(--theme-border, #1E232B)' }}
-                        className="p-2 rounded-lg border text-white outline-none"
+                        className="p-2 rounded-xl border border-[#CBD5E1] bg-[#F8FAFC] text-[#0F172A] text-xs font-medium outline-none"
                       >
                         <option value="apply_label">Apply Label</option>
                         <option value="star">Star it</option>
@@ -1193,8 +1311,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <button
                       type="submit"
                       disabled={!newRuleName.trim() || !newRuleValue.trim()}
-                      style={{ backgroundColor: 'var(--theme-accent, #2D5BFF)' }}
-                      className="px-4 py-2 rounded-lg text-white font-bold disabled:opacity-50"
+                      className="px-5 py-2.5 rounded-xl bg-[#14B8A6] hover:bg-[#0D9488] text-white font-bold disabled:opacity-50 text-xs shadow-xs transition-all"
                     >
                       Create filter
                     </button>
@@ -1203,21 +1320,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
                 {/* Filters Table */}
                 <div 
-                  style={{ backgroundColor: 'var(--theme-bg-card, #12141A)', borderColor: 'var(--theme-border, #1E232B)' }}
-                  className="rounded-xl border divide-y divide-white/5"
+                  className="rounded-2xl border border-[#E2E8F0] bg-white divide-y divide-[#E2E8F0] shadow-xs overflow-hidden"
                 >
                   {filterRules.length === 0 ? (
-                    <div className="p-6 text-center text-slate-500">No active filter rules.</div>
+                    <div className="p-6 text-center text-[#64748B] font-medium text-xs">No active filter rules.</div>
                   ) : (
                     filterRules.map((rule) => (
-                      <div key={rule.id} className="p-3.5 flex items-center justify-between">
+                      <div key={rule.id} className="p-3.5 flex items-center justify-between text-xs">
                         <div>
-                          <div className="font-bold text-white">{rule.name}</div>
-                          <div className="text-slate-400 text-[11px]">
-                            Matches: <span className="text-slate-200 font-mono">{rule.field} {rule.operator} "{rule.value}"</span> ➔ {rule.action} {rule.actionValue ? `("${rule.actionValue}")` : ''}
+                          <div className="font-bold text-[#0F172A]">{rule.name}</div>
+                          <div className="text-[#64748B] text-[11px]">
+                            Matches: <span className="text-[#0F172A] font-mono font-semibold">{rule.field} {rule.operator} "{rule.value}"</span> ➔ {rule.action} {rule.actionValue ? `("${rule.actionValue}")` : ''}
                           </div>
                         </div>
-                        <button onClick={() => handleDeleteFilter(rule.id)} className="p-1.5 text-slate-400 hover:text-rose-400 transition-colors">
+                        <button onClick={() => handleDeleteFilter(rule.id)} className="p-1.5 text-[#64748B] hover:text-rose-600 transition-colors">
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
@@ -1228,17 +1344,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
               {/* Blocked Addresses Section */}
               <div>
-                <h3 className="text-sm font-bold text-white mb-2">Blocked Email Addresses</h3>
-                <p className="text-slate-400 text-[11px] mb-3">Messages from these addresses will appear in Spam:</p>
+                <h3 className="text-sm font-bold text-[#0F172A] mb-2">Blocked Email Addresses</h3>
+                <p className="text-[#64748B] text-[11px] mb-3 font-medium">Messages from these addresses will appear in Spam:</p>
 
                 <div 
-                  style={{ backgroundColor: 'var(--theme-bg-card, #12141A)', borderColor: 'var(--theme-border, #1E232B)' }}
-                  className="rounded-xl border divide-y divide-white/5"
+                  className="rounded-2xl border border-[#E2E8F0] bg-white divide-y divide-[#E2E8F0] shadow-xs overflow-hidden"
                 >
                   {blockedAddresses.map((addr) => (
-                    <div key={addr} className="p-3.5 flex items-center justify-between">
-                      <span className="font-mono text-slate-300">{addr}</span>
-                      <button onClick={() => handleUnblock(addr)} style={{ color: 'var(--theme-accent, #2D5BFF)' }} className="hover:underline font-semibold">
+                    <div key={addr} className="p-3.5 flex items-center justify-between text-xs">
+                      <span className="font-mono text-[#0F172A] font-medium">{addr}</span>
+                      <button onClick={() => handleUnblock(addr)} className="text-[#0F766E] hover:underline font-bold">
                         unblock
                       </button>
                     </div>
@@ -1252,11 +1367,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           {/* 6. FORWARDING AND POP/IMAP TAB */}
           {/* ========================================================= */}
           {activeTab === 'forwarding' && (
-            <div className="space-y-6 divide-y divide-white/5">
+            <div className="space-y-6 divide-y divide-[#E2E8F0]">
               
               {/* Forwarding */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-2">
-                <div className="font-semibold text-slate-300">Forwarding:</div>
+                <div className="font-bold text-[#0F172A]">Forwarding:</div>
                 <div className="md:col-span-3 space-y-3">
                   <div className="flex items-center gap-3">
                     <input
@@ -1264,20 +1379,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       placeholder="forward-to@example.com"
                       value={forwardingAddress}
                       onChange={(e) => setForwardingAddress(e.target.value)}
-                      style={{ backgroundColor: 'var(--theme-bg-card, #12141A)', borderColor: 'var(--theme-border, #1E232B)' }}
-                      className="p-2 rounded-lg border text-white outline-none flex-1 max-w-sm"
+                      className="p-2.5 rounded-xl border border-[#CBD5E1] bg-white text-[#0F172A] outline-none flex-1 max-w-sm text-xs font-medium"
                     />
-                    <button style={{ backgroundColor: 'var(--theme-accent, #2D5BFF)' }} className="px-4 py-2 rounded-lg text-white font-bold">
+                    <button className="px-4 py-2.5 rounded-xl bg-[#14B8A6] hover:bg-[#0D9488] text-white font-bold text-xs shadow-xs transition-all">
                       Add forwarding address
                     </button>
                   </div>
-                  <p className="text-slate-400 text-[11px]">Tip: You can also forward only some of your mail by creating a filter.</p>
+                  <p className="text-[#64748B] text-[11px] font-medium">Tip: You can also forward only some of your mail by creating a filter.</p>
                 </div>
               </div>
 
               {/* POP Download */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4">
-                <div className="font-semibold text-slate-300">POP download:</div>
+                <div className="font-bold text-[#0F172A]">POP download:</div>
                 <div className="md:col-span-3 space-y-2">
                   <label className="flex items-center gap-2.5 cursor-pointer">
                     <input
@@ -1285,9 +1399,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       name="popStatus"
                       checked={!popEnabled}
                       onChange={() => setPopEnabled(false)}
-                      style={{ accentColor: 'var(--theme-accent, #2D5BFF)' }}
+                      className="accent-[#14B8A6] w-4 h-4"
                     />
-                    <span className="text-slate-200">Status: POP is disabled</span>
+                    <span className="text-[#1E293B] font-medium text-xs">Status: POP is disabled</span>
                   </label>
                   <label className="flex items-center gap-2.5 cursor-pointer">
                     <input
@@ -1295,31 +1409,31 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       name="popStatus"
                       checked={popEnabled}
                       onChange={() => setPopEnabled(true)}
-                      style={{ accentColor: 'var(--theme-accent, #2D5BFF)' }}
+                      className="accent-[#14B8A6] w-4 h-4"
                     />
-                    <span className="text-slate-200">Enable POP for all mail</span>
+                    <span className="text-[#1E293B] font-medium text-xs">Enable POP for all mail</span>
                   </label>
                 </div>
               </div>
 
               {/* IMAP Access */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4">
-                <div className="font-semibold text-slate-300">IMAP access:</div>
+                <div className="font-bold text-[#0F172A]">IMAP access:</div>
                 <div className="md:col-span-3 space-y-3">
                   <div className="flex items-center gap-2">
-                    <span className="text-emerald-400 font-bold">Status: IMAP is enabled</span>
+                    <span className="text-emerald-600 font-bold text-xs flex items-center gap-1.5"><Check className="w-4 h-4 text-emerald-600" /> Status: IMAP is enabled</span>
                   </div>
                   <div className="space-y-2">
-                    <div className="font-semibold text-slate-300">When I mark a message in IMAP as deleted:</div>
+                    <div className="font-bold text-[#0F172A] text-xs">When I mark a message in IMAP as deleted:</div>
                     <label className="flex items-center gap-2.5 cursor-pointer">
                       <input
                         type="radio"
                         name="imapExpunge"
                         checked={imapExpunge === 'auto'}
                         onChange={() => setImapExpunge('auto')}
-                        style={{ accentColor: 'var(--theme-accent, #2D5BFF)' }}
+                        className="accent-[#14B8A6] w-4 h-4"
                       />
-                      <span>Auto-Expunge on — Immediately update the server (default)</span>
+                      <span className="text-[#1E293B] font-medium text-xs">Auto-Expunge on — Immediately update the server (default)</span>
                     </label>
                     <label className="flex items-center gap-2.5 cursor-pointer">
                       <input
@@ -1327,9 +1441,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         name="imapExpunge"
                         checked={imapExpunge === 'manual'}
                         onChange={() => setImapExpunge('manual')}
-                        style={{ accentColor: 'var(--theme-accent, #2D5BFF)' }}
+                        className="accent-[#14B8A6] w-4 h-4"
                       />
-                      <span>Auto-Expunge off — Wait for client to update</span>
+                      <span className="text-[#1E293B] font-medium text-xs">Auto-Expunge off — Wait for client to update</span>
                     </label>
                   </div>
                 </div>
@@ -1345,12 +1459,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               
               {/* Preset Gallery */}
               <div>
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                    <Palette style={{ color: 'var(--theme-accent, #2D5BFF)' }} className="w-4 h-4" />
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-bold text-[#0F172A] flex items-center gap-2">
+                    <Palette className="w-4 h-4 text-[#14B8A6]" />
                     <span>Visual Themes Gallery</span>
                   </h3>
-                  <span className="text-[11px] text-slate-400">Click any preset to apply instantly across the entire interface</span>
+                  <span className="text-[11px] text-[#64748B] font-medium">Click any preset to apply instantly across the entire interface</span>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3.5">
@@ -1364,12 +1478,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           backgroundColor: th.bg, 
                           borderColor: isSelected ? th.accent : th.border,
                         }}
-                        className={`p-3.5 rounded-2xl border text-left flex flex-col justify-between h-36 transition-all duration-200 relative group shadow-xl hover:scale-[1.02] ${
-                          isSelected ? 'ring-2 ring-offset-2 ring-offset-black' : ''
+                        className={`p-3.5 rounded-2xl border text-left flex flex-col justify-between h-36 transition-all duration-200 relative group shadow-sm hover:scale-[1.02] ${
+                          isSelected ? 'ring-2 ring-offset-2 ring-offset-white' : ''
                         }`}
                       >
                         <div className="flex items-center justify-between w-full">
-                          <div className="w-4 h-4 rounded-full shadow-lg" style={{ backgroundColor: th.accent }} />
+                          <div className="w-4 h-4 rounded-full shadow-md" style={{ backgroundColor: th.accent }} />
                           {isSelected && (
                             <div 
                               style={{ backgroundColor: th.accent }}
@@ -1380,9 +1494,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           )}
                         </div>
                         <div>
-                          <div className="font-bold text-white text-sm">{th.name}</div>
-                          <div className="text-[10px] text-slate-400 mt-0.5 line-clamp-1">{th.desc}</div>
-                          <div className="text-[9px] text-slate-500 font-mono mt-1">{th.bg}</div>
+                          <div className={`font-bold text-sm ${th.isLight ? 'text-[#0F172A]' : 'text-white'}`}>{th.name}</div>
+                          <div className={`text-[10px] mt-0.5 line-clamp-1 ${th.isLight ? 'text-[#64748B]' : 'text-slate-300'}`}>{th.desc}</div>
+                          <div className={`text-[9px] font-mono mt-1 ${th.isLight ? 'text-[#94A3B8]' : 'text-slate-400'}`}>{th.bg}</div>
                         </div>
                       </button>
                     );
@@ -1392,71 +1506,64 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
               {/* Custom Theme Creator */}
               <div 
-                style={{ 
-                  backgroundColor: 'var(--theme-bg-card, #12141A)', 
-                  borderColor: 'var(--theme-border, #1E232B)' 
-                }}
-                className="p-5 rounded-2xl border space-y-4"
+                className="p-5 rounded-2xl border border-[#CBD5E1] bg-white shadow-xs space-y-4"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Wand2 style={{ color: 'var(--theme-accent, #2D5BFF)' }} className="w-4 h-4" />
-                    <h3 className="text-sm font-bold text-white">Create Custom Theme</h3>
+                    <Wand2 className="w-4 h-4 text-[#14B8A6]" />
+                    <h3 className="text-sm font-bold text-[#0F172A]">Create Custom Theme</h3>
                   </div>
-                  <span className="text-[11px] text-slate-400">Design your own bespoke palette with full color control</span>
+                  <span className="text-[11px] text-[#64748B] font-medium">Design your own bespoke palette with full color control</span>
                 </div>
 
                 <form onSubmit={handleCreateCustomTheme} className="space-y-4">
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     {/* Theme Name */}
                     <div>
-                      <label className="block text-slate-400 mb-1 font-medium">Theme Name</label>
+                      <label className="block text-[#475569] mb-1 font-semibold text-xs">Theme Name</label>
                       <input
                         type="text"
                         value={customThemeName}
                         onChange={(e) => setCustomThemeName(e.target.value)}
-                        style={{ backgroundColor: 'var(--theme-bg-sidebar, #090A0D)', borderColor: 'var(--theme-border, #1E232B)' }}
-                        className="w-full p-2 rounded-lg border text-white outline-none"
+                        className="w-full p-2.5 rounded-xl border border-[#CBD5E1] bg-[#F8FAFC] text-[#0F172A] text-xs font-medium outline-none focus:border-[#14B8A6]"
                         placeholder="e.g. Neon Cyber"
                       />
                     </div>
 
                     {/* Main Background */}
                     <div>
-                      <label className="block text-slate-400 mb-1 font-medium">Main Background</label>
+                      <label className="block text-[#475569] mb-1 font-semibold text-xs">Main Background</label>
                       <div className="flex items-center gap-2">
                         <input
                           type="color"
                           value={customBgMain}
                           onChange={(e) => setCustomBgMain(e.target.value)}
-                          className="w-9 h-9 rounded-lg bg-transparent border-0 cursor-pointer"
+                          className="w-9 h-9 rounded-xl bg-transparent border-0 cursor-pointer"
                         />
                         <input
                           type="text"
                           value={customBgMain}
                           onChange={(e) => setCustomBgMain(e.target.value)}
-                          style={{ backgroundColor: 'var(--theme-bg-sidebar, #090A0D)', borderColor: 'var(--theme-border, #1E232B)' }}
-                          className="w-full p-2 rounded-lg border text-white font-mono uppercase"
+                          className="w-full p-2 rounded-xl border border-[#CBD5E1] bg-[#F8FAFC] text-[#0F172A] font-mono text-xs uppercase"
                         />
                       </div>
                     </div>
 
                     {/* Accent Color */}
                     <div>
-                      <label className="block text-slate-400 mb-1 font-medium">Accent / Brand Glow</label>
+                      <label className="block text-[#475569] mb-1 font-semibold text-xs">Accent / Brand Glow</label>
                       <div className="flex items-center gap-2">
                         <input
                           type="color"
                           value={customAccent}
                           onChange={(e) => setCustomAccent(e.target.value)}
-                          className="w-9 h-9 rounded-lg bg-transparent border-0 cursor-pointer"
+                          className="w-9 h-9 rounded-xl bg-transparent border-0 cursor-pointer"
                         />
                         <input
                           type="text"
                           value={customAccent}
                           onChange={(e) => setCustomAccent(e.target.value)}
-                          style={{ backgroundColor: 'var(--theme-bg-sidebar, #090A0D)', borderColor: 'var(--theme-border, #1E232B)' }}
-                          className="w-full p-2 rounded-lg border text-white font-mono uppercase"
+                          className="w-full p-2 rounded-xl border border-[#CBD5E1] bg-[#F8FAFC] text-[#0F172A] font-mono text-xs uppercase"
                         />
                       </div>
                     </div>
@@ -1465,80 +1572,77 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     {/* Sidebar Background */}
                     <div>
-                      <label className="block text-slate-400 mb-1 font-medium">Sidebar / Drawer</label>
+                      <label className="block text-[#475569] mb-1 font-semibold text-xs">Sidebar / Drawer</label>
                       <div className="flex items-center gap-2">
                         <input
                           type="color"
                           value={customBgSidebar}
                           onChange={(e) => setCustomBgSidebar(e.target.value)}
-                          className="w-9 h-9 rounded-lg bg-transparent border-0 cursor-pointer"
+                          className="w-9 h-9 rounded-xl bg-transparent border-0 cursor-pointer"
                         />
                         <input
                           type="text"
                           value={customBgSidebar}
                           onChange={(e) => setCustomBgSidebar(e.target.value)}
-                          style={{ backgroundColor: 'var(--theme-bg-sidebar, #090A0D)', borderColor: 'var(--theme-border, #1E232B)' }}
-                          className="w-full p-2 rounded-lg border text-white font-mono uppercase"
+                          className="w-full p-2 rounded-xl border border-[#CBD5E1] bg-[#F8FAFC] text-[#0F172A] font-mono text-xs uppercase"
                         />
                       </div>
                     </div>
 
                     {/* Card / Panel Background */}
                     <div>
-                      <label className="block text-slate-400 mb-1 font-medium">Card / Modal Surface</label>
+                      <label className="block text-[#475569] mb-1 font-semibold text-xs">Card / Modal Surface</label>
                       <div className="flex items-center gap-2">
                         <input
                           type="color"
                           value={customBgCard}
                           onChange={(e) => setCustomBgCard(e.target.value)}
-                          className="w-9 h-9 rounded-lg bg-transparent border-0 cursor-pointer"
+                          className="w-9 h-9 rounded-xl bg-transparent border-0 cursor-pointer"
                         />
                         <input
                           type="text"
                           value={customBgCard}
                           onChange={(e) => setCustomBgCard(e.target.value)}
-                          style={{ backgroundColor: 'var(--theme-bg-sidebar, #090A0D)', borderColor: 'var(--theme-border, #1E232B)' }}
-                          className="w-full p-2 rounded-lg border text-white font-mono uppercase"
+                          className="w-full p-2 rounded-xl border border-[#CBD5E1] bg-[#F8FAFC] text-[#0F172A] font-mono text-xs uppercase"
                         />
                       </div>
                     </div>
 
                     {/* Border Color */}
                     <div>
-                      <label className="block text-slate-400 mb-1 font-medium">Border Lines</label>
+                      <label className="block text-[#475569] mb-1 font-semibold text-xs">Border Lines</label>
                       <div className="flex items-center gap-2">
                         <input
                           type="color"
                           value={customBorder}
                           onChange={(e) => setCustomBorder(e.target.value)}
-                          className="w-9 h-9 rounded-lg bg-transparent border-0 cursor-pointer"
+                          className="w-9 h-9 rounded-xl bg-transparent border-0 cursor-pointer"
                         />
                         <input
                           type="text"
                           value={customBorder}
                           onChange={(e) => setCustomBorder(e.target.value)}
-                          style={{ backgroundColor: 'var(--theme-bg-sidebar, #090A0D)', borderColor: 'var(--theme-border, #1E232B)' }}
-                          className="w-full p-2 rounded-lg border text-white font-mono uppercase"
+                          className="w-full p-2 rounded-xl border border-[#CBD5E1] bg-[#F8FAFC] text-[#0F172A] font-mono text-xs uppercase"
                         />
                       </div>
                     </div>
                   </div>
 
                   {/* Live Preview & Submit */}
-                  <div className="flex items-center justify-between pt-3 border-t border-white/5">
+                  <div className="flex items-center justify-between pt-3 border-t border-[#E2E8F0]">
                     {/* Live Preview Card */}
                     <div 
                       style={{ backgroundColor: customBgMain, borderColor: customBorder }}
-                      className="p-3 rounded-xl border flex items-center gap-3 w-72 shadow-lg"
+                      className="p-3 rounded-xl border flex items-center gap-3 w-72 shadow-sm"
                     >
-                      <div style={{ backgroundColor: customAccent }} className="w-3.5 h-3.5 rounded-full" />
+                      <div style={{ backgroundColor: customAccent }} className="w-3.5 h-3.5 rounded-full shadow-xs" />
                       <div className="flex-1">
-                        <div className="font-bold text-white text-[11px] truncate">{customThemeName || 'Preview'}</div>
+                        <div className="font-bold text-[#0F172A] text-[11px] truncate">{customThemeName || 'Preview'}</div>
                         <div style={{ color: customAccent }} className="text-[9px] font-semibold">Active Palette</div>
                       </div>
                       <div 
                         style={{ backgroundColor: customBgCard, borderColor: customBorder }}
-                        className="px-2 py-0.5 rounded border text-[9px] text-slate-300"
+                        className="px-2 py-0.5 rounded border text-[9px] text-[#475569]"
                       >
                         Card
                       </div>
@@ -1546,8 +1650,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
                     <button
                       type="submit"
-                      style={{ backgroundColor: 'var(--theme-accent, #2D5BFF)' }}
-                      className="px-5 py-2.5 rounded-xl text-white font-bold shadow-lg hover:brightness-110 transition-all flex items-center gap-2"
+                      className="px-5 py-2.5 rounded-xl bg-[#14B8A6] hover:bg-[#0D9488] text-white font-bold shadow-xs transition-all flex items-center gap-2 text-xs"
                     >
                       <Wand2 className="w-4 h-4" />
                       <span>Save & Apply Custom Theme</span>
@@ -1562,26 +1665,32 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
         {/* Modal Footer */}
         <div 
-          style={{ 
-            backgroundColor: 'var(--theme-bg-header, #0A0C10)', 
-            borderColor: 'var(--theme-border, #1E232B)' 
+          style={{
+            backgroundColor: 'var(--theme-bg-header, #F8FAFC)',
+            borderColor: 'var(--theme-border, #E2E8F0)',
           }}
           className="h-16 px-6 border-t flex items-center justify-between shrink-0"
         >
-          <div className="text-[11px] text-slate-500 font-mono">
-            0% of 5,120 GB used · Eazzio Mail v2.4.0 Enterprise
+          <div className="text-[11px] opacity-60 font-mono">
+            Eazzio Mail v2.4.0 Enterprise · 500 MB Free Tier (Cloudinary Multi-Account Pooled)
           </div>
           <div className="flex items-center gap-3">
             <button
               onClick={onClose}
-              className="px-4 py-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 font-semibold transition-colors"
+              style={{
+                backgroundColor: 'var(--theme-bg-card, #FFFFFF)',
+                borderColor: 'var(--theme-border, #CBD5E1)',
+              }}
+              className="px-4 py-2 rounded-xl border opacity-80 hover:opacity-100 font-semibold text-xs transition-colors"
             >
               Cancel
             </button>
             <button
               onClick={handleSaveGeneral}
-              style={{ backgroundColor: 'var(--theme-accent, #2D5BFF)' }}
-              className="px-6 py-2 rounded-xl text-white font-bold shadow-lg hover:brightness-110 transition-all"
+              style={{
+                backgroundColor: 'var(--theme-accent, #14B8A6)',
+              }}
+              className="px-6 py-2 rounded-xl text-white font-bold text-xs shadow-sm transition-all hover:brightness-95"
             >
               Save Changes
             </button>

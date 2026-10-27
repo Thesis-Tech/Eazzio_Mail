@@ -52,77 +52,77 @@ export const AdvancedSearchModal: React.FC<AdvancedSearchModalProps> = ({
   };
 
   return (
-    <div className="absolute top-14 left-0 right-0 max-w-2xl mx-auto z-50 bg-[#16181D] border border-[#2A2E37] rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+    <div className="absolute top-14 left-0 right-0 max-w-2xl mx-auto z-50 bg-white border border-[#E2E8F0] rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
       <form onSubmit={handleSearchSubmit} className="p-5 space-y-4 text-xs">
         
         {/* From */}
         <div className="grid grid-cols-4 items-center gap-3">
-          <label className="text-slate-400 font-medium">From</label>
+          <label className="text-[#475569] font-medium">From</label>
           <input
             type="text"
             value={from}
             onChange={(e) => setFrom(e.target.value)}
             placeholder="e.g. sender@example.com"
-            className="col-span-3 bg-[#0F1115] border border-[#2A2E37] rounded-lg px-3 py-2 text-white placeholder-slate-600 focus:outline-none focus:border-[#2D5BFF]"
+            className="col-span-3 bg-[#F8FAFC] border border-[#CBD5E1] rounded-xl px-3 py-2 text-[#0F172A] placeholder-[#94A3B8] focus:outline-none focus:border-[#14B8A6] focus:ring-2 focus:ring-[#14B8A6]/20 transition-all"
           />
         </div>
 
         {/* To */}
         <div className="grid grid-cols-4 items-center gap-3">
-          <label className="text-slate-400 font-medium">To</label>
+          <label className="text-[#475569] font-medium">To</label>
           <input
             type="text"
             value={to}
             onChange={(e) => setTo(e.target.value)}
             placeholder="e.g. recipient@example.com"
-            className="col-span-3 bg-[#0F1115] border border-[#2A2E37] rounded-lg px-3 py-2 text-white placeholder-slate-600 focus:outline-none focus:border-[#2D5BFF]"
+            className="col-span-3 bg-[#F8FAFC] border border-[#CBD5E1] rounded-xl px-3 py-2 text-[#0F172A] placeholder-[#94A3B8] focus:outline-none focus:border-[#14B8A6] focus:ring-2 focus:ring-[#14B8A6]/20 transition-all"
           />
         </div>
 
         {/* Subject */}
         <div className="grid grid-cols-4 items-center gap-3">
-          <label className="text-slate-400 font-medium">Subject</label>
+          <label className="text-[#475569] font-medium">Subject</label>
           <input
             type="text"
             value={subject}
             onChange={(e) => setSubject(e.target.value)}
             placeholder="e.g. Monthly Report"
-            className="col-span-3 bg-[#0F1115] border border-[#2A2E37] rounded-lg px-3 py-2 text-white placeholder-slate-600 focus:outline-none focus:border-[#2D5BFF]"
+            className="col-span-3 bg-[#F8FAFC] border border-[#CBD5E1] rounded-xl px-3 py-2 text-[#0F172A] placeholder-[#94A3B8] focus:outline-none focus:border-[#14B8A6] focus:ring-2 focus:ring-[#14B8A6]/20 transition-all"
           />
         </div>
 
         {/* Has the words */}
         <div className="grid grid-cols-4 items-center gap-3">
-          <label className="text-slate-400 font-medium">Has the words</label>
+          <label className="text-[#475569] font-medium">Has the words</label>
           <input
             type="text"
             value={hasWords}
             onChange={(e) => setHasWords(e.target.value)}
             placeholder="e.g. invoice urgent"
-            className="col-span-3 bg-[#0F1115] border border-[#2A2E37] rounded-lg px-3 py-2 text-white placeholder-slate-600 focus:outline-none focus:border-[#2D5BFF]"
+            className="col-span-3 bg-[#F8FAFC] border border-[#CBD5E1] rounded-xl px-3 py-2 text-[#0F172A] placeholder-[#94A3B8] focus:outline-none focus:border-[#14B8A6] focus:ring-2 focus:ring-[#14B8A6]/20 transition-all"
           />
         </div>
 
         {/* Doesn't have */}
         <div className="grid grid-cols-4 items-center gap-3">
-          <label className="text-slate-400 font-medium">Doesn't have</label>
+          <label className="text-[#475569] font-medium">Doesn't have</label>
           <input
             type="text"
             value={doesntHave}
             onChange={(e) => setDoesntHave(e.target.value)}
             placeholder="e.g. newsletter unsubscribe"
-            className="col-span-3 bg-[#0F1115] border border-[#2A2E37] rounded-lg px-3 py-2 text-white placeholder-slate-600 focus:outline-none focus:border-[#2D5BFF]"
+            className="col-span-3 bg-[#F8FAFC] border border-[#CBD5E1] rounded-xl px-3 py-2 text-[#0F172A] placeholder-[#94A3B8] focus:outline-none focus:border-[#14B8A6] focus:ring-2 focus:ring-[#14B8A6]/20 transition-all"
           />
         </div>
 
         {/* Size */}
         <div className="grid grid-cols-4 items-center gap-3">
-          <label className="text-slate-400 font-medium">Size</label>
+          <label className="text-[#475569] font-medium">Size</label>
           <div className="col-span-3 flex items-center gap-2">
             <select
               value={sizeOperator}
               onChange={(e) => setSizeOperator(e.target.value as any)}
-              className="bg-[#0F1115] border border-[#2A2E37] rounded-lg px-2.5 py-2 text-white focus:outline-none focus:border-[#2D5BFF]"
+              className="bg-[#F8FAFC] border border-[#CBD5E1] rounded-xl px-2.5 py-2 text-[#0F172A] focus:outline-none focus:border-[#14B8A6]"
             >
               <option value="greater_than">greater than</option>
               <option value="less_than">less than</option>
@@ -132,12 +132,12 @@ export const AdvancedSearchModal: React.FC<AdvancedSearchModalProps> = ({
               value={sizeVal}
               onChange={(e) => setSizeVal(e.target.value)}
               placeholder="10"
-              className="w-20 bg-[#0F1115] border border-[#2A2E37] rounded-lg px-3 py-2 text-white placeholder-slate-600 focus:outline-none focus:border-[#2D5BFF]"
+              className="w-20 bg-[#F8FAFC] border border-[#CBD5E1] rounded-xl px-3 py-2 text-[#0F172A] placeholder-[#94A3B8] focus:outline-none focus:border-[#14B8A6]"
             />
             <select
               value={sizeUnit}
               onChange={(e) => setSizeUnit(e.target.value as any)}
-              className="bg-[#0F1115] border border-[#2A2E37] rounded-lg px-2.5 py-2 text-white focus:outline-none focus:border-[#2D5BFF]"
+              className="bg-[#F8FAFC] border border-[#CBD5E1] rounded-xl px-2.5 py-2 text-[#0F172A] focus:outline-none focus:border-[#14B8A6]"
             >
               <option value="MB">MB</option>
               <option value="KB">KB</option>
@@ -147,13 +147,13 @@ export const AdvancedSearchModal: React.FC<AdvancedSearchModalProps> = ({
         </div>
 
         {/* Options */}
-        <div className="pt-2 border-t border-[#2A2E37] flex items-center gap-6 text-slate-300">
+        <div className="pt-2 border-t border-[#E2E8F0] flex items-center gap-6 text-[#334155]">
           <label className="flex items-center gap-2 cursor-pointer">
             <input
               type="checkbox"
               checked={hasAttachment}
               onChange={(e) => setHasAttachment(e.target.checked)}
-              className="w-4 h-4 rounded bg-[#0F1115] border-[#2A2E37] text-[#2D5BFF] focus:ring-0"
+              className="w-4 h-4 rounded border-[#CBD5E1] text-[#14B8A6] focus:ring-0"
             />
             <span>Has attachment</span>
           </label>
@@ -162,14 +162,14 @@ export const AdvancedSearchModal: React.FC<AdvancedSearchModalProps> = ({
               type="checkbox"
               checked={dontIncludeChats}
               onChange={(e) => setDontIncludeChats(e.target.checked)}
-              className="w-4 h-4 rounded bg-[#0F1115] border-[#2A2E37] text-[#2D5BFF] focus:ring-0"
+              className="w-4 h-4 rounded border-[#CBD5E1] text-[#14B8A6] focus:ring-0"
             />
             <span>Don't include chats</span>
           </label>
         </div>
 
         {/* Action Buttons */}
-        <div className="pt-3 border-t border-[#2A2E37] flex items-center justify-between">
+        <div className="pt-3 border-t border-[#E2E8F0] flex items-center justify-between">
           <button
             type="button"
             onClick={() => {
@@ -178,7 +178,7 @@ export const AdvancedSearchModal: React.FC<AdvancedSearchModalProps> = ({
               }
               onClose();
             }}
-            className="text-slate-400 hover:text-white font-medium hover:underline py-1.5 px-3 rounded-lg"
+            className="text-[#0F766E] hover:text-[#0D9488] font-semibold hover:underline py-1.5 px-3 rounded-lg transition-colors"
           >
             Create filter
           </button>
@@ -187,13 +187,13 @@ export const AdvancedSearchModal: React.FC<AdvancedSearchModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-3.5 py-1.5 rounded-lg border border-[#2A2E37] text-slate-400 hover:text-white hover:bg-[#1E232B] transition-colors"
+              className="px-4 py-2 rounded-xl border border-[#E2E8F0] text-[#475569] hover:text-[#0F172A] hover:bg-[#F1F5F9] transition-colors font-medium"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-5 py-1.5 rounded-lg bg-[#2D5BFF] hover:bg-[#2448D6] text-white font-semibold flex items-center gap-1.5 shadow-lg shadow-[#2D5BFF]/20 transition-colors"
+              className="px-5 py-2 rounded-xl bg-[#14B8A6] hover:bg-[#0D9488] text-white font-semibold flex items-center gap-1.5 shadow-sm transition-all"
             >
               <Search className="w-3.5 h-3.5" />
               <span>Search</span>

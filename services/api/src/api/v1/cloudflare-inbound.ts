@@ -7,7 +7,8 @@ export const cloudflareInboundRouter: Router = Router();
 
 const LMTP_HOST = process.env.LMTP_HOST || '127.0.0.1';
 const LMTP_PORT = Number(process.env.LMTP_PORT || 2424);
-const CLOUDFLARE_SECRET = process.env.CLOUDFLARE_WEBHOOK_SECRET || process.env.EAZZIO_CLOUDFLARE_SECRET;
+const CLOUDFLARE_SECRET =
+  process.env.CLOUDFLARE_WEBHOOK_SECRET || process.env.EAZZIO_CLOUDFLARE_SECRET;
 
 /**
  * Injects raw RFC 822 email payload directly into local LMTP socket (:2424)
@@ -89,14 +90,22 @@ async function injectToLmtp(from: string, to: string[], rawMime: string | Buffer
 // POST /v1/messages/cloudflare-inbound - Receives Cloudflare Email Routing events
 cloudflareInboundRouter.post('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    // 1. Verify Secret Header if configured
+    // 1. Verify Secret Header if configured (using constant-time comparison)
     if (CLOUDFLARE_SECRET) {
-      const providedSecret =
+      const headerSecret =
         req.headers['x-cloudflare-secret'] ||
         req.headers['x-eazzio-secret'] ||
         req.headers['authorization']?.replace(/^Bearer\s+/i, '');
 
-      if (!providedSecret || providedSecret !== CLOUDFLARE_SECRET) {
+      const provided = typeof headerSecret === 'string' ? headerSecret : '';
+      const expected = CLOUDFLARE_SECRET;
+
+      // Constant-time comparison using HMAC-SHA256 to avoid leaking string length or content timing
+      const hmacKey = crypto.randomBytes(32);
+      const hmacProvided = crypto.createHmac('sha256', hmacKey).update(provided).digest();
+      const hmacExpected = crypto.createHmac('sha256', hmacKey).update(expected).digest();
+
+      if (!provided || !crypto.timingSafeEqual(hmacProvided, hmacExpected)) {
         throw new AppError('UNAUTHORIZED', 'Invalid or missing Cloudflare webhook secret', 401);
       }
     }

@@ -7,18 +7,18 @@ export class InboundSyncScheduler {
 
   constructor(
     private readonly syncService: MailSyncService,
-    intervalSeconds?: number
+    intervalSeconds?: number,
   ) {
-    this.intervalSeconds =
-      intervalSeconds ||
-      Number(process.env.INBOUND_MAIL_POLL_INTERVAL || 60);
+    this.intervalSeconds = intervalSeconds || Number(process.env.INBOUND_MAIL_POLL_INTERVAL || 60);
   }
 
   public start(): void {
     if (this.isRunning) return;
     this.isRunning = true;
 
-    console.log(`⏱️ [InboundSyncScheduler] Started background inbound sync scheduler (Interval: ${this.intervalSeconds}s)`);
+    console.log(
+      `⏱️ [InboundSyncScheduler] Started background inbound sync scheduler (Interval: ${this.intervalSeconds}s)`,
+    );
 
     // Initial sync after 3 seconds
     setTimeout(() => {

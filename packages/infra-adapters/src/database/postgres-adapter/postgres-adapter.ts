@@ -70,8 +70,14 @@ export class PostgresAdapter implements EazzioDatabase {
       if (!configOrUrl || !configOrUrl.trim()) {
         throw new Error('PostgresAdapter: Connection string cannot be empty');
       }
+      const isSslRequired =
+        configOrUrl.includes('sslmode=require') ||
+        configOrUrl.includes('neon.tech') ||
+        configOrUrl.includes('ssl=true');
+
       this.pool = new Pool({
         connectionString: configOrUrl,
+        ssl: isSslRequired ? { rejectUnauthorized: false } : undefined,
         max: 20,
         idleTimeoutMillis: 30000,
         connectionTimeoutMillis: 5000,

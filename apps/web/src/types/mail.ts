@@ -29,6 +29,7 @@ export interface ThreadSummary {
   isStarred: boolean;
   hasAttachments: boolean;
   labels: string[];
+  isMuted?: boolean;
 }
 
 export interface MessageDetail {
@@ -53,6 +54,15 @@ export interface MessageDetail {
     dmarc: 'pass' | 'fail' | 'none';
     clamavStatus: 'clean' | 'infected';
     spamScore: number;
+    threatAnalysis?: {
+      score: number;
+      severity: 'clean' | 'suspicious' | 'dangerous';
+      isPhishing: boolean;
+      isSpoofed: boolean;
+      warnings: string[];
+      neutralizeLinks: boolean;
+      detectedBrands: string[];
+    };
   };
   listUnsubscribe?: string | null;
   listId?: string | null;
@@ -81,7 +91,11 @@ export interface UserPreferences {
   signature: string;
   autoSummarizeWithAI: boolean;
   soundNotifications: boolean;
-  theme: 'dark' | 'light' | 'system';
+  theme: string;
+  density?: 'default' | 'comfortable' | 'compact';
+  inboxType?: 'default' | 'important' | 'unread' | 'starred' | 'priority';
+  readingPane?: 'none' | 'right' | 'below';
+  conversationView?: boolean;
 }
 
 export interface ComposerAttachment {
@@ -109,6 +123,7 @@ export interface ComposeEmailPayload {
   threadId?: string;
   inReplyTo?: string;
   scheduledAt?: string;
+  from?: string;
   security?: {
     isConfidential?: boolean;
     expiresInDays?: number;

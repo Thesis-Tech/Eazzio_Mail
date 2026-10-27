@@ -5,7 +5,7 @@ const API_BACKEND_URL = process.env.API_BACKEND_URL || 'http://127.0.0.1:8080';
 
 const DEFAULT_PREFERENCES = {
   density: 'default',
-  theme: 'dark-oled',
+  theme: 'eazzio-teal',
   language: 'en_US',
   pageSize: 50,
   undoSendTime: 10,

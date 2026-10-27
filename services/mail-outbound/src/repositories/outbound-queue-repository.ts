@@ -1,7 +1,7 @@
 import { EazzioDatabase } from '@eazzio/infra-adapters';
 
 export type OutboundDeliveryState =
-  'queued' | 'sending' | 'delivered' | 'retrying' | 'bounced' | 'failed';
+  'queued' | 'sending' | 'delivered' | 'retrying' | 'bounced' | 'failed' | 'cancelled';
 
 export interface OutboundQueueItem {
   id: string;
@@ -38,6 +38,8 @@ export interface OutboundQueueRepository {
     lastError?: string | null,
   ): Promise<void>;
   findById(id: string): Promise<OutboundQueueItem | null>;
+  cancelByMessageId(messageId: string): Promise<boolean>;
+  cancelById(id: string): Promise<boolean>;
 }
 
 export class PostgresOutboundQueueRepository implements OutboundQueueRepository {
@@ -112,5 +114,28 @@ export class PostgresOutboundQueueRepository implements OutboundQueueRepository 
       [id],
     );
     return rows[0] ? this.mapRow(rows[0]) : null;
+  }
+
+  public async cancelByMessageId(messageId: string): Promise<boolean> {
+    // Only cancel if still pending delivery (queued or retrying)
+    const result = await this.db.query<{ id: string }>(
+      `UPDATE outbound_queue
+       SET state = 'cancelled', last_error = 'Cancelled by user during undo window'
+       WHERE message_id = $1 AND state IN ('queued', 'retrying')
+       RETURNING id`,
+      [messageId],
+    );
+    return result && result.length > 0;
+  }
+
+  public async cancelById(id: string): Promise<boolean> {
+    const result = await this.db.query<{ id: string }>(
+      `UPDATE outbound_queue
+       SET state = 'cancelled', last_error = 'Cancelled by user during undo window'
+       WHERE id = $1 AND state IN ('queued', 'retrying')
+       RETURNING id`,
+      [id],
+    );
+    return result && result.length > 0;
   }
 }

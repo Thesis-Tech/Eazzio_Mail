@@ -15,7 +15,10 @@ import {
   QueueRunner,
 } from '@eazzio/mail-outbound';
 import { defaultDb } from '../../config/index.js';
+import { rateLimit, RateLimitPolicies } from '../../middleware/rate-limiter.js';
+import { validateRequest, MailSchemas } from '../../middleware/validator.js';
 import crypto from 'crypto';
+import { ScamDetectionEngine } from '../../algorithms/scam-detection-engine.js';
 
 export const messagesRouter: Router = Router();
 
@@ -317,7 +320,7 @@ messagesRouter.get('/', async (req: AuthenticatedRequest, res: Response, next: N
           subject: msg.subject || '(No Subject)',
           snippet: msg.snippet || '',
           sender: { name: msg.from_address.split('@')[0], email: msg.from_address },
-          lastMessageAt: new Date(msg.received_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          lastMessageAt: new Date(msg.received_at).toISOString(),
           messageCount: 1,
           isUnread: !msg.is_read,
           isStarred: Boolean(msg.is_starred),
@@ -479,7 +482,11 @@ messagesRouter.post('/:id/star', async (req: AuthenticatedRequest, res: Response
 });
 
 // POST /v1/messages/batch-action - Execute bulk operation on multiple messages / threads
-messagesRouter.post('/batch-action', async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+messagesRouter.post(
+  '/batch-action',
+  rateLimit(RateLimitPolicies.BULK_ACTION),
+  validateRequest({ body: MailSchemas.batchAction }),
+  async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const { action, threadIds = [] } = req.body;
     const userId = req.user!.userId;
@@ -522,8 +529,24 @@ messagesRouter.post('/batch-action', async (req: AuthenticatedRequest, res: Resp
       );
     } else if (action === 'delete') {
       await defaultDb.query(
+        `DELETE FROM outbound_queue WHERE message_id = ANY($1) OR message_id IN (SELECT id FROM messages WHERE thread_id = ANY($1))`,
+        [threadIds]
+      );
+      await defaultDb.query(
         `DELETE FROM messages WHERE (id = ANY($1) OR thread_id = ANY($1)) AND mailbox_id = $2`,
         [threadIds, mailboxId]
+      );
+    } else if (action === 'cancel-scheduled') {
+      const draftsFolderId = await getFolderId(mailboxId, 'drafts');
+      await defaultDb.query(
+        `DELETE FROM outbound_queue WHERE message_id = ANY($1) OR message_id IN (SELECT id FROM messages WHERE thread_id = ANY($1))`,
+        [threadIds]
+      );
+      await defaultDb.query(
+        `UPDATE messages 
+         SET delivery_state = 'draft', scheduled_at = NULL, folder_id = $2 
+         WHERE (id = ANY($1) OR thread_id = ANY($1)) AND mailbox_id = $3`,
+        [threadIds, draftsFolderId, mailboxId]
       );
     } else if (action === 'spam') {
       const spamFolderId = await getFolderId(mailboxId, 'spam');
@@ -675,6 +698,36 @@ messagesRouter.post('/:id/archive', async (req: AuthenticatedRequest, res: Respo
   }
 });
 
+// POST /v1/messages/:id/cancel-scheduled - Cancel scheduled send and revert to Draft
+messagesRouter.post('/:id/cancel-scheduled', async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user!.userId;
+    const userEmail = req.user!.email;
+
+    const { mailboxId } = await getOrCreateUserMailbox(userId, userEmail);
+    const draftsFolderId = await getFolderId(mailboxId, 'drafts');
+
+    // 1. Remove pending queue jobs
+    await defaultDb.query(
+      `DELETE FROM outbound_queue WHERE message_id = $1 OR message_id IN (SELECT id FROM messages WHERE thread_id = $1)`,
+      [id]
+    );
+
+    // 2. Update message to draft
+    await defaultDb.query(
+      `UPDATE messages 
+       SET delivery_state = 'draft', scheduled_at = NULL, folder_id = $2 
+       WHERE (id = $1 OR thread_id = $1) AND mailbox_id = $3`,
+      [id, draftsFolderId, mailboxId]
+    );
+
+    res.json({ success: true, message: 'Scheduled send cancelled and reverted to draft' });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // DELETE /v1/messages/:id - Permanently delete message or thread
 messagesRouter.delete('/:id', async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
@@ -683,6 +736,13 @@ messagesRouter.delete('/:id', async (req: AuthenticatedRequest, res: Response, n
     const userEmail = req.user!.email;
 
     const { mailboxId } = await getOrCreateUserMailbox(userId, userEmail);
+
+    // Also remove from outbound_queue if scheduled
+    await defaultDb.query(
+      `DELETE FROM outbound_queue WHERE message_id = $1 OR message_id IN (SELECT id FROM messages WHERE thread_id = $1)`,
+      [id]
+    );
+
     await defaultDb.query(
       `DELETE FROM messages WHERE (id = $1 OR thread_id = $1) AND mailbox_id = $2`,
       [id, mailboxId]
@@ -850,6 +910,18 @@ messagesRouter.get('/:id', async (req: AuthenticatedRequest, res: Response, next
       }
     }
 
+    // Run Scam & Phishing Detection Engine
+    const threatAnalysis = ScamDetectionEngine.analyze({
+      fromAddress: first.from_address,
+      fromDisplayName: first.from_address.split('@')[0],
+      subject: first.subject || '',
+      bodyText,
+      bodyHtml,
+      spfVerified: true,
+      dkimVerified: true,
+      dmarcVerified: true,
+    });
+
     res.json({
       success: true,
       data: {
@@ -875,6 +947,7 @@ messagesRouter.get('/:id', async (req: AuthenticatedRequest, res: Response, next
           dmarc: 'pass',
           clamavStatus: 'clean',
           spamScore: Number(first.spam_score || 0.0),
+          threatAnalysis,
         },
         attachments: (
           (await defaultDb.query(
@@ -896,10 +969,13 @@ messagesRouter.get('/:id', async (req: AuthenticatedRequest, res: Response, next
 });
 
 // POST /v1/messages/compose
-messagesRouter.post('/compose', async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+messagesRouter.post(
+  '/compose',
+  rateLimit(RateLimitPolicies.MAIL_SEND),
+  async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const userId = req.user!.userId;
-    const { to, cc, bcc, subject, bodyText, bodyHtml, mailboxId: requestedMailboxId } = req.body;
+    const { to, cc, bcc, subject, bodyText, bodyHtml, mailboxId: requestedMailboxId, undoGraceSeconds } = req.body;
 
     // 1. Validate & Canonicalize recipients
     if (!to || !Array.isArray(to) || to.length === 0) {
@@ -950,6 +1026,12 @@ messagesRouter.post('/compose', async (req: AuthenticatedRequest, res: Response,
     const requestedFrom = (req.body.from as string | undefined)?.trim()?.toLowerCase();
     let senderAddress = requestedFrom || userEmail;
 
+    if (senderAddress.startsWith('no-reply@') || senderAddress.startsWith('noreply@')) {
+      throw new AppError('VALIDATION_ERROR', 'Cannot send emails from system-generated no-reply addresses', 400, [
+        { field: 'from', issue: 'System-generated no-reply addresses are restricted from outbound compose' }
+      ]);
+    }
+
     const { mailboxId: resolvedMailboxId, address: resolvedSenderAddress } = await getOrCreateUserMailbox(
       userId,
       senderAddress
@@ -985,10 +1067,20 @@ messagesRouter.post('/compose', async (req: AuthenticatedRequest, res: Response,
       folderId: sentFolderId,
     });
 
+    let isScheduled = false;
+    let scheduledDate: Date | null = null;
+    if (req.body.scheduledAt) {
+      const parsedDate = new Date(req.body.scheduledAt);
+      if (!isNaN(parsedDate.getTime()) && parsedDate.getTime() > Date.now()) {
+        isScheduled = true;
+        scheduledDate = parsedDate;
+      }
+    }
+
     let messageId = composedMessageId;
     let queueIds: string[] = [];
 
-    // Store sender's copy in Sent folder
+    // Store sender's copy in Sent folder (marked scheduled if future date specified)
     const senderMsgId = crypto.randomUUID();
     const senderRawKey = `mailboxes/${mailboxId}/messages/${senderMsgId}/raw.eml`;
     await storage.put(senderRawKey, composedMime, 'message/rfc822');
@@ -1008,10 +1100,17 @@ messagesRouter.post('/compose', async (req: AuthenticatedRequest, res: Response,
         isStarred: false,
         isImportant: false,
         direction: 'outbound' as any,
-        deliveryState: localRecipients.length > 0 ? 'delivered' : 'queued',
+        deliveryState: (isScheduled ? 'scheduled' : (localRecipients.length > 0 ? 'delivered' : 'queued')) as any,
         receivedAt: new Date(),
       });
       await messageRepo.save(senderMsg);
+
+      if (isScheduled && scheduledDate) {
+        await defaultDb.query(
+          `UPDATE messages SET scheduled_at = $1, delivery_state = 'scheduled' WHERE id = $2`,
+          [scheduledDate, senderMsgId]
+        );
+      }
     }
 
     // Deliver to each local recipient's inbox
@@ -1072,6 +1171,7 @@ messagesRouter.post('/compose', async (req: AuthenticatedRequest, res: Response,
     }
 
     // 4b. EXTERNAL DELIVERY — enqueue for SMTP relay (Brevo)
+    const effectiveUndoSeconds = (typeof undoGraceSeconds === 'number' && undoGraceSeconds >= 0) ? undoGraceSeconds : 10;
     if (externalRecipients.length > 0) {
       const result = await outboundService.enqueueOutbound({
         fromAddress: senderAddress,
@@ -1084,6 +1184,7 @@ messagesRouter.post('/compose', async (req: AuthenticatedRequest, res: Response,
         domainName,
         mailboxId,
         folderId: sentFolderId,
+        undoGraceSeconds: isScheduled ? 0 : effectiveUndoSeconds,
       });
       messageId = result.messageId;
       queueIds = result.queueIds;
@@ -1163,16 +1264,6 @@ messagesRouter.post('/compose', async (req: AuthenticatedRequest, res: Response,
     }
 
     // 6. Check if scheduled for future delivery
-    let isScheduled = false;
-    let scheduledDate: Date | null = null;
-    if (req.body.scheduledAt) {
-      const parsedDate = new Date(req.body.scheduledAt);
-      if (!isNaN(parsedDate.getTime()) && parsedDate.getTime() > Date.now()) {
-        isScheduled = true;
-        scheduledDate = parsedDate;
-      }
-    }
-
     if (isScheduled && scheduledDate) {
       if (actualMsgUuid) {
         await defaultDb.query(
@@ -1187,14 +1278,15 @@ messagesRouter.post('/compose', async (req: AuthenticatedRequest, res: Response,
         );
       }
     } else if (externalRecipients.length > 0) {
-      // Trigger Queue Runner immediately for external delivery only
-      setImmediate(() => {
+      // Trigger Queue Runner after undo grace window expires (or immediately if grace is 0)
+      const triggerDelayMs = effectiveUndoSeconds > 0 ? (effectiveUndoSeconds * 1000) + 200 : 0;
+      setTimeout(() => {
         getQueueRunner()
           .processNextBatch(10)
           .catch((runnerErr) => {
             console.error('Background outbound queue runner error:', runnerErr);
           });
-      });
+      }, triggerDelayMs);
     }
 
     res.status(202).json({
@@ -1204,12 +1296,57 @@ messagesRouter.post('/compose', async (req: AuthenticatedRequest, res: Response,
       queueIds,
       deliveryState: isScheduled ? 'scheduled' : 'queued',
       scheduledAt: isScheduled ? scheduledDate?.toISOString() : undefined,
+      undoGraceSeconds: isScheduled ? 0 : effectiveUndoSeconds,
       status: isScheduled ? 'scheduled_for_delivery' : 'accepted_for_delivery',
     });
   } catch (err) {
     next(err);
   }
 });
+
+// POST /v1/messages/outbound/:id/cancel
+messagesRouter.post(
+  '/outbound/:id/cancel',
+  async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+      const id = Array.isArray(req.params.id) ? req.params.id[0]! : req.params.id!;
+      const cancelled = await outboundService.cancelOutbound({
+        queueId: id,
+        messageId: id,
+      });
+
+      if (!cancelled) {
+        // Also check if id is a message id directly
+        const qCheck = (await defaultDb.query(
+          `SELECT id FROM outbound_queue WHERE (message_id = $1 OR id = $1) AND state = 'cancelled' LIMIT 1`,
+          [id]
+        )) as any[];
+
+        if (qCheck.length === 0) {
+          throw new AppError(
+            'CANNOT_CANCEL',
+            'Cannot cancel outbound delivery: message has already been relayed, expired, or not found',
+            409
+          );
+        }
+      }
+
+      // Also update message delivery_state if applicable
+      await defaultDb.query(
+        `UPDATE messages SET delivery_state = 'bounced' WHERE id = $1 AND delivery_state = 'queued'`,
+        [id]
+      );
+
+      res.status(200).json({
+        success: true,
+        message: 'Outbound delivery cancelled successfully',
+        id,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
 
 // GET /v1/attachments/:id/download
 messagesRouter.get('/attachments/:id/download', async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {

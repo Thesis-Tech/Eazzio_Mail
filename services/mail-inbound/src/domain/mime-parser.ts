@@ -108,7 +108,8 @@ export class MimeParser {
       const rawHeaders: Record<string, string> = {};
       if (parsed.headers) {
         for (const [k, v] of parsed.headers) {
-          rawHeaders[k.toLowerCase()] = typeof v === 'string' ? v : (v as any)?.text || JSON.stringify(v);
+          rawHeaders[k.toLowerCase()] =
+            typeof v === 'string' ? v : (v as any)?.text || JSON.stringify(v);
         }
       }
 

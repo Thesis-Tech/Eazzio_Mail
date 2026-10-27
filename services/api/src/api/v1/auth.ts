@@ -16,6 +16,7 @@ import { MailboxService } from '../../application/mailbox-service.js';
 import { defaultDb } from '../../config/index.js';
 import { AppError } from '../../middleware/error-handler.js';
 import { AuthenticatedRequest, requireAuth } from '../../middleware/auth.js';
+import { rateLimit, RateLimitPolicies } from '../../middleware/rate-limiter.js';
 
 export const authRouter: Router = Router();
 
@@ -81,7 +82,7 @@ function normalizeIdentifier(rawIdentifier: string): string {
 }
 
 // 1. POST /identify — Progressive Step 1: Validate identifier and determine available auth methods & risk challenge
-authRouter.post('/identify', async (req: Request, res: Response, next: NextFunction) => {
+authRouter.post('/identify', rateLimit(RateLimitPolicies.LOGIN), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { identifier } = req.body;
     const cleanId = validateIdentifierInput(identifier);
@@ -115,7 +116,7 @@ authRouter.post('/identify', async (req: Request, res: Response, next: NextFunct
 });
 
 // 2. POST /login — Progressive Step 2: Authenticate password
-authRouter.post('/login', async (req: Request, res: Response, next: NextFunction) => {
+authRouter.post('/login', rateLimit(RateLimitPolicies.LOGIN), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { identifier, email: directEmail, password, challengeResponse } = req.body;
     const targetEmail = normalizeIdentifier(directEmail || identifier || '');
@@ -181,14 +182,22 @@ authRouter.post('/login', async (req: Request, res: Response, next: NextFunction
     // Reset failed attempts on success
     failedLoginAttempts.delete(targetEmail);
 
-    // Create session & JWT token
+    // Create session & JWT tokens (Access: 15m, Session/Refresh: 5 months)
     const sessionId = crypto.randomUUID();
     const now = new Date();
-    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+    const expiresAt = new Date(Date.now() + 5 * 30.4375 * 24 * 60 * 60 * 1000); // 5 months max lifetime
+
+    const refreshToken = TokenService.generateRefreshToken({
+      userId: user.id,
+      sessionId,
+      email: user.email,
+    });
+    const refreshTokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
 
     await sessionRepo.create({
       id: sessionId,
       userId: user.id,
+      refreshTokenHash,
       deviceLabel: (req.headers['user-agent'] || 'Browser').slice(0, 100),
       ipAddress: (req.ip || '127.0.0.1') as string,
       userAgent: req.headers['user-agent'] || 'Browser',
@@ -196,6 +205,7 @@ authRouter.post('/login', async (req: Request, res: Response, next: NextFunction
       lastSeenAt: now,
       expiresAt,
       revokedAt: null,
+      revocationReason: null,
     });
 
     const token = TokenService.generateAccessToken({
@@ -204,10 +214,21 @@ authRouter.post('/login', async (req: Request, res: Response, next: NextFunction
       email: user.email,
     });
 
+    // Set secure HTTP-only refresh cookie if supported
+    res.cookie('eazzio_refresh_token', refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 5 * 30.4375 * 24 * 60 * 60 * 1000,
+      path: '/',
+    });
+
     res.json({
       success: true,
       data: {
         token,
+        refreshToken,
+        expiresIn: 900, // 15 minutes
         user: {
           id: user.id,
           email: user.email,
@@ -394,7 +415,7 @@ authRouter.post('/otp/verify', async (req: Request, res: Response, next: NextFun
 });
 
 // 5. POST /forgot-password — Initiate Password Recovery (Multi-Channel)
-authRouter.post('/forgot-password', async (req: Request, res: Response, next: NextFunction) => {
+authRouter.post('/forgot-password', rateLimit(RateLimitPolicies.FORGOT_PASSWORD), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { identifier, email: directEmail, channel, recoveryTarget } = req.body;
     const cleanId = validateIdentifierInput(directEmail || identifier || '');
@@ -611,7 +632,7 @@ authRouter.post('/reset-password', async (req: Request, res: Response, next: Nex
 });
 
 // 7. POST /register — Progressive Account Creation
-authRouter.post('/register', async (req: Request, res: Response, next: NextFunction) => {
+authRouter.post('/register', rateLimit(RateLimitPolicies.REGISTER), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { email: rawEmail, username, password, displayName } = req.body;
     const cleanId = validateIdentifierInput(rawEmail || username || '');
@@ -672,14 +693,22 @@ authRouter.post('/register', async (req: Request, res: Response, next: NextFunct
       await folderRepo.save(f);
     }
 
-    // Persist session to sessionRepo
+    // Persist session to sessionRepo (5 months max lifetime)
     const sessionId = crypto.randomUUID();
     const now = new Date();
-    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+    const expiresAt = new Date(Date.now() + 5 * 30.4375 * 24 * 60 * 60 * 1000); // 5 months
+
+    const refreshToken = TokenService.generateRefreshToken({
+      userId: newUser.id,
+      sessionId,
+      email: newUser.email,
+    });
+    const refreshTokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
 
     await sessionRepo.create({
       id: sessionId,
       userId: newUser.id,
+      refreshTokenHash,
       deviceLabel: (req.headers['user-agent'] || 'Browser').slice(0, 100),
       ipAddress: (req.ip || '127.0.0.1') as string,
       userAgent: req.headers['user-agent'] || 'Browser',
@@ -687,6 +716,7 @@ authRouter.post('/register', async (req: Request, res: Response, next: NextFunct
       lastSeenAt: now,
       expiresAt,
       revokedAt: null,
+      revocationReason: null,
     });
 
     const token = TokenService.generateAccessToken({
@@ -695,10 +725,20 @@ authRouter.post('/register', async (req: Request, res: Response, next: NextFunct
       email: newUser.email,
     });
 
+    res.cookie('eazzio_refresh_token', refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 5 * 30.4375 * 24 * 60 * 60 * 1000,
+      path: '/',
+    });
+
     res.status(201).json({
       success: true,
       data: {
         token,
+        refreshToken,
+        expiresIn: 900,
         user: {
           id: newUser.id,
           email: newUser.email,
@@ -737,15 +777,94 @@ authRouter.get('/session', requireAuth, async (req: AuthenticatedRequest, res: R
   }
 });
 
-// 9. POST /logout — Revoke Session
+// 9. POST /refresh — Refresh Short-Lived Access Token with Active Session
+authRouter.post('/refresh', rateLimit(RateLimitPolicies.REFRESH_TOKEN), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const rawRefreshToken = req.body.refreshToken || (req.headers.cookie ? req.headers.cookie.split('; ').find(row => row.startsWith('eazzio_refresh_token='))?.split('=')[1] : null);
+
+    if (!rawRefreshToken || typeof rawRefreshToken !== 'string') {
+      throw new AppError('UNAUTHENTICATED', 'Refresh token is required', 401);
+    }
+
+    let payload;
+    try {
+      payload = TokenService.verifyRefreshToken(rawRefreshToken);
+    } catch (err: any) {
+      throw new AppError('UNAUTHENTICATED', 'Invalid or expired refresh token. Please sign in again.', 401);
+    }
+
+    // Lookup session in database
+    const session = await sessionRepo.findById(payload.sessionId);
+    if (!session) {
+      throw new AppError('UNAUTHENTICATED', 'Session not found. Please sign in again.', 401);
+    }
+
+    if (session.revokedAt) {
+      throw new AppError('UNAUTHENTICATED', 'Session has been revoked or logged out.', 401);
+    }
+
+    if (session.expiresAt.getTime() <= Date.now()) {
+      await sessionRepo.revoke(session.id, 'EXPIRED_5_MONTHS');
+      throw new AppError('UNAUTHENTICATED', 'Session expired (5-month limit reached). Please sign in again.', 401);
+    }
+
+    // Verify refresh token hash to detect token reuse
+    const providedHash = crypto.createHash('sha256').update(rawRefreshToken).digest('hex');
+    if (session.refreshTokenHash && session.refreshTokenHash !== providedHash) {
+      // Possible token reuse attack - immediately revoke session!
+      await sessionRepo.revoke(session.id, 'TOKEN_REUSE_DETECTED');
+      throw new AppError('UNAUTHENTICATED', 'Token reuse detected. Session has been revoked for security.', 401);
+    }
+
+    // Rotate refresh token
+    const newRefreshToken = TokenService.generateRefreshToken({
+      userId: payload.userId,
+      sessionId: session.id,
+      email: payload.email,
+    });
+    const newRefreshTokenHash = crypto.createHash('sha256').update(newRefreshToken).digest('hex');
+    await sessionRepo.updateRefreshTokenHash(session.id, newRefreshTokenHash);
+
+    // Generate new 15-minute access token
+    const newAccessToken = TokenService.generateAccessToken({
+      userId: payload.userId,
+      sessionId: session.id,
+      email: payload.email,
+    });
+
+    res.cookie('eazzio_refresh_token', newRefreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: Math.max(0, session.expiresAt.getTime() - Date.now()),
+      path: '/',
+    });
+
+    res.json({
+      success: true,
+      data: {
+        token: newAccessToken,
+        refreshToken: newRefreshToken,
+        expiresIn: 900,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// 10. POST /logout — Revoke Session immediately
 authRouter.post('/logout', requireAuth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     if (req.user?.sessionId) {
-      await sessionRepo.revoke(req.user.sessionId);
+      await sessionRepo.revoke(req.user.sessionId, 'USER_LOGOUT');
     }
+
+    res.clearCookie('eazzio_refresh_token', { path: '/' });
+
     res.json({
       success: true,
-      data: { message: 'Logged out successfully' },
+      data: { message: 'Logged out and session revoked successfully' },
     });
   } catch (err) {
     next(err);

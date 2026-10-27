@@ -94,13 +94,15 @@ export class InboundPipeline {
 
     const spamStatisticalScore = input.spamStatisticalScore ?? 0.0;
 
-    // 4. Deterministic Security Decision Gate
+    // 4. Deterministic Security Decision Gate (including RETVec adversarial normalization)
+    const rawTextContent = parsed.bodyText || parsed.bodyHtml || parsed.subject || '';
     const decision = decide({
       authResults: input.authResults,
       spamRuleResult,
       spamStatisticalScore,
       avResult,
       domainDmarcPolicy: input.domainDmarcPolicy,
+      rawTextContent,
     });
 
     if (decision.action === 'REJECT') {
@@ -173,10 +175,15 @@ export class InboundPipeline {
       let existingThread: Thread | null = null;
 
       // 1. Match by RFC 5322 In-Reply-To or References
-      const inReplyToHeader = (parsed.headers ? (parsed.headers['in-reply-to'] || parsed.headers['references']) : undefined) as string | undefined;
+      const inReplyToHeader = (
+        parsed.headers ? parsed.headers['in-reply-to'] || parsed.headers['references'] : undefined
+      ) as string | undefined;
       if (inReplyToHeader && this.messageRepo && effectiveMailboxId) {
         try {
-          const parentMsg = await this.messageRepo.findByMessageIdHeader(effectiveMailboxId, String(inReplyToHeader).trim());
+          const parentMsg = await this.messageRepo.findByMessageIdHeader(
+            effectiveMailboxId,
+            String(inReplyToHeader).trim(),
+          );
           if (parentMsg && parentMsg.threadId) {
             existingThread = await this.threadRepo.findById(parentMsg.threadId);
           }
@@ -251,14 +258,15 @@ export class InboundPipeline {
                   (f) =>
                     f.id === action.value ||
                     f.name.toLowerCase() === action.value!.toLowerCase() ||
-                    f.kind === action.value!.toLowerCase()
+                    f.kind === action.value!.toLowerCase(),
                 );
                 if (match) finalFolderId = match.id;
               }
               if (action.type === 'apply_label' && action.value && this.labelRepo) {
                 const labels = await this.labelRepo.findByMailboxId(effectiveMailboxId);
                 const match = labels.find(
-                  (l) => l.id === action.value || l.name.toLowerCase() === action.value!.toLowerCase()
+                  (l) =>
+                    l.id === action.value || l.name.toLowerCase() === action.value!.toLowerCase(),
                 );
                 if (match && !appliedLabelIds.includes(match.id)) {
                   appliedLabelIds.push(match.id);
@@ -278,7 +286,10 @@ export class InboundPipeline {
       isImportant = true;
       if (dsnReport.originalMessageId && effectiveMailboxId) {
         try {
-          const originalMsg = await this.messageRepo.findByMessageIdHeader(effectiveMailboxId, dsnReport.originalMessageId);
+          const originalMsg = await this.messageRepo.findByMessageIdHeader(
+            effectiveMailboxId,
+            dsnReport.originalMessageId,
+          );
           if (originalMsg) {
             await this.messageRepo.updateDeliveryState(originalMsg.id, 'bounced');
             threadId = originalMsg.threadId || threadId; // Thread bounce directly into the same conversation

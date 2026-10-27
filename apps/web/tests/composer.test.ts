@@ -45,4 +45,54 @@ describe('Rich Text Mail Composer Logic (TASK-017)', () => {
     toChips = toChips.filter((c) => c !== 'alex@eazzio.com');
     expect(toChips).toEqual(['dev@eazzio.com']);
   });
+
+  it('should allow support and billing as automated role senders and filter out no-reply', () => {
+    const domain = 'eazzio.com';
+    const rawSenders = [
+      { label: 'Rahul Kumar <kumarrahul0@eazzio.com>', email: 'kumarrahul0@eazzio.com', isPrimary: true, type: 'primary' },
+      { label: `Support <support@${domain}>`, email: `support@${domain}`, type: 'automated' },
+      { label: `Billing <billing@${domain}>`, email: `billing@${domain}`, type: 'automated' },
+      { label: `No Reply <no-reply@${domain}>`, email: `no-reply@${domain}`, type: 'system' },
+      { label: `No Reply System <noreply@${domain}>`, email: `noreply@${domain}`, type: 'system' },
+    ];
+
+    const isSystemNoReply = (email: string) =>
+      email.toLowerCase().startsWith('no-reply@') || email.toLowerCase().startsWith('noreply@');
+
+    const filteredSenders = rawSenders.filter((s) => !isSystemNoReply(s.email));
+
+    expect(filteredSenders.map((s) => s.email)).toEqual([
+      'kumarrahul0@eazzio.com',
+      'support@eazzio.com',
+      'billing@eazzio.com',
+    ]);
+    expect(filteredSenders.find((s) => s.email === 'support@eazzio.com')?.type).toBe('automated');
+    expect(filteredSenders.find((s) => s.email === 'billing@eazzio.com')?.type).toBe('automated');
+    expect(filteredSenders.some((s) => isSystemNoReply(s.email))).toBe(false);
+  });
+
+  it('should reject outbound manual composition from system-generated no-reply addresses', () => {
+    const validateSenderAddress = (from: string): { valid: boolean; error?: string } => {
+      const lower = from.toLowerCase().trim();
+      if (lower.startsWith('no-reply@') || lower.startsWith('noreply@')) {
+        return {
+          valid: false,
+          error: 'System-generated no-reply addresses cannot be used to compose messages.',
+        };
+      }
+      return { valid: true };
+    };
+
+    expect(validateSenderAddress('kumarrahul0@eazzio.com').valid).toBe(true);
+    expect(validateSenderAddress('support@eazzio.com').valid).toBe(true);
+    expect(validateSenderAddress('billing@eazzio.com').valid).toBe(true);
+
+    const noReplyResult = validateSenderAddress('no-reply@eazzio.com');
+    expect(noReplyResult.valid).toBe(false);
+    expect(noReplyResult.error).toContain('cannot be used to compose messages');
+
+    const noreplyResult = validateSenderAddress('noreply@eazzio.com');
+    expect(noreplyResult.valid).toBe(false);
+    expect(noreplyResult.error).toContain('cannot be used to compose messages');
+  });
 });

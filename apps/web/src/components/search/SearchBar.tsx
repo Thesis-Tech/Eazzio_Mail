@@ -175,10 +175,10 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           ref={inputRef}
           type="text"
           value={query}
-          onFocus={() => setIsOpen(true)}
           onChange={(e) => setQuery(e.target.value)}
+          onFocus={() => setIsOpen(true)}
           placeholder={placeholder}
-          className="w-full bg-[#0F1115] border border-[#2A2E37] focus:border-[#2D5BFF] focus:ring-2 focus:ring-[#2D5BFF]/30 rounded-xl pl-10 pr-20 py-2 text-sm text-[#E1E4EA] placeholder-slate-500 outline-none transition-all"
+          className="w-full bg-[#F8FAFC] border border-[#CBD5E1] focus:border-[#14B8A6] focus:ring-2 focus:ring-[#14B8A6]/20 rounded-xl pl-10 pr-20 py-2 text-sm text-[#0F172A] placeholder-[#94A3B8] outline-none transition-all"
           data-testid="search-input"
         />
 
@@ -187,7 +187,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
             <button
               type="button"
               onClick={handleClear}
-              className="p-1 rounded-md text-slate-400 hover:text-white hover:bg-[#1C1F26] transition-colors"
+              className="p-1 rounded-md text-[#64748B] hover:text-[#0F172A] hover:bg-[#F1F5F9] transition-colors"
               title="Clear search"
               data-testid="search-clear-btn"
             >
@@ -197,12 +197,12 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           <button
             type="button"
             onClick={() => setIsOpen(!isOpen)}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[#1C1F26] transition-colors"
+            className="p-1.5 rounded-lg text-[#64748B] hover:text-[#0F172A] hover:bg-[#F1F5F9] transition-colors"
             title="Show search options"
           >
             <Filter className="w-3.5 h-3.5" />
           </button>
-          <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-mono text-slate-400 bg-[#1C1F26] border border-[#2A2E37] rounded">
+          <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-mono text-[#64748B] bg-[#F1F5F9] border border-[#CBD5E1] rounded">
             ⌘K
           </kbd>
         </div>
@@ -211,13 +211,13 @@ export const SearchBar: React.FC<SearchBarProps> = ({
       {/* Autocomplete & Typeahead Dropdown */}
       {isOpen && (
         <div
-          className="absolute left-0 right-0 mt-2 bg-[#16181D] border border-[#2A2E37] rounded-2xl shadow-2xl overflow-hidden z-50 animate-in fade-in zoom-in-95 text-xs"
+          className="absolute left-0 right-0 mt-2 bg-white border border-[#E2E8F0] rounded-2xl shadow-xl overflow-hidden z-50 animate-in fade-in zoom-in-95 text-xs"
           data-testid="search-typeahead-dropdown"
         >
           {/* Quick Filter Syntax Helpers */}
-          <div className="p-3 border-b border-[#2A2E37] bg-[#121418]">
-            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-              <Filter className="w-3 h-3 text-[#2D5BFF]" />
+          <div className="p-3 border-b border-[#E2E8F0] bg-[#F8FAFC]">
+            <p className="text-[11px] font-bold text-[#64748B] uppercase tracking-wider mb-2 flex items-center gap-1.5">
+              <Filter className="w-3 h-3 text-[#14B8A6]" />
               Quick Syntax Filters
             </p>
             <div className="flex flex-wrap gap-1.5">
@@ -228,11 +228,11 @@ export const SearchBar: React.FC<SearchBarProps> = ({
                     key={helper.label}
                     type="button"
                     onClick={() => handleApplyFilterHelper(helper.label)}
-                    className="px-2.5 py-1 rounded-lg bg-[#1C1F26] hover:bg-[#2D5BFF]/15 hover:text-[#2D5BFF] border border-[#2A2E37] hover:border-[#2D5BFF]/40 text-slate-300 transition-all flex items-center gap-1.5"
+                    className="px-2.5 py-1 rounded-lg bg-[#F0FDFA] hover:bg-[#CCFBF1] text-[#0F766E] border border-[#CCFBF1] transition-all flex items-center gap-1.5 font-medium"
                     title={helper.desc}
                     data-testid={`filter-chip-${helper.label}`}
                   >
-                    <Icon className="w-3 h-3 text-slate-400" />
+                    <Icon className="w-3 h-3 text-[#14B8A6]" />
                     <span>{helper.label}</span>
                   </button>
                 );
@@ -242,8 +242,8 @@ export const SearchBar: React.FC<SearchBarProps> = ({
 
           {/* Dynamic Thread Matches (when typing) */}
           {matchingSuggestions.length > 0 && (
-            <div className="p-2 border-b border-[#2A2E37]">
-              <p className="px-3 py-1 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+            <div className="p-2 border-b border-[#E2E8F0]">
+              <p className="px-3 py-1 text-[11px] font-bold text-[#64748B] uppercase tracking-wider">
                 Matching Conversations
               </p>
               {matchingSuggestions.map((t) => (
@@ -255,16 +255,16 @@ export const SearchBar: React.FC<SearchBarProps> = ({
                     onSearch(`subject:${t.subject}`);
                     setIsOpen(false);
                   }}
-                  className="w-full px-3 py-2 rounded-xl hover:bg-[#1C1F26] text-left flex items-center justify-between gap-3 text-slate-300 hover:text-white transition-colors"
+                  className="w-full px-3 py-2 rounded-xl hover:bg-[#F8FAFC] text-left flex items-center justify-between gap-3 text-[#334155] hover:text-[#0F172A] transition-colors"
                 >
                   <div className="flex items-center gap-2 truncate">
-                    <Mail className="w-3.5 h-3.5 text-[#2D5BFF] shrink-0" />
+                    <Mail className="w-3.5 h-3.5 text-[#14B8A6] shrink-0" />
                     <span className="font-medium truncate">{t.subject}</span>
-                    <span className="text-slate-500 truncate text-[11px]">
+                    <span className="text-[#64748B] truncate text-[11px]">
                       ({t.sender.name || t.sender.email})
                     </span>
                   </div>
-                  <span className="text-[11px] text-slate-500 shrink-0">{t.lastMessageAt}</span>
+                  <span className="text-[11px] text-[#64748B] shrink-0">{t.lastMessageAt}</span>
                 </button>
               ))}
             </div>
@@ -273,7 +273,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           {/* Recent Searches */}
           {recentSearches.length > 0 && (
             <div className="p-2">
-              <p className="px-3 py-1 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+              <p className="px-3 py-1 text-[11px] font-bold text-[#64748B] uppercase tracking-wider">
                 Recent Searches
               </p>
               {recentSearches.map((term) => (
@@ -281,14 +281,14 @@ export const SearchBar: React.FC<SearchBarProps> = ({
                   key={term}
                   type="button"
                   onClick={() => handleSelectRecent(term)}
-                  className="w-full px-3 py-2 rounded-xl hover:bg-[#1C1F26] text-left flex items-center justify-between gap-3 text-slate-300 hover:text-white transition-colors"
+                  className="w-full px-3 py-2 rounded-xl hover:bg-[#F8FAFC] text-left flex items-center justify-between gap-3 text-[#334155] hover:text-[#0F172A] transition-colors"
                   data-testid="recent-search-item"
                 >
                   <div className="flex items-center gap-2 truncate">
-                    <Clock className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                    <Clock className="w-3.5 h-3.5 text-[#94A3B8] shrink-0" />
                     <span className="truncate">{term}</span>
                   </div>
-                  <ArrowRight className="w-3 h-3 text-slate-500" />
+                  <ArrowRight className="w-3 h-3 text-[#94A3B8]" />
                 </button>
               ))}
             </div>

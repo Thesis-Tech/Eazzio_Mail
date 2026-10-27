@@ -1,14 +1,16 @@
 /**
- * Eazzio Mail — Live Outbound Email & OTP Dispatch CLI
+ * Eazzio Mail — Live Outbound Email Dispatch CLI via Pluggable Outbound Providers
+ * Supports: Postfix, GoDaddy SMTP relay, and MailerSend
+ *
  * Usage:
- *   npx tsx scripts/send-test-email.ts <recipient-email> [custom-otp-or-message]
- *   pnpm mail:send <recipient-email> [custom-otp-or-message]
+ *   npx tsx scripts/send-test-email.ts <recipient-email> [custom-subject]
  */
 import * as fs from 'fs';
 import * as path from 'path';
+import { OutboundProviderFactory } from '../services/mail-outbound/src/provider/outbound-provider-factory.js';
 import { SmtpAuthenticatedTransport } from '../packages/infra-adapters/src/email-transport/smtp-authenticated-adapter.js';
 
-// Automatically load .env from repository root (last non-empty value wins for duplicates)
+// Automatically load .env from repository root
 function loadEnvFile() {
   const possiblePaths = [
     path.resolve(process.cwd(), '.env'),
@@ -18,22 +20,27 @@ function loadEnvFile() {
   const collected = new Map<string, string>();
   for (const envPath of possiblePaths) {
     if (fs.existsSync(envPath)) {
-      const content = fs.readFileSync(envPath, 'utf8');
-      for (const line of content.split('\n')) {
-        const trimmed = line.trim();
-        if (!trimmed || trimmed.startsWith('#')) continue;
-        const eqIdx = trimmed.indexOf('=');
-        if (eqIdx !== -1) {
-          const key = trimmed.slice(0, eqIdx).trim();
-          let val = trimmed.slice(eqIdx + 1).trim();
-          if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
-            val = val.slice(1, -1);
-          }
-          if (val) {
-            collected.set(key, val);
+      try {
+        const content = fs.readFileSync(envPath, 'utf8');
+        for (const line of content.split('\n')) {
+          const trimmed = line.trim();
+          if (!trimmed || trimmed.startsWith('#')) continue;
+          const eqIdx = trimmed.indexOf('=');
+          if (eqIdx !== -1) {
+            const key = trimmed.slice(0, eqIdx).trim();
+            let val = trimmed.slice(eqIdx + 1).trim();
+            if (
+              (val.startsWith('"') && val.endsWith('"')) ||
+              (val.startsWith("'") && val.endsWith("'"))
+            ) {
+              val = val.slice(1, -1);
+            }
+            if (val) {
+              collected.set(key, val);
+            }
           }
         }
-      }
+      } catch {}
     }
   }
   for (const [key, val] of collected) {
@@ -47,109 +54,80 @@ loadEnvFile();
 async function sendTestEmail() {
   const args = process.argv.slice(2);
   const recipient = args[0] || process.env.SMTP_TEST_RECIPIENT || 'kumarrahulraj468@gmail.com';
-  const customOtp = args[1] || String(Math.floor(100000 + Math.random() * 900000));
+  const customSubject = args[1] || 'Eazzio Mail — Test Delivery';
 
-  const smtpHost = process.env.SMTP_HOST || 'smtp-relay.brevo.com';
-  const smtpPort = Number(process.env.SMTP_PORT) || 587;
-  const smtpUser = process.env.SMTP_USERNAME || process.env.SMTP_USER || process.env.SMTP_AUTH_USER;
-  const smtpPass = process.env.SMTP_PASSWORD || process.env.SMTP_PASS || process.env.SMTP_AUTH_PASS;
-  const fromEmail = process.env.SMTP_FROM_EMAIL || smtpUser || 'kumarrahulraj468@gmail.com';
+  const providerType = (process.env.OUTBOUND_MAIL_PROVIDER || 'postfix').toLowerCase().trim();
+  const fromEmail =
+    process.env.GODADDY_SMTP_USERNAME ||
+    process.env.INBOUND_MAIL_USERNAME ||
+    process.env.SMTP_FROM_EMAIL ||
+    'rahulkumar@eazzio.com';
 
   console.log('════════════════════════════════════════════════════════════════');
-  console.log('📬 EAZZIO MAIL — LIVE EMAIL & OTP DISPATCH CLI');
+  console.log('📬 EAZZIO MAIL — OUTBOUND EMAIL DISPATCH CLI');
   console.log('════════════════════════════════════════════════════════════════');
+  console.log(`🚀 Active Provider  : ${providerType}`);
   console.log(`🎯 Recipient Target : ${recipient}`);
-  console.log(`🔑 Verification Code: ${customOtp}`);
-  console.log(`⚙️  SMTP Host        : ${smtpHost}:${smtpPort}`);
-  console.log(`👤 SMTP User        : ${smtpUser ? smtpUser : '❌ NOT SET IN .ENV'}`);
-  console.log(`🔑 SMTP Pass        : ${smtpPass ? '******** (configured)' : '❌ NOT SET IN .ENV'}`);
   console.log(`✉️  From Address     : ${fromEmail}`);
+  console.log(`📝 Subject          : ${customSubject}`);
   console.log('────────────────────────────────────────────────────────────────');
 
-  if (!smtpUser || !smtpPass) {
-    console.error('❌ Missing SMTP Authentication Credentials in .env!');
-    console.error('\n📝 Please add your Brevo / SMTP login credentials to .env:');
-    console.error('   SMTP_HOST=smtp-relay.brevo.com');
-    console.error('   SMTP_PORT=587');
-    console.error('   SMTP_USER=your-brevo-login-email');
-    console.error('   SMTP_PASS=your-brevo-smtp-master-key');
-    console.error('   SMTP_FROM_EMAIL=kumarrahulraj468@11947139.brevosend.com\n');
-    process.exit(1);
-  }
+  // Fallback transport for postfix provider
+  const fallbackTransport = new SmtpAuthenticatedTransport();
 
+  const provider = OutboundProviderFactory.createProvider(providerType, fallbackTransport);
 
-  const transport = new SmtpAuthenticatedTransport({
-    host: smtpHost,
-    port: smtpPort,
-    secure: process.env.SMTP_SECURE === 'true',
-    user: smtpUser,
-    pass: smtpPass,
-    fromEmail,
-  });
+  const messageId = `<${Date.now()}@eazzio.com>`;
+  const dateStr = new Date().toUTCString();
 
-  // Step 1: Verify SMTP Handshake & Authentication
-  console.log('⏳ Connecting to SMTP relay...');
-  const connStatus = await transport.verifyConnection();
-  if (!connStatus.ok) {
-    console.error('❌ SMTP Connection / Auth Failed:', connStatus.error);
-    console.error('\n💡 Tip: Check your SMTP_USER and SMTP_PASS in .env');
-    process.exit(1);
-  }
-  console.log('✅ SMTP Relay Handshake & Auth OK!');
-
-  // Step 2: Construct RFC 5322 MIME stream
   const rawMime = Buffer.from(
-    `From: "Eazzio Mail Security" <${fromEmail}>\r\n` +
-    `To: ${recipient}\r\n` +
-    `Subject: ${customOtp} is your Eazzio Mail verification code\r\n` +
-    `MIME-Version: 1.0\r\n` +
-    `Content-Type: text/html; charset=utf-8\r\n\r\n` +
-    `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>Eazzio Mail Verification</title>
-</head>
-<body style="margin: 0; padding: 30px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0F1115; color: #FFFFFF;">
-  <div style="max-width: 520px; margin: 0 auto; background: #16181D; border-radius: 16px; border: 1px solid #2A2E37; padding: 32px; box-shadow: 0 8px 30px rgba(0,0,0,0.5);">
-    <div style="margin-bottom: 24px;">
-      <span style="font-size: 20px; font-weight: bold; color: #14B8A6; letter-spacing: -0.5px;">Eazzio</span>
-      <span style="font-size: 14px; background: rgba(20, 184, 166, 0.15); color: #14B8A6; padding: 2px 8px; border-radius: 6px; margin-left: 6px; font-weight: 600;">Mail</span>
-    </div>
-    
-    <h1 style="font-size: 22px; font-weight: 700; margin: 0 0 12px 0; color: #FFFFFF;">Account Verification Code</h1>
-    <p style="font-size: 14px; line-height: 22px; color: #94A3B8; margin: 0 0 24px 0;">
-      Use the 6-digit security code below to verify your recovery email address for your Eazzio Mail account. This code expires in 10 minutes.
-    </p>
-
-    <div style="background: #0D0E11; border: 1px solid #22262E; border-radius: 12px; padding: 20px; text-align: center; margin-bottom: 24px;">
-      <div style="font-family: 'Courier New', Courier, monospace; font-size: 36px; font-weight: 800; letter-spacing: 8px; color: #14B8A6;">${customOtp}</div>
-    </div>
-
-    <p style="font-size: 12px; line-height: 18px; color: #64748B; margin: 0;">
-      If you did not request this email, no further action is required. Please do not share this code with anyone.
-    </p>
-  </div>
-</body>
-</html>`
+    [
+      `From: "Rahul Kumar (Eazzio Mail)" <${fromEmail}>`,
+      `To: ${recipient}`,
+      `Subject: ${customSubject}`,
+      `Date: ${dateStr}`,
+      `Message-ID: ${messageId}`,
+      `MIME-Version: 1.0`,
+      `Content-Type: text/html; charset=utf-8`,
+      ``,
+      `<div style="font-family: sans-serif; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">`,
+      `  <h2 style="color: #0f766e;">Eazzio Mail — Verification Test</h2>`,
+      `  <p>This message was dispatched via provider: <b>${provider.providerName}</b>.</p>`,
+      `  <p>Sent at: <code>${dateStr}</code></p>`,
+      `  <hr style="border: 0; border-top: 1px solid #cbd5e1; margin: 20px 0;" />`,
+      `  <p style="font-size: 12px; color: #64748b;">Eazzio Mail Development Infrastructure</p>`,
+      `</div>`,
+    ].join('\r\n'),
+    'utf-8',
   );
 
-  // Step 3: Dispatch email
-  console.log(`📤 Sending message to ${recipient}...`);
-  try {
-    const result = await transport.submitOutbound(rawMime, fromEmail, [recipient]);
+  console.log(`⏳ Submitting message via ${provider.providerName}...`);
+
+  const result = await provider.send({
+    messageId,
+    fromAddress: fromEmail,
+    recipientAddress: recipient,
+    rawMime,
+    subject: customSubject,
+  });
+
+  if (result.success) {
+    console.log('✅ Email successfully dispatched!');
+    console.log(`   Message ID : ${result.messageId}`);
+    console.log(`   Queue / Relayed ID : ${result.queueId || 'N/A'}`);
     console.log('────────────────────────────────────────────────────────────────');
-    console.log('🎉 EMAIL DISPATCHED SUCCESSFULLY!');
-    console.log(`📦 Message ID / Queue ID: ${result.queueId}`);
-    console.log(`📬 Check inbox & spam folder of: ${recipient}`);
-    console.log('════════════════════════════════════════════════════════════════\n');
-  } catch (err: any) {
-    console.error('❌ Failed to dispatch email:', err.message);
+    console.log(
+      '📌 Next Step: Check the recipient inbox and spam folders to verify SPF/DKIM delivery headers.',
+    );
+  } else {
+    console.error('❌ Failed to dispatch email:');
+    console.error(`   Error     : ${result.error}`);
+    console.error(`   SMTP Code : ${result.smtpCode || 'N/A'}`);
     process.exit(1);
   }
 }
 
 sendTestEmail().catch((err) => {
-  console.error('Unhandled error:', err);
+  console.error('Unexpected error:', err);
   process.exit(1);
 });

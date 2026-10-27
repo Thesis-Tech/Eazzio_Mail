@@ -17,24 +17,33 @@ const migrationsDir = path.resolve(
 
 async function runMigrations() {
   console.log(`🔌 Connecting to PostgreSQL at ${databaseUrl.replace(/:[^:@]+@/, ':****@')}...`);
-  const client = new pg.Client({ connectionString: databaseUrl });
+  // Automatically configure ssl: { rejectUnauthorized: false } for Neon / cloud providers if sslmode=require or neon hostname is detected
+  const isNeonOrSsl = databaseUrl.includes('sslmode=require') || databaseUrl.includes('neon.tech') || databaseUrl.includes('ssl=true');
+  const client = new pg.Client({
+    connectionString: databaseUrl,
+    ssl: isNeonOrSsl ? { rejectUnauthorized: false } : undefined,
+  });
   await client.connect();
 
   try {
     // Ensure helper roles exist for RLS policies
     console.log('👤 Ensuring application roles exist...');
-    await client.query(`
-      DO $$
-      BEGIN
-        IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'eazzio_app') THEN
-          CREATE ROLE eazzio_app WITH LOGIN PASSWORD 'eazzio_app_password';
-        END IF;
-        IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'eazzio_ai_gateway') THEN
-          CREATE ROLE eazzio_ai_gateway WITH LOGIN PASSWORD 'eazzio_ai_password';
-        END IF;
-      END
-      $$;
-    `);
+    try {
+      await client.query(`
+        DO $$
+        BEGIN
+          IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'eazzio_app') THEN
+            CREATE ROLE eazzio_app WITH LOGIN PASSWORD 'eazzio_app_password';
+          END IF;
+          IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'eazzio_ai_gateway') THEN
+            CREATE ROLE eazzio_ai_gateway WITH LOGIN PASSWORD 'eazzio_ai_password';
+          END IF;
+        END
+        $$;
+      `);
+    } catch (roleErr: any) {
+      console.warn('⚠️ Notice: Could not create auxiliary roles (eazzio_app/eazzio_ai_gateway) - likely Neon DB managed user restrictions. Continuing...');
+    }
 
     // Ensure migrations table
     await client.query(`

@@ -4,6 +4,8 @@ import { LandingHero } from '../components/landing/LandingHero';
 import { ProductShowcaseSlider } from '../components/landing/ProductShowcaseSlider';
 import { InteractiveMailDemo } from '../components/landing/InteractiveMailDemo';
 import { PricingSection } from '../components/landing/PricingSection';
+import { LandingFaq } from '../components/landing/LandingFaq';
+import { CookieBanner } from '../components/landing/CookieBanner';
 import { GlobalFooter } from '../components/landing/GlobalFooter';
 
 const jsonLd = {
@@ -41,19 +43,29 @@ const jsonLd = {
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-[#F8FAFC] text-[#0F172A] flex flex-col font-sans selection:bg-[#14B8A6]/20 selection:text-[#0F172A]">
+    <div className="min-h-screen bg-[#F8FAFC] text-[#0F172A] flex flex-col font-sans selection:bg-[#14B8A6]/20 selection:text-[#0F172A] relative">
+      {/* 1123: Accessible Skip to Content Link */}
+      <a href="#main-content" className="skip-link">
+        Skip to main content
+      </a>
+
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
+      
       <LandingHeader />
-      <main className="flex-1">
+      
+      <main id="main-content" tabIndex={-1} className="flex-1 focus:outline-none">
         <LandingHero />
         <ProductShowcaseSlider />
         <InteractiveMailDemo />
         <PricingSection />
+        <LandingFaq />
       </main>
+
       <GlobalFooter />
+      <CookieBanner />
     </div>
   );
 }

@@ -10,6 +10,7 @@ export interface AuthUser {
 export interface AuthState {
   user: AuthUser | null;
   token: string | null;
+  refreshToken: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
@@ -28,12 +29,15 @@ export class AuthStore {
   private static state: AuthState = {
     user: null,
     token: null,
+    refreshToken: null,
     isAuthenticated: false,
     isLoading: false,
     error: null,
   };
 
   private static listeners = new Set<(state: AuthState) => void>();
+  private static isRefreshing = false;
+  private static refreshSubscribers: Array<(token: string | null) => void> = [];
 
   public static getState(): AuthState {
     return this.state;
@@ -53,10 +57,11 @@ export class AuthStore {
     }
   }
 
-  public static setSession(user: AuthUser, token: string): void {
+  public static setSession(user: AuthUser, token: string, refreshToken?: string | null): void {
     this.setState({
       user,
       token,
+      refreshToken: refreshToken || this.state.refreshToken,
       isAuthenticated: true,
       isLoading: false,
       error: null,
@@ -64,6 +69,9 @@ export class AuthStore {
     if (typeof window !== 'undefined') {
       try {
         localStorage.setItem('eazzio_token', token);
+        if (refreshToken) {
+          localStorage.setItem('eazzio_refresh_token', refreshToken);
+        }
         localStorage.setItem('eazzio_user', JSON.stringify(user));
       } catch {
         // ignore localStorage errors in non-browser environments
@@ -75,6 +83,7 @@ export class AuthStore {
     this.setState({
       user: null,
       token: null,
+      refreshToken: null,
       isAuthenticated: false,
       isLoading: false,
       error: null,
@@ -82,6 +91,7 @@ export class AuthStore {
     if (typeof window !== 'undefined') {
       try {
         localStorage.removeItem('eazzio_token');
+        localStorage.removeItem('eazzio_refresh_token');
         localStorage.removeItem('eazzio_user');
       } catch {
         // ignore
@@ -93,13 +103,17 @@ export class AuthStore {
     if (typeof window === 'undefined') return false;
     try {
       const token = localStorage.getItem('eazzio_token');
+      const refreshToken = localStorage.getItem('eazzio_refresh_token');
       const userStr = localStorage.getItem('eazzio_user');
       if (token && userStr) {
         const user = JSON.parse(userStr) as AuthUser;
         this.setState({
           user,
           token,
+          refreshToken: refreshToken || null,
           isAuthenticated: true,
+          isLoading: false,
+          error: null,
         });
         return true;
       }
@@ -109,37 +123,102 @@ export class AuthStore {
     return false;
   }
 
+  public static async refreshAccessToken(): Promise<string | null> {
+    const refreshToken = this.state.refreshToken || (typeof window !== 'undefined' ? localStorage.getItem('eazzio_refresh_token') : null);
+    if (!refreshToken) {
+      this.clearSession();
+      return null;
+    }
+
+    if (this.isRefreshing) {
+      return new Promise((resolve) => {
+        this.refreshSubscribers.push((token) => resolve(token));
+      });
+    }
+
+    this.isRefreshing = true;
+
+    try {
+      const res = await fetch('/api/v1/auth/refresh', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken }),
+      });
+
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        this.clearSession();
+        this.refreshSubscribers.forEach((cb) => cb(null));
+        this.refreshSubscribers = [];
+        this.isRefreshing = false;
+        return null;
+      }
+
+      const { token, refreshToken: newRefreshToken } = json.data;
+      if (this.state.user) {
+        this.setSession(this.state.user, token, newRefreshToken);
+      }
+
+      this.refreshSubscribers.forEach((cb) => cb(token));
+      this.refreshSubscribers = [];
+      this.isRefreshing = false;
+      return token;
+    } catch (err) {
+      this.clearSession();
+      this.refreshSubscribers.forEach((cb) => cb(null));
+      this.refreshSubscribers = [];
+      this.isRefreshing = false;
+      return null;
+    }
+  }
+
+  public static async fetchWithAuth(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
+    let token = this.state.token;
+    if (!token && typeof window !== 'undefined') {
+      token = localStorage.getItem('eazzio_token');
+    }
+
+    const headers = new Headers(init.headers || {});
+    if (token && !headers.has('Authorization')) {
+      headers.set('Authorization', `Bearer ${token}`);
+    }
+    if (this.state.user?.email && !headers.has('x-user-email')) {
+      headers.set('x-user-email', this.state.user.email);
+    }
+
+    const response = await fetch(input, { ...init, headers });
+
+    // Handle 401 token expiry by refreshing transparently
+    if (response.status === 401) {
+      const clone = response.clone();
+      const body = await clone.json().catch(() => ({}));
+      if (body?.error?.code === 'TOKEN_EXPIRED' || body?.message?.includes('expired')) {
+        const newToken = await this.refreshAccessToken();
+        if (newToken) {
+          headers.set('Authorization', `Bearer ${newToken}`);
+          return fetch(input, { ...init, headers });
+        }
+      }
+    }
+
+    return response;
+  }
+
   // --- Backend API Integration Methods ---
 
   public static async identify(identifier: string): Promise<IdentifyResult> {
-    const trimmed = identifier.trim().toLowerCase();
-    const normalized = trimmed.includes('@') ? trimmed : `${trimmed.replace(/[^a-z0-9.]/g, '')}@eazzio.com`;
+    const res = await fetch('/api/v1/auth/identify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identifier }),
+    });
 
-    try {
-      const res = await fetch('/api/v1/auth/identify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ identifier }),
-      });
-
-      if (res.ok) {
-        const json = await res.json();
-        if (json.success && json.data) {
-          return json.data as IdentifyResult;
-        }
-      }
-    } catch (err) {
-      console.warn('API /identify error, using local fallback:', err);
+    const json = await res.json();
+    if (!res.ok || !json.success) {
+      throw new Error(json.error?.message || 'Failed to identify user');
     }
 
-    // Dev fallback
-    return {
-      exists: true,
-      email: normalized,
-      displayName: normalized.split('@')[0],
-      authMethods: ['password', 'otp', 'passkey'],
-      requiresChallenge: false,
-    };
+    return json.data;
   }
 
   public static async login(
@@ -165,7 +244,7 @@ export class AuthStore {
         throw new Error(message);
       }
 
-      const { user, token } = json.data;
+      const { user, token, refreshToken } = json.data;
       const authUser: AuthUser = {
         id: user.id,
         email: user.email,
@@ -173,7 +252,7 @@ export class AuthStore {
         role: user.role || 'user',
       };
 
-      this.setSession(authUser, token);
+      this.setSession(authUser, token, refreshToken);
       return authUser;
     } catch (err: any) {
       this.setState({ isLoading: false, error: err.message });
@@ -210,7 +289,7 @@ export class AuthStore {
       throw new Error(message);
     }
 
-    const { user, token } = json.data;
+    const { user, token, refreshToken } = json.data;
     const authUser: AuthUser = {
       id: user.id,
       email: user.email,
@@ -218,7 +297,7 @@ export class AuthStore {
       role: user.role || 'user',
     };
 
-    this.setSession(authUser, token);
+    this.setSession(authUser, token, refreshToken);
     return authUser;
   }
 
@@ -269,7 +348,7 @@ export class AuthStore {
       throw new Error(message);
     }
 
-    const { user, token } = json.data;
+    const { user, token, refreshToken } = json.data;
     const authUser: AuthUser = {
       id: user.id,
       email: user.email,
@@ -277,7 +356,7 @@ export class AuthStore {
       role: user.role || 'user',
     };
 
-    this.setSession(authUser, token);
+    this.setSession(authUser, token, refreshToken);
     return authUser;
   }
 

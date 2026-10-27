@@ -136,5 +136,36 @@ describe('Conversation Viewer Component Logic (TASK-016 / STEP-7-STATE-SYNC)', (
     expect(msg.attachments.length).toBe(1);
     expect(msg.attachments[0]?.filename).toBe('spec.pdf');
   });
+
+  it('should identify system-generated no-reply and automated mailboxes for UI badges and reply restrictions', () => {
+    const getSenderRoleBadge = (email: string) => {
+      const lower = email.toLowerCase().trim();
+      if (lower.startsWith('no-reply@') || lower.startsWith('noreply@')) {
+        return 'System Generated (No-Reply)';
+      }
+      if (lower.startsWith('support@') || lower.startsWith('billing@')) {
+        return 'Automated Mailbox';
+      }
+      return null;
+    };
+
+    const isDirectReplyAllowed = (email: string) => {
+      const lower = email.toLowerCase().trim();
+      return !(lower.startsWith('no-reply@') || lower.startsWith('noreply@'));
+    };
+
+    expect(getSenderRoleBadge('no-reply@eazzio.com')).toBe('System Generated (No-Reply)');
+    expect(getSenderRoleBadge('noreply@service.com')).toBe('System Generated (No-Reply)');
+    expect(isDirectReplyAllowed('no-reply@eazzio.com')).toBe(false);
+    expect(isDirectReplyAllowed('noreply@service.com')).toBe(false);
+
+    expect(getSenderRoleBadge('support@thesistech.com')).toBe('Automated Mailbox');
+    expect(getSenderRoleBadge('billing@thesistech.com')).toBe('Automated Mailbox');
+    expect(isDirectReplyAllowed('support@thesistech.com')).toBe(true);
+    expect(isDirectReplyAllowed('billing@thesistech.com')).toBe(true);
+
+    expect(getSenderRoleBadge('alex@eazzio.com')).toBeNull();
+    expect(isDirectReplyAllowed('alex@eazzio.com')).toBe(true);
+  });
 });
 

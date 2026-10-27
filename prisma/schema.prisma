@@ -1,0 +1,350 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model api_tokens {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  owner_id   String    @db.Uuid
+  scopes     String[]
+  token_hash String
+  created_at DateTime  @default(now()) @db.Timestamptz(6)
+  expires_at DateTime? @db.Timestamptz(6)
+  revoked_at DateTime? @db.Timestamptz(6)
+  users      users     @relation(fields: [owner_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model attachments {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  message_id  String   @db.Uuid
+  filename    String
+  mime_type   String
+  size_bytes  Int
+  sha256_hash String
+  object_key  String
+  scan_status String   @default("pending")
+  messages    messages @relation(fields: [message_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model audit_log {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  actor_user_id String?  @db.Uuid
+  actor_type    String
+  action        String
+  target_type   String?
+  target_id     String?  @db.Uuid
+  metadata      Json     @default("{}")
+  occurred_at   DateTime @default(now()) @db.Timestamptz(6)
+  users         users?   @relation(fields: [actor_user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model domain_aliases {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  domain_id         String    @db.Uuid
+  alias_address     String    @unique @db.Citext
+  target_mailbox_id String    @db.Uuid
+  is_disposable     Boolean   @default(false)
+  expires_at        DateTime? @db.Timestamptz(6)
+  domains           domains   @relation(fields: [domain_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  mailboxes         mailboxes @relation(fields: [target_mailbox_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_domain_aliases_target_mailbox")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model domains {
+  id                   String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organization_id      String?          @db.Uuid
+  domain_name          String           @unique
+  verification_status  String           @default("pending")
+  mx_verified          Boolean          @default(false)
+  spf_verified         Boolean          @default(false)
+  dkim_verified        Boolean          @default(false)
+  dmarc_verified       Boolean          @default(false)
+  dkim_private_key_ref String?
+  created_at           DateTime         @default(now()) @db.Timestamptz(6)
+  activated_at         DateTime?        @db.Timestamptz(6)
+  domain_aliases       domain_aliases[]
+  organizations        organizations?   @relation(fields: [organization_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  mailboxes            mailboxes[]
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model filters {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  mailbox_id String    @db.Uuid
+  conditions Json
+  actions    Json
+  is_enabled Boolean   @default(true)
+  priority   Int       @default(0)
+  mailboxes  mailboxes @relation(fields: [mailbox_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model folders {
+  id               String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  mailbox_id       String     @db.Uuid
+  parent_folder_id String?    @db.Uuid
+  name             String
+  kind             String     @default("custom")
+  mailboxes        mailboxes  @relation(fields: [mailbox_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  folders          folders?   @relation("foldersTofolders", fields: [parent_folder_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  other_folders    folders[]  @relation("foldersTofolders")
+  messages         messages[]
+
+  @@unique([mailbox_id, parent_folder_id, name])
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model labels {
+  id             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  mailbox_id     String           @db.Uuid
+  name           String
+  color          String?
+  mailboxes      mailboxes        @relation(fields: [mailbox_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  message_labels message_labels[]
+
+  @@unique([mailbox_id, name])
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model mailboxes {
+  id             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  owner_user_id  String           @db.Uuid
+  domain_id      String?          @db.Uuid
+  address        String           @unique @db.Citext
+  quota_bytes    BigInt           @default(5368709120)
+  used_bytes     BigInt           @default(0)
+  created_at     DateTime         @default(now()) @db.Timestamptz(6)
+  domain_aliases domain_aliases[]
+  filters        filters[]
+  folders        folders[]
+  labels         labels[]
+  domains        domains?         @relation(fields: [domain_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users          users            @relation(fields: [owner_user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  messages       messages[]
+  threads        threads[]
+  webhooks       webhooks[]
+
+  @@index([owner_user_id], map: "idx_mailboxes_owner")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model message_labels {
+  message_id String   @db.Uuid
+  label_id   String   @db.Uuid
+  labels     labels   @relation(fields: [label_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  messages   messages @relation(fields: [message_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([message_id, label_id])
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model message_recipients {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  message_id String   @db.Uuid
+  address    String   @db.Citext
+  kind       String
+  messages   messages @relation(fields: [message_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model messages {
+  id                 String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  mailbox_id         String               @db.Uuid
+  folder_id          String               @db.Uuid
+  thread_id          String?              @db.Uuid
+  message_id_header  String
+  in_reply_to        String?
+  references_header  String?
+  from_address       String               @db.Citext
+  subject            String?
+  snippet            String?
+  size_bytes         Int
+  raw_object_key     String
+  is_read            Boolean              @default(false)
+  is_starred         Boolean              @default(false)
+  is_important       Boolean              @default(false)
+  spam_score         Decimal?             @db.Decimal(5, 4)
+  auth_results       Json?
+  direction          String
+  delivery_state     String?
+  received_at        DateTime             @default(now()) @db.Timestamptz(6)
+  body_text          String?              @default("")
+  body_html          String?              @default("")
+  snoozed_until      DateTime?            @db.Timestamptz(6)
+  is_snoozed         Boolean              @default(false)
+  scheduled_at       DateTime?            @db.Timestamptz(6)
+  attachments        attachments[]
+  message_labels     message_labels[]
+  message_recipients message_recipients[]
+  folders            folders              @relation(fields: [folder_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  mailboxes          mailboxes            @relation(fields: [mailbox_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  threads            threads?             @relation(fields: [thread_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  outbound_queue     outbound_queue[]
+
+  @@index([mailbox_id, folder_id, received_at(sort: Desc)], map: "idx_messages_inbox")
+  @@index([mailbox_id, is_snoozed, snoozed_until], map: "idx_messages_snoozed")
+  @@index([mailbox_id, thread_id], map: "idx_messages_thread")
+}
+
+model mfa_totp_secrets {
+  user_id          String    @id @db.Uuid
+  secret_encrypted String
+  confirmed_at     DateTime? @db.Timestamptz(6)
+  users            users     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model organizations {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name       String
+  policy     Json      @default("{}")
+  created_at DateTime  @default(now()) @db.Timestamptz(6)
+  domains    domains[]
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model outbound_queue {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  message_id        String    @db.Uuid
+  recipient_address String    @db.Citext
+  state             String    @default("queued")
+  attempt_count     Int       @default(0)
+  next_attempt_at   DateTime  @default(now()) @db.Timestamptz(6)
+  last_error        String?
+  idempotency_key   String    @unique
+  created_at        DateTime  @default(now()) @db.Timestamptz(6)
+  scheduled_at      DateTime? @db.Timestamptz(6)
+  messages          messages  @relation(fields: [message_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([state, next_attempt_at], map: "idx_outbound_queue_poll")
+  @@index([state, scheduled_at, next_attempt_at], map: "idx_outbound_queue_scheduled")
+}
+
+model roles {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  scope_type String
+  scope_id   String?  @db.Uuid
+  user_id    String   @db.Uuid
+  role_name  String
+  granted_at DateTime @default(now()) @db.Timestamptz(6)
+  users      users    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model schema_migrations {
+  version    String   @id @db.VarChar(255)
+  applied_at DateTime @default(now()) @db.Timestamptz(6)
+}
+
+model sessions {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id      String    @db.Uuid
+  device_label String?
+  ip_address   String?   @db.Inet
+  user_agent   String?
+  created_at   DateTime  @default(now()) @db.Timestamptz(6)
+  last_seen_at DateTime  @default(now()) @db.Timestamptz(6)
+  expires_at   DateTime  @db.Timestamptz(6)
+  revoked_at   DateTime? @db.Timestamptz(6)
+  users        users     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model threads {
+  id                 String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  mailbox_id         String     @db.Uuid
+  subject_normalized String?
+  last_message_at    DateTime   @db.Timestamptz(6)
+  message_count      Int        @default(0)
+  snoozed_until      DateTime?  @db.Timestamptz(6)
+  is_snoozed         Boolean    @default(false)
+  messages           messages[]
+  mailboxes          mailboxes  @relation(fields: [mailbox_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([mailbox_id, is_snoozed, snoozed_until], map: "idx_threads_snoozed")
+}
+
+model user_preferences {
+  user_id                String    @id
+  density                String    @default("default")
+  theme                  String    @default("dark-oled")
+  inbox_type             String    @default("default")
+  reading_pane           String    @default("right")
+  conversation_view      Boolean   @default(true)
+  signature_text         String    @default("")
+  signature_enabled      Boolean   @default(false)
+  auto_reply_enabled     Boolean   @default(false)
+  auto_reply_subject     String    @default("")
+  auto_reply_body        String    @default("")
+  auto_reply_start_date  DateTime? @db.Timestamptz(6)
+  auto_reply_end_date    DateTime? @db.Timestamptz(6)
+  notifications_enabled  Boolean   @default(true)
+  sound_enabled          Boolean   @default(true)
+  spam_threshold         Decimal   @default(0.85) @db.Decimal(3, 2)
+  created_at             DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime  @default(now()) @db.Timestamptz(6)
+  language               String    @default("en_US")
+  page_size              Int       @default(50)
+  undo_send_time         Int       @default(10)
+  default_reply_behavior String    @default("reply")
+  hover_actions          Boolean   @default(true)
+  send_and_archive       Boolean   @default(false)
+  desktop_notifications  String    @default("all")
+  star_preset            String    @default("1star")
+  signature_for_new      String    @default("default")
+  signature_for_reply    String    @default("default")
+  vacation_contacts_only Boolean   @default(false)
+  categories             Json      @default("{\"forums\": false, \"social\": true, \"primary\": true, \"updates\": true, \"promotions\": true}")
+  importance_markers     Boolean   @default(true)
+  forwarding_address     String    @default("")
+  pop_enabled            Boolean   @default(false)
+  imap_enabled           Boolean   @default(true)
+  imap_expunge           String    @default("auto")
+  imap_folder_limit      Int       @default(1000)
+  blocked_addresses      Json      @default("[]")
+}
+
+model users {
+  id               String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email            String            @unique @db.Citext
+  password_hash    String
+  display_name     String?
+  status           String            @default("active")
+  mfa_enabled      Boolean           @default(false)
+  created_at       DateTime          @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime          @default(now()) @db.Timestamptz(6)
+  api_tokens       api_tokens[]
+  audit_log        audit_log[]
+  mailboxes        mailboxes[]
+  mfa_totp_secrets mfa_totp_secrets?
+  roles            roles[]
+  sessions         sessions[]
+}
+
+model webhook_deliveries {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  webhook_id      String   @db.Uuid
+  event_type      String
+  payload         Json
+  response_status Int?
+  response_body   String?
+  delivered_at    DateTime @default(now()) @db.Timestamptz(6)
+  webhooks        webhooks @relation(fields: [webhook_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model webhooks {
+  id                 String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  mailbox_id         String?              @db.Uuid
+  url                String
+  secret             String
+  events             String[]             @default(dbgenerated("'{mail.received,mail.sent}'::text[]"))
+  is_active          Boolean              @default(true)
+  created_at         DateTime             @default(now()) @db.Timestamptz(6)
+  webhook_deliveries webhook_deliveries[]
+  mailboxes          mailboxes?           @relation(fields: [mailbox_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}

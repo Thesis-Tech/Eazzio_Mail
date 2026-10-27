@@ -14,10 +14,12 @@ export class DsnParser {
    */
   public static parse(bodyText: string, headers: Record<string, string> = {}): ParsedDsnReport {
     const contentType = (headers['content-type'] || '').toLowerCase();
-    const isReport = contentType.includes('multipart/report') || contentType.includes('delivery-status');
-    const isSubjectBounce = /(undelivered|delivery status notification|failure notice|returned mail|mail delivery failed)/i.test(
-      headers['subject'] || '',
-    );
+    const isReport =
+      contentType.includes('multipart/report') || contentType.includes('delivery-status');
+    const isSubjectBounce =
+      /(undelivered|delivery status notification|failure notice|returned mail|mail delivery failed)/i.test(
+        headers['subject'] || '',
+      );
 
     if (!isReport && !isSubjectBounce) {
       return { isBounce: false };
@@ -59,7 +61,9 @@ export class DsnParser {
     }
 
     // 4. Extract Original-Recipient / Final-Recipient
-    const recipientMatch = bodyText.match(/(?:Final-Recipient|Original-Recipient):\s*(?:rfc822;)?\s*([^\s;]+)/i);
+    const recipientMatch = bodyText.match(
+      /(?:Final-Recipient|Original-Recipient):\s*(?:rfc822;)?\s*([^\s;]+)/i,
+    );
     if (recipientMatch && recipientMatch[1]) {
       originalRecipient = recipientMatch[1].trim();
     }

@@ -1,12 +1,14 @@
 import { Router, Response, NextFunction } from 'express';
 import { AuthenticatedRequest, requireAuth } from '../../middleware/auth.js';
 import { AppError } from '../../middleware/error-handler.js';
+import { rateLimit, RateLimitPolicies } from '../../middleware/rate-limiter.js';
 import { defaultDb } from '../../config/index.js';
 import crypto from 'crypto';
 
 export const settingsRouter: Router = Router();
 
 settingsRouter.use(requireAuth);
+settingsRouter.use(rateLimit(RateLimitPolicies.MUTATION_GENERAL));
 
 // Helper to resolve user's mailbox
 async function resolveMailbox(userId: string, email?: string): Promise<{ id: string; address: string }> {
@@ -35,7 +37,7 @@ async function ensurePrefsTable() {
       CREATE TABLE IF NOT EXISTS user_preferences (
         user_id                TEXT PRIMARY KEY,
         density                TEXT NOT NULL DEFAULT 'default',
-        theme                  TEXT NOT NULL DEFAULT 'dark-oled',
+        theme                  TEXT NOT NULL DEFAULT 'eazzio-teal',
         language               TEXT NOT NULL DEFAULT 'en_US',
         page_size              INTEGER NOT NULL DEFAULT 50,
         undo_send_time         INTEGER NOT NULL DEFAULT 10,
@@ -121,7 +123,7 @@ async function ensurePrefsTable() {
 
 const DEFAULT_USER_PREFERENCES = {
   density: 'default',
-  theme: 'dark-oled',
+  theme: 'eazzio-teal',
   language: 'en_US',
   pageSize: 50,
   undoSendTime: 10,
@@ -209,7 +211,7 @@ settingsRouter.get('/preferences', async (req: AuthenticatedRequest, res: Respon
       success: true,
       data: {
         density: row.density || 'default',
-        theme: row.theme || 'dark-oled',
+        theme: row.theme || 'eazzio-teal',
         language: row.language || 'en_US',
         pageSize: Number(row.page_size || 50),
         undoSendTime: Number(row.undo_send_time || 10),
@@ -261,48 +263,55 @@ settingsRouter.put('/preferences', async (req: AuthenticatedRequest, res: Respon
   try {
     await ensurePrefsTable();
     const userId = await resolveEffectiveUserId(req);
-    const {
-      density = 'default',
-      theme = 'dark-oled',
-      language = 'en_US',
-      pageSize = 50,
-      undoSendTime = 10,
-      defaultReplyBehavior = 'reply',
-      hoverActions = true,
-      sendAndArchive = false,
-      inboxType = 'default',
-      readingPane = 'right',
-      conversationView = true,
-      desktopNotifications = 'all',
-      starPreset = '1star',
-      signature = {},
-      autoReply = {},
-      categories = { primary: true, promotions: true, social: true, updates: true, forums: false },
-      importanceMarkers = true,
-      forwardingAddress = '',
-      popEnabled = false,
-      imapEnabled = true,
-      imapExpunge = 'auto',
-      imapFolderLimit = 1000,
-      blockedAddresses = [],
-      notifications = {},
-      spamThreshold = 0.85,
-    } = req.body;
 
-    const signatureText = signature.text || '';
-    const signatureEnabled = Boolean(signature.enabled ?? signatureText.trim().length > 0);
-    const signatureForNew = signature.forNew || 'default';
-    const signatureForReply = signature.forReply || 'default';
+    // Fetch existing preferences if any to support partial updates
+    const existingRows = (await defaultDb.query(
+      `SELECT * FROM user_preferences WHERE user_id = $1 LIMIT 1`,
+      [userId]
+    )) as any[];
+    const existing = existingRows[0] || {};
 
-    const autoReplyEnabled = Boolean(autoReply.enabled);
-    const autoReplySubject = autoReply.subject || '';
-    const autoReplyBody = autoReply.body || '';
-    const autoReplyStartDate = autoReply.startDate ? new Date(autoReply.startDate) : null;
-    const autoReplyEndDate = autoReply.endDate ? new Date(autoReply.endDate) : null;
-    const vacationContactsOnly = Boolean(autoReply.contactsOnly);
+    const density = req.body.density !== undefined ? req.body.density : (existing.density || 'default');
+    const theme = req.body.theme !== undefined ? req.body.theme : (existing.theme || 'eazzio-teal');
+    const language = req.body.language !== undefined ? req.body.language : (existing.language || 'en_US');
+    const pageSize = req.body.pageSize !== undefined ? Number(req.body.pageSize) : Number(existing.page_size || 50);
+    const undoSendTime = req.body.undoSendTime !== undefined ? Number(req.body.undoSendTime) : Number(existing.undo_send_time || 10);
+    const defaultReplyBehavior = req.body.defaultReplyBehavior !== undefined ? req.body.defaultReplyBehavior : (existing.default_reply_behavior || 'reply');
+    const hoverActions = req.body.hoverActions !== undefined ? Boolean(req.body.hoverActions) : (existing.hover_actions ?? true);
+    const sendAndArchive = req.body.sendAndArchive !== undefined ? Boolean(req.body.sendAndArchive) : (existing.send_and_archive ?? false);
+    const inboxType = req.body.inboxType !== undefined ? req.body.inboxType : (existing.inbox_type || 'default');
+    const readingPane = req.body.readingPane !== undefined ? req.body.readingPane : (existing.reading_pane || 'right');
+    const conversationView = req.body.conversationView !== undefined ? Boolean(req.body.conversationView) : (existing.conversation_view ?? true);
+    const desktopNotifications = req.body.desktopNotifications !== undefined ? req.body.desktopNotifications : (existing.desktop_notifications || 'all');
+    const starPreset = req.body.starPreset !== undefined ? req.body.starPreset : (existing.star_preset || '1star');
 
-    const notificationsEnabled = notifications.enabled !== undefined ? Boolean(notifications.enabled) : true;
-    const soundEnabled = notifications.sound !== undefined ? Boolean(notifications.sound) : true;
+    const signature = req.body.signature || {};
+    const signatureText = signature.text !== undefined ? signature.text : (existing.signature_text || '');
+    const signatureEnabled = signature.enabled !== undefined ? Boolean(signature.enabled) : Boolean(existing.signature_enabled ?? signatureText.trim().length > 0);
+    const signatureForNew = signature.forNew !== undefined ? signature.forNew : (existing.signature_for_new || 'default');
+    const signatureForReply = signature.forReply !== undefined ? signature.forReply : (existing.signature_for_reply || 'default');
+
+    const autoReply = req.body.autoReply || {};
+    const autoReplyEnabled = autoReply.enabled !== undefined ? Boolean(autoReply.enabled) : Boolean(existing.auto_reply_enabled);
+    const autoReplySubject = autoReply.subject !== undefined ? autoReply.subject : (existing.auto_reply_subject || '');
+    const autoReplyBody = autoReply.body !== undefined ? autoReply.body : (existing.auto_reply_body || '');
+    const autoReplyStartDate = autoReply.startDate !== undefined ? (autoReply.startDate ? new Date(autoReply.startDate) : null) : existing.auto_reply_start_date;
+    const autoReplyEndDate = autoReply.endDate !== undefined ? (autoReply.endDate ? new Date(autoReply.endDate) : null) : existing.auto_reply_end_date;
+    const vacationContactsOnly = autoReply.contactsOnly !== undefined ? Boolean(autoReply.contactsOnly) : Boolean(existing.vacation_contacts_only);
+
+    const categories = req.body.categories !== undefined ? req.body.categories : (existing.categories || { primary: true, promotions: true, social: true, updates: true, forums: false });
+    const importanceMarkers = req.body.importanceMarkers !== undefined ? Boolean(req.body.importanceMarkers) : (existing.importance_markers ?? true);
+    const forwardingAddress = req.body.forwardingAddress !== undefined ? req.body.forwardingAddress : (existing.forwarding_address || '');
+    const popEnabled = req.body.popEnabled !== undefined ? Boolean(req.body.popEnabled) : Boolean(existing.pop_enabled);
+    const imapEnabled = req.body.imapEnabled !== undefined ? Boolean(req.body.imapEnabled) : (existing.imap_enabled ?? true);
+    const imapExpunge = req.body.imapExpunge !== undefined ? req.body.imapExpunge : (existing.imap_expunge || 'auto');
+    const imapFolderLimit = req.body.imapFolderLimit !== undefined ? Number(req.body.imapFolderLimit) : Number(existing.imap_folder_limit || 1000);
+    const blockedAddresses = req.body.blockedAddresses !== undefined ? req.body.blockedAddresses : (existing.blocked_addresses || []);
+
+    const notifications = req.body.notifications || {};
+    const notificationsEnabled = notifications.enabled !== undefined ? Boolean(notifications.enabled) : (existing.notifications_enabled ?? true);
+    const soundEnabled = notifications.sound !== undefined ? Boolean(notifications.sound) : (existing.sound_enabled ?? true);
+    const spamThreshold = req.body.spamThreshold !== undefined ? Number(req.body.spamThreshold) : Number(existing.spam_threshold || 0.85);
 
     await defaultDb.query(
       `INSERT INTO user_preferences (
@@ -357,7 +366,7 @@ settingsRouter.put('/preferences', async (req: AuthenticatedRequest, res: Respon
         forwarding_address = EXCLUDED.forwarding_address,
         pop_enabled = EXCLUDED.pop_enabled,
         imap_enabled = EXCLUDED.imap_enabled,
-        imapExpunge = EXCLUDED.imap_expunge,
+        imap_expunge = EXCLUDED.imap_expunge,
         imap_folder_limit = EXCLUDED.imap_folder_limit,
         blocked_addresses = EXCLUDED.blocked_addresses,
         notifications_enabled = EXCLUDED.notifications_enabled,
@@ -406,15 +415,52 @@ settingsRouter.put('/preferences', async (req: AuthenticatedRequest, res: Respon
     res.json({
       success: true,
       message: 'Preferences saved successfully',
-      data: req.body,
+      data: {
+        density,
+        theme,
+        language,
+        pageSize,
+        undoSendTime,
+        defaultReplyBehavior,
+        hoverActions,
+        sendAndArchive,
+        inboxType,
+        readingPane,
+        conversationView,
+        desktopNotifications,
+        starPreset,
+        signature: {
+          text: signatureText,
+          enabled: signatureEnabled,
+          forNew: signatureForNew,
+          forReply: signatureForReply,
+        },
+        autoReply: {
+          enabled: autoReplyEnabled,
+          subject: autoReplySubject,
+          body: autoReplyBody,
+          startDate: autoReplyStartDate,
+          endDate: autoReplyEndDate,
+          contactsOnly: vacationContactsOnly,
+        },
+        categories,
+        importanceMarkers,
+        forwardingAddress,
+        popEnabled,
+        imapEnabled,
+        imapExpunge,
+        imapFolderLimit,
+        blockedAddresses,
+        notifications: {
+          enabled: notificationsEnabled,
+          sound: soundEnabled,
+        },
+        spamThreshold,
+      },
     });
   } catch (err) {
-    console.error('Preferences PUT fallback:', err);
-    res.json({
-      success: true,
-      message: 'Preferences saved',
-      data: req.body,
-    });
+    console.error('Failed to save preferences:', err);
+    res.status(500).json({ success: false, error: 'Internal Server Error' });
   }
 });
 

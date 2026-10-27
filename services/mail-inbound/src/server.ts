@@ -17,7 +17,8 @@ import { ClamAVScanner } from './security/clamav-scanner.js';
 
 const PORT = Number(process.env.LMTP_PORT || process.env.PORT || 2424);
 const HOST = process.env.HOST || '0.0.0.0';
-const DATABASE_URL = process.env.DATABASE_URL || 'postgresql://eazzio_user:eazzio_password@localhost:5432/eazzio_mail';
+const DATABASE_URL =
+  process.env.DATABASE_URL || 'postgresql://eazzio_user:eazzio_password@localhost:5432/eazzio_mail';
 const RSPAMD_URL = process.env.RSPAMD_URL || 'http://localhost:11333';
 const CLAMAV_HOST = process.env.CLAMAV_HOST || 'localhost';
 const CLAMAV_PORT = Number(process.env.CLAMAV_PORT || 3310);
@@ -102,7 +103,9 @@ export function createLmtpServer(customPipeline?: InboundPipeline): net.Server {
               }
             } else {
               for (let i = 0; i < envelopeTo.length; i++) {
-                socket.write(`250 2.1.5 <${envelopeTo[i]}> Message accepted (${result.messageId})\r\n`);
+                socket.write(
+                  `250 2.1.5 <${envelopeTo[i]}> Message accepted (${result.messageId})\r\n`,
+                );
               }
             }
           } catch (err: any) {
@@ -122,7 +125,10 @@ export function createLmtpServer(customPipeline?: InboundPipeline): net.Server {
       lineBuffer += chunk.toString('utf-8');
       let lineEnd: number;
 
-      while ((lineEnd = lineBuffer.indexOf('\r\n')) !== -1 || (lineEnd = lineBuffer.indexOf('\n')) !== -1) {
+      while (
+        (lineEnd = lineBuffer.indexOf('\r\n')) !== -1 ||
+        (lineEnd = lineBuffer.indexOf('\n')) !== -1
+      ) {
         const line = lineBuffer.substring(0, lineEnd).trim();
         lineBuffer = lineBuffer.substring(lineEnd + (lineBuffer.charAt(lineEnd) === '\r' ? 2 : 1));
 
