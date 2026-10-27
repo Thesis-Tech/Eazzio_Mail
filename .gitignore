@@ -49,3 +49,5 @@ scanned_pages/
 
 
 
+.vercel
+.env*

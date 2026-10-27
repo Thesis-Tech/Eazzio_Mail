@@ -73,6 +73,7 @@ export async function POST(req: Request) {
     OtpStore.setOtp(cleanTarget, generatedOtp, activeChannel, 300); // 5 minutes TTL
 
     let dispatchNotice = '';
+    let devCode: string | undefined = undefined;
 
     if (activeChannel === 'whatsapp') {
       const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
@@ -84,7 +85,7 @@ export async function POST(req: Request) {
       if (accessToken && phoneNumberId) {
         try {
           const metaUrl = `https://graph.facebook.com/v21.0/${phoneNumberId}/messages`;
-          await fetch(metaUrl, {
+          const metaRes = await fetch(metaUrl, {
             method: 'POST',
             headers: {
               Authorization: `Bearer ${accessToken}`,
@@ -101,9 +102,15 @@ export async function POST(req: Request) {
               },
             }),
           });
+          if (!metaRes.ok) {
+            const errJson = await metaRes.json().catch(() => ({}));
+            console.error('[WhatsApp Cloud API Error]', errJson);
+          }
         } catch (err) {
           console.warn('[WhatsApp Cloud Gateway Warning]', err);
         }
+      } else {
+        devCode = generatedOtp;
       }
       console.log(`[Eazzio Security] WhatsApp OTP for ${cleanTarget}: ${generatedOtp}`);
       dispatchNotice = `6-digit verification code sent to WhatsApp (${cleanTarget})`;
@@ -189,6 +196,7 @@ export async function POST(req: Request) {
       target: cleanTarget,
       message: dispatchNotice,
       cooldownSeconds: 60,
+      devCode,
     });
 
   } catch (err: unknown) {
