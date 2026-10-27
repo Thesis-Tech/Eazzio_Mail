@@ -2,6 +2,7 @@
   "name": "eazzio-mail-monorepo",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@11.22.0",
   "scripts": {
     "build": "pnpm --recursive run build",
     "lint": "npx prettier --check .",
