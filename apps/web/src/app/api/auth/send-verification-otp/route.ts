@@ -18,7 +18,7 @@ export async function POST(req: Request) {
   try {
     const { target, channel, email: accountEmail } = (await req.json()) as {
       target?: string;
-      channel?: 'email' | 'telegram' | 'whatsapp';
+      channel?: 'email' | 'telegram';
       email?: string;
     };
 
@@ -30,18 +30,7 @@ export async function POST(req: Request) {
     }
 
     const rawTarget = (target || accountEmail || '').trim();
-    const activeChannel = channel || (rawTarget.includes('@') ? 'email' : 'whatsapp');
-
-    // WhatsApp is disabled by default
-    if (activeChannel === 'whatsapp') {
-      return NextResponse.json(
-        {
-          error:
-            'WhatsApp verification is currently disabled. Please use Recovery Email or Telegram Bot.',
-        },
-        { status: 400 }
-      );
-    }
+    const activeChannel = channel || (rawTarget.includes('@') ? 'email' : 'telegram');
 
     // 1. Resolve Delivery Target & Security Linkage
     let resolvedEmail = '';

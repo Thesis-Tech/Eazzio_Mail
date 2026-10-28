@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import crypto from 'crypto';
 
 /**
- * Better Auth & Eazzio Modernized Authentication Security Suite
+ * Supabase Auth & Eazzio Modernized Authentication Security Suite
  * Covers requirements 1 - 20:
  * 1. Successful registration
  * 2. Email verification
@@ -26,7 +26,7 @@ import crypto from 'crypto';
  * 20. Recovery email change verification
  */
 
-describe('Better Auth & Eazzio Security Engine', () => {
+describe('Supabase Auth & Eazzio Security Engine', () => {
   // In-memory mock database simulating Neon PostgreSQL `verification` table
   let dbVerificationTable: Map<string, { id: string; identifier: string; value: string; expiresAt: Date; createdAt: Date }>;
   let dbUserTable: Map<string, any>;

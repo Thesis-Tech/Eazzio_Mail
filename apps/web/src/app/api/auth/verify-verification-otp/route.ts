@@ -16,7 +16,7 @@ export async function POST(req: Request) {
     const { target, code, channel, email: accountEmail } = (await req.json()) as {
       target?: string;
       code?: string;
-      channel?: 'email' | 'telegram' | 'whatsapp';
+      channel?: 'email' | 'telegram';
       email?: string;
     };
 
@@ -36,7 +36,7 @@ export async function POST(req: Request) {
     }
 
     const rawTarget = (target || accountEmail || '').trim();
-    const activeChannel = channel || (rawTarget.includes('@') ? 'email' : 'whatsapp');
+    const activeChannel = channel || (rawTarget.includes('@') ? 'email' : 'telegram');
 
     // 1. Resolve Identifier Key
     let identifierKey = '';

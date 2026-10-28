@@ -17,10 +17,9 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import { AuthStore } from '../../lib/auth-store';
-import { loginWithFacebook } from '../../components/auth/FacebookSdk';
 
 type RegisterStep = 'name' | 'username' | 'password' | 'verify';
-type VerificationChannel = 'whatsapp' | 'telegram' | 'email';
+type VerificationChannel = 'email' | 'telegram';
 
 const COUNTRY_CODES = [
   { code: '+91', country: 'IN', label: 'India (+91)' },
@@ -249,30 +248,6 @@ export default function RegisterPage() {
     }
   };
 
-  // Social Login: Facebook OAuth Handler
-  const handleFacebookAuth = async () => {
-    setIsLoading(true);
-    setErrorMessage(null);
-
-    try {
-      const fbUser = await loginWithFacebook();
-      AuthStore.setSession(
-        {
-          id: fbUser.id,
-          email: fbUser.email,
-          displayName: fbUser.name,
-          role: 'user',
-        },
-        `fb_token_${Date.now()}`
-      );
-      router.push('/mail');
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Facebook registration was not completed.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-[#0F172A] flex flex-col justify-between items-center py-10 px-4 sm:px-6 lg:px-8 selection:bg-[#14B8A6]/20 selection:text-[#0F172A]">
       {/* Centered Brand Header */}
@@ -392,27 +367,6 @@ export default function RegisterPage() {
                 </button>
               </div>
             </form>
-
-            <div className="relative py-2">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-[#E2E8F0]" />
-              </div>
-              <div className="relative flex justify-center text-xs">
-                <span className="bg-white px-3 text-[#64748B] font-medium">Or continue with</span>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={handleFacebookAuth}
-              disabled={isLoading}
-              className="w-full bg-white hover:bg-[#F8FAFC] border border-[#CBD5E1] hover:border-[#94A3B8] rounded-[10px] py-2.5 px-4 text-xs font-semibold text-[#0F172A] flex items-center justify-center gap-2.5 shadow-sm transition-all focus-visible:ring-2 focus-visible:ring-[#14B8A6] focus-visible:outline-none"
-            >
-              <svg className="w-4 h-4 fill-[#1877F2]" viewBox="0 0 24 24">
-                <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
-              </svg>
-              <span>Continue with Facebook</span>
-            </button>
           </div>
         )}
 
@@ -579,7 +533,7 @@ export default function RegisterPage() {
             </div>
 
             {/* Verification Channel Selector Pills */}
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={() => {
@@ -595,25 +549,7 @@ export default function RegisterPage() {
                 }`}
               >
                 <Mail className={`w-4 h-4 ${verificationChannel === 'email' ? 'text-[#14B8A6]' : ''}`} />
-                <span>Email</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setVerificationChannel('whatsapp');
-                  setOtpSent(false);
-                  setErrorMessage(null);
-                  setSuccessNotice(null);
-                }}
-                className={`p-2.5 rounded-[10px] border flex flex-col items-center justify-center gap-1 transition-all text-xs font-semibold ${
-                  verificationChannel === 'whatsapp'
-                    ? 'border-[#25D366] bg-[#25D366]/10 text-[#0F172A] shadow-sm'
-                    : 'border-[#E2E8F0] bg-white text-[#64748B] hover:border-[#CBD5E1] hover:text-[#0F172A]'
-                }`}
-              >
-                <MessageSquare className={`w-4 h-4 ${verificationChannel === 'whatsapp' ? 'text-[#25D366]' : ''}`} />
-                <span>WhatsApp</span>
+                <span>Email OTP (Free)</span>
               </button>
 
               <button
@@ -631,7 +567,7 @@ export default function RegisterPage() {
                 }`}
               >
                 <Send className={`w-4 h-4 ${verificationChannel === 'telegram' ? 'text-[#229ED9]' : ''}`} />
-                <span>Telegram</span>
+                <span>Telegram Bot (Free)</span>
               </button>
             </div>
 
@@ -657,7 +593,7 @@ export default function RegisterPage() {
               ) : (
                 <div className="space-y-1.5">
                   <label htmlFor="reg-phone-input" className="block text-xs font-semibold text-[#0F172A]">
-                    {verificationChannel === 'whatsapp' ? 'WhatsApp Phone Number' : 'Telegram Phone Number'}
+                    Telegram Phone Number or Linked Chat ID
                   </label>
                   <div className="flex gap-2">
                     <select
@@ -745,7 +681,7 @@ export default function RegisterPage() {
                     autoFocus
                   />
                   <p className="text-[11px] text-[#64748B] text-center">
-                    Enter the 6-digit code received via {verificationChannel === 'whatsapp' ? 'WhatsApp' : verificationChannel === 'telegram' ? 'Telegram' : 'Email'}.
+                    Enter the 6-digit code received via {verificationChannel === 'telegram' ? 'Telegram Bot' : 'Email'}.
                   </p>
                 </div>
 

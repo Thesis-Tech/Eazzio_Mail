@@ -17,7 +17,6 @@ import {
   ChevronDown,
 } from 'lucide-react';
 import { AuthStore, IdentifyResult } from '../../lib/auth-store';
-import { loginWithFacebook } from '../../components/auth/FacebookSdk';
 
 type LoginStep =
   | 'identifier'
@@ -217,30 +216,6 @@ export default function LoginPage() {
     }
   };
 
-  // Social Login: Facebook OAuth Handler with Graceful Fallback
-  const handleFacebookAuth = async () => {
-    setIsLoading(true);
-    setErrorMessage(null);
-
-    try {
-      const fbUser = await loginWithFacebook();
-      AuthStore.setSession(
-        {
-          id: fbUser.id,
-          email: fbUser.email,
-          displayName: fbUser.name,
-          role: 'user',
-        },
-        `fb_token_${Date.now()}`
-      );
-      router.push('/mail');
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Facebook login was not completed. Please use email and password.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-[#0F172A] flex flex-col justify-between items-center py-10 px-4 sm:px-6 lg:px-8 selection:bg-[#14B8A6]/20 selection:text-[#0F172A]">
       {/* Centered Brand Header */}
@@ -316,27 +291,6 @@ export default function LoginPage() {
               >
                 <span>{isLoading ? 'Verifying identity...' : 'Next'}</span>
                 {!isLoading && <ArrowRight className="w-4 h-4" />}
-              </button>
-
-              {/* Divider */}
-              <div className="relative my-4 flex items-center justify-center">
-                <div className="border-t border-[#E2E8F0] w-full" />
-                <span className="bg-white px-3 text-xs text-[#64748B] uppercase tracking-wider font-medium shrink-0">
-                  or
-                </span>
-              </div>
-
-              {/* Social Login: Facebook Button */}
-              <button
-                type="button"
-                onClick={handleFacebookAuth}
-                disabled={isLoading}
-                className="w-full py-2.5 px-4 rounded-[10px] bg-white hover:bg-[#F8FAFC] active:scale-[0.99] border border-[#CBD5E1] text-[#334155] hover:text-[#0F172A] font-medium text-xs shadow-sm transition-all flex items-center justify-center gap-2.5 focus-visible:ring-2 focus-visible:ring-[#14B8A6] focus-visible:outline-none"
-              >
-                <svg className="w-4 h-4 text-[#1877F2]" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
-                </svg>
-                <span>Continue with Facebook</span>
               </button>
 
               {/* Bottom Registration Link */}

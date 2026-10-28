@@ -2,7 +2,7 @@ interface OtpRecord {
   code: string;
   expiresAt: number;
   attempts: number;
-  channel: 'whatsapp' | 'telegram' | 'email';
+  channel: 'telegram' | 'email';
 }
 
 const globalOtpCache = new Map<string, OtpRecord>();
@@ -19,7 +19,7 @@ export class OtpStore {
   public static setOtp(
     target: string,
     code: string,
-    channel: 'whatsapp' | 'telegram' | 'email' = 'whatsapp',
+    channel: 'telegram' | 'email' = 'email',
     ttlSeconds = 300
   ): void {
     const key = this.normalizeTarget(target);

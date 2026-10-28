@@ -17,7 +17,7 @@ import {
 import { AuthStore } from '../../lib/auth-store';
 
 type RecoveryStep = 'identifier' | 'channel' | 'code' | 'newPassword' | 'success';
-type RecoveryChannel = 'email' | 'telegram' | 'whatsapp';
+type RecoveryChannel = 'email' | 'telegram';
 
 const COUNTRY_CODES = [
   { code: '+91', country: 'IN', label: 'India (+91)' },
@@ -139,7 +139,7 @@ export default function ForgotPasswordPage() {
     }
   };
 
-  const channelLabel = channel === 'email' ? 'recovery email' : channel === 'telegram' ? 'Telegram' : 'WhatsApp';
+  const channelLabel = channel === 'email' ? 'recovery email' : 'Telegram Bot';
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-[#0F172A] flex flex-col justify-between items-center py-10 px-4 sm:px-6 lg:px-8 selection:bg-[#14B8A6]/20 selection:text-[#0F172A]">
@@ -232,11 +232,10 @@ export default function ForgotPasswordPage() {
             )}
 
             {/* Channel Tabs */}
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               {([
-                { key: 'email' as RecoveryChannel, icon: Mail, label: 'Email' },
-                { key: 'whatsapp' as RecoveryChannel, icon: MessageSquare, label: 'WhatsApp' },
-                { key: 'telegram' as RecoveryChannel, icon: Send, label: 'Telegram' },
+                { key: 'email' as RecoveryChannel, icon: Mail, label: 'Email (Free)' },
+                { key: 'telegram' as RecoveryChannel, icon: Send, label: 'Telegram Bot (Free)' },
               ]).map(({ key, icon: Icon, label }) => (
                 <button
                   key={key}
@@ -274,11 +273,11 @@ export default function ForgotPasswordPage() {
                 </div>
               )}
 
-              {/* Phone Input for WhatsApp/Telegram */}
-              {(channel === 'whatsapp' || channel === 'telegram') && (
+              {/* Phone Input for Telegram */}
+              {channel === 'telegram' && (
                 <div className="space-y-1.5">
                   <label htmlFor="recovery-phone" className="block text-xs font-semibold text-[#0F172A]">
-                    {channel === 'telegram' ? 'Phone Number or @Username' : 'WhatsApp Phone Number'}
+                    Telegram Phone Number or @Username
                   </label>
                   <div className="flex gap-2">
                     {/* Country Code Selector */}
@@ -319,9 +318,7 @@ export default function ForgotPasswordPage() {
                     />
                   </div>
                   <p className="text-[11px] text-[#94A3B8]">
-                    {channel === 'telegram'
-                      ? 'Make sure you have started @eazzioMailOtp_bot on Telegram first.'
-                      : 'The reset code will be sent to this WhatsApp number.'}
+                    Make sure you have started @eazzioMailOtp_bot on Telegram first.
                   </p>
                 </div>
               )}

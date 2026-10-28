@@ -261,9 +261,10 @@ export async function POST(req: Request) {
       // Success: Invalidate OTP record immediately
       await prisma.verification.delete({ where: { id: record.id } });
 
-      // Hash password using Better Auth's official password hashing
-      const { hashPassword } = await import('better-auth/crypto');
-      const newHash = await hashPassword(newPassword);
+      // Hash password securely using Node crypto scrypt
+      const salt = crypto.randomBytes(16).toString('hex');
+      const derivedKey = crypto.scryptSync(newPassword, salt, 64).toString('hex');
+      const newHash = `${salt}:${derivedKey}`;
 
       // Update password in Better Auth Account table
       await prisma.account.upsert({
