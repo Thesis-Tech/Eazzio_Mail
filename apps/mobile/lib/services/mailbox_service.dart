@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../config/app_env.dart';
 import '../models/thread_model.dart';
 import '../models/message_model.dart';
 
@@ -8,9 +9,9 @@ class MailboxService {
   final String? token;
 
   MailboxService({
-    this.baseUrl = 'http://10.0.2.2:8080',
+    String? baseUrl,
     this.token,
-  });
+  }) : baseUrl = baseUrl ?? AppEnv.apiBaseUrl;
 
   Map<String, String> get _headers => {
         'Content-Type': 'application/json',
@@ -24,7 +25,7 @@ class MailboxService {
   }) async {
     try {
       final res = await http.get(
-        Uri.parse('$baseUrl/v1/mailboxes/$mailboxId/threads?folder=$folderKind&limit=$limit'),
+        Uri.parse('$baseUrl/api/v1/mailboxes/$mailboxId/threads?folder=$folderKind&limit=$limit'),
         headers: _headers,
       );
 
@@ -45,7 +46,7 @@ class MailboxService {
   }) async {
     try {
       final res = await http.get(
-        Uri.parse('$baseUrl/v1/mailboxes/$mailboxId/threads/$threadId/messages'),
+        Uri.parse('$baseUrl/api/v1/mailboxes/$mailboxId/threads/$threadId/messages'),
         headers: _headers,
       );
 
@@ -68,7 +69,7 @@ class MailboxService {
   }) async {
     try {
       final res = await http.post(
-        Uri.parse('$baseUrl/v1/messages/compose'),
+        Uri.parse('$baseUrl/api/messages/compose'),
         headers: _headers,
         body: jsonEncode({
           'to': to,
@@ -91,7 +92,7 @@ class MailboxService {
   }) async {
     try {
       final res = await http.patch(
-        Uri.parse('$baseUrl/v1/mailboxes/$mailboxId/threads/$threadId'),
+        Uri.parse('$baseUrl/api/v1/mailboxes/$mailboxId/threads/$threadId'),
         headers: _headers,
         body: jsonEncode({
           if (isRead != null) 'isRead': isRead,
@@ -111,7 +112,7 @@ class MailboxService {
   }) async {
     try {
       final res = await http.post(
-        Uri.parse('$baseUrl/v1/mailboxes/$mailboxId/threads/$threadId/move'),
+        Uri.parse('$baseUrl/api/v1/mailboxes/$mailboxId/threads/$threadId/move'),
         headers: _headers,
         body: jsonEncode({'targetFolder': targetFolder}),
       );
@@ -119,5 +120,34 @@ class MailboxService {
     } catch (_) {
       return false;
     }
+  }
+
+  Future<bool> snoozeThread({
+    required String messageId,
+    required String snoozeUntil,
+  }) async {
+    try {
+      final res = await http.post(
+        Uri.parse('$baseUrl/api/messages/$messageId/snooze'),
+        headers: _headers,
+        body: jsonEncode({'snoozeUntil': snoozeUntil}),
+      );
+      return res.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<Map<String, dynamic>?> fetchStorageQuota() async {
+    try {
+      final res = await http.get(
+        Uri.parse('$baseUrl/api/storage/quota'),
+        headers: _headers,
+      );
+      if (res.statusCode == 200) {
+        return jsonDecode(res.body) as Map<String, dynamic>;
+      }
+    } catch (_) {}
+    return null;
   }
 }
